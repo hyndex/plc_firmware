@@ -1,0 +1,14 @@
+# PlatformIO build output
+.pio/
+
+# Runtime logs and captures
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo
