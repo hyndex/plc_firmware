@@ -1,0 +1,334 @@
+2026-03-06T15:07:19.179 [SERCTRL] RESET done
+2026-03-06T15:07:19.182 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=0 auth=0 allow_slac=0 allow_energy=0 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=1
+2026-03-06T15:07:19.251 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:19.254 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=53635 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:19.582 [CTRL] waiting SLAC start auth (hb=0 armed=0 start=0)
+2026-03-06T15:07:20.272 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:20.275 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=54656 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:21.295 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:21.297 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=55678 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:21.390 [SERCTRL] SLAC cmd=0 arm_ms=3000
+2026-03-06T15:07:21.391 [SERCTRL] AUTH state=0 ttl_ms=3000
+2026-03-06T15:07:21.392 [SERCTRL] ALLOC ABORT
+2026-03-06T15:07:21.394 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=0 auth=0 allow_slac=0 allow_energy=0 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=1
+2026-03-06T15:07:21.394 [CTRLRX] SLAC disarm seq=1
+2026-03-06T15:07:21.587 [CTRL] waiting SLAC start auth (hb=0 armed=0 start=0)
+2026-03-06T15:07:21.975 [SERCTRL] MODE standalone=1 plc_id=1 controller_id=1 (use CTRL SAVE then reboot)
+2026-03-06T15:07:21.978 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=1
+2026-03-06T15:07:21.985 [SLAC] session start
+2026-03-06T15:07:21.987 [FSM] Reset -> Idle
+2026-03-06T15:07:21.987 [FSM] EnterBCD
+2026-03-06T15:07:22.012 [FSM] Idle -> WaitForMatchingStart
+2026-03-06T15:07:22.321 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:22.323 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=56704 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:22.384 [CFG] saved to NVS
+2026-03-06T15:07:22.385 [SERCTRL] SAVE OK
+2026-03-06T15:07:22.387 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:22.389 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:23.338 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:23.340 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=57721 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:24.376 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:24.378 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=58759 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:25.418 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:25.420 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=59801 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:26.448 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:26.450 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=60831 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:27.382 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:27.496 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:27.498 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=61879 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:28.526 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:28.528 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=62909 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:29.571 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:29.576 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=63951 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:30.606 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:30.608 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=64989 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:31.646 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:31.648 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=66029 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:32.403 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:32.688 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:32.690 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=67071 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:33.726 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:33.728 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=68109 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:34.760 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:34.766 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=69138 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:35.791 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:35.797 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=70170 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:36.827 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:36.829 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=71210 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:37.410 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:37.856 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:37.858 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=72239 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:38.889 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:38.891 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=73272 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:39.946 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:39.948 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=74329 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:40.990 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:40.996 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=75369 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:42.029 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:42.031 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=76412 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:42.442 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:43.069 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:43.071 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=77452 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:44.097 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:44.099 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=78480 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:45.144 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:45.146 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=79527 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:46.193 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:46.195 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=80576 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:47.220 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:47.222 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=81603 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:47.425 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:48.273 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:48.275 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=82656 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:49.310 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:49.312 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=83693 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:50.346 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:50.348 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=84729 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:51.387 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:51.389 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=85770 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:52.418 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:52.424 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=86797 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:52.442 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:53.452 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:53.454 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=87835 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:54.496 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:54.498 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=88879 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:55.523 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:55.525 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=89906 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:56.562 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:56.564 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=90945 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:57.447 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:07:57.608 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:57.610 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=91991 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:58.635 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:58.637 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=93018 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:07:59.672 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:07:59.674 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=94055 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:00.700 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:00.702 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=95083 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:01.729 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:01.731 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=96112 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:01.994 [FSM] WaitForMatchingStart -> SignalError
+2026-03-06T15:08:02.029 [FSM] SignalError -> WaitForMatchingStart
+2026-03-06T15:08:02.466 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:02.768 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:02.770 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=97151 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:03.809 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:03.811 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=98192 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:04.849 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:04.851 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=99232 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:05.889 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:05.891 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=100272 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:06.918 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:06.920 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=101301 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:07.486 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:07.958 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:07.960 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=102341 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:08.990 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:08.997 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=103369 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:10.029 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:10.037 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=104408 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:11.074 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:11.076 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=105457 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:12.112 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:12.114 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=106495 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:12.495 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:13.152 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:13.154 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=107535 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:14.183 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:14.234 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=
+2026-03-06T15:08:15.202 0 online=0 fresh=0 ageMs=108566 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:15.204 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:15.206 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=109586 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:16.242 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:16.244 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=110625 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:17.283 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:17.286 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=111666 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:17.526 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:18.321 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:18.323 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=112704 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:19.359 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:19.361 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=113742 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:20.390 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:20.393 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=114773 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:21.441 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:21.447 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=115820 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:22.465 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:22.477 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=116848 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:22.497 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:23.507 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:23.509 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=117890 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:24.547 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:24.549 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=118930 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:25.576 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:25.578 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=119959 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:26.632 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:26.638 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=121012 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:27.513 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:27.673 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:27.679 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=122053 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:28.701 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:28.708 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=123080 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:29.728 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:29.730 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=124111 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:30.765 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:30.767 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=125148 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:31.803 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:31.805 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=126186 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:32.527 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:32.845 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:32.847 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=127228 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:33.871 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:33.873 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=128254 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:34.908 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:34.910 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=129291 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:35.950 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:35.952 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=130333 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:36.987 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:36.989 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=131370 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:37.541 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:38.009 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:38.011 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=132392 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:39.052 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:39.054 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=133435 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:40.080 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:40.082 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=134463 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:41.117 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:41.119 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=135500 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:42.046 [FSM] WaitForMatchingStart -> SignalError
+2026-03-06T15:08:42.098 [FSM] SignalError -> WaitForMatchingStart
+2026-03-06T15:08:42.147 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:42.149 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=136530 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:42.546 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:43.179 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:43.181 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=137562 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:44.218 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:44.220 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=138601 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:45.245 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:45.247 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=139628 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:46.288 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:46.290 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=140671 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:47.314 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:47.316 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=141697 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:47.566 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:48.352 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:48.354 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=142735 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:49.395 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:49.397 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=143778 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:50.422 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:50.424 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=144805 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:51.452 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:51.454 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=145835 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:52.484 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:52.486 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=146867 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:52.567 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:53.525 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:53.527 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=147908 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:54.552 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:54.554 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=148935 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:55.607 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:55.610 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=149990 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:56.637 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:56.639 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=151020 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:57.585 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:08:57.676 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:57.678 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=152059 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:58.718 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:58.720 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=153101 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:08:59.747 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:08:59.749 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=154130 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:00.785 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:00.787 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=155168 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:01.824 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:01.826 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=156207 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:02.594 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:02.879 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:02.881 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=157262 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:03.927 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:03.929 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=158310 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:04.965 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:04.967 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=159348 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:05.993 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:05.996 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=160376 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:07.030 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:07.033 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=161413 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:07.603 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:08.060 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:08.063 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=162443 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:09.112 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:09.115 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=163495 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:10.140 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:10.142 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=164523 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:11.183 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:11.186 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=165564 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:12.230 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:12.236 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=166608 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:12.626 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:13.264 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:13.266 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=167647 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:14.306 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:14.309 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=168689 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:15.349 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:15.351 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=169732 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:16.386 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:16.388 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=170769 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:17.397 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:17.404 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=171776 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:17.627 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:18.448 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:18.451 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=172831 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:19.475 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:19.478 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=173858 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:20.489 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:20.492 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=174872 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:21.532 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:21.534 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=175915 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:22.163 [FSM] WaitForMatchingStart -> SignalError
+2026-03-06T15:09:22.164 [FSM] SignalError -> WaitForMatchingStart
+2026-03-06T15:09:22.557 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:22.559 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=176940 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:22.644 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:23.586 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:23.588 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=177969 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:24.630 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:24.632 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=179013 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:25.656 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:25.659 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=180039 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:26.704 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:26.707 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=181087 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:27.642 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:27.741 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:27.743 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=182124 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:28.774 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:28.782 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=183153 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:29.798 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:29.801 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=184181 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:30.841 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:30.844 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=185224 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:31.846 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:31.849 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=186229 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:32.653 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:32.895 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:32.898 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=187278 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:33.922 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:33.925 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=188305 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:34.953 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:34.956 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=189336 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:35.990 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:35.993 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=190373 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:37.026 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:37.028 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=191409 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:37.667 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:38.068 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:38.071 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=192451 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:39.104 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:39.107 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=193487 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:40.154 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:40.156 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=194537 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:41.186 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:41.188 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=195569 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:42.213 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:42.215 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=196595 V=500.4 I=0.00 alarm=0x00000000
+2026-03-06T15:09:42.684 [SERCTRL] STATUS standalone=1 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=1 allow_energy=1 alloc_sz=0 stop_active=0 stop_hard=0 stop_done=0
+2026-03-06T15:09:43.251 [MODRT][GRP] valid=1 en=0 assigned=0 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=0.0 cmbI=0.00 availI=0.0
+2026-03-06T15:09:43.254 [MODRT][MOD] id=MXR_1 lc=Validated grp= lease=0 iso=0 off=0 fault=0 online=0 fresh=0 ageMs=197634 V=500.4 I=0.00 alarm=0x00000000

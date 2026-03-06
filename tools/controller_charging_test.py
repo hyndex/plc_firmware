@@ -86,6 +86,7 @@ class ControllerChargingRunner:
         heartbeat_ms: int,
         auth_ttl_ms: int,
         arm_ms: int,
+        mode: str,
         log_file: str,
     ) -> None:
         self.port = port
@@ -96,6 +97,9 @@ class ControllerChargingRunner:
         self.heartbeat_timeout_ms = max(3000, self.heartbeat_ms * 8)
         self.auth_ttl_ms = max(1000, auth_ttl_ms)
         self.arm_ms = max(2000, arm_ms)
+        self.mode = mode.lower().strip()
+        if self.mode not in ("controller", "standalone"):
+            self.mode = "controller"
         self.log_file = log_file
 
         self.ser: Optional[serial.Serial] = None
@@ -286,7 +290,16 @@ class ControllerChargingRunner:
         self._write_cmd("CTRL STATUS")
         time.sleep(0.6)
 
-        # runtime mode must be controller-dependent
+        if self.mode == "standalone":
+            # Standalone mode: no external controller driving auth/SLAC.
+            self._write_cmd("CTRL MODE 1 1 1")
+            self._write_cmd("CTRL STATUS")
+            time.sleep(0.4)
+            self._write_cmd("CTRL SAVE")
+            self._write_cmd("CTRL STATUS")
+            return
+
+        # Controller-dependent mode.
         self._write_cmd("CTRL MODE 0 1 1")
         self._write_cmd(f"CTRL HB {self.heartbeat_timeout_ms}")
         self._write_cmd("CTRL STATUS")
@@ -337,10 +350,17 @@ class ControllerChargingRunner:
                 self._write_cmd(f"CTRL AUTH pending {self.auth_ttl_ms}")
             self._last_auth = now
 
+    def _tick_standalone(self) -> None:
+        now = time.time()
+        if now - self._last_status >= 5.0:
+            self._write_cmd("CTRL STATUS")
+            self._last_status = now
+
     def _request_stop(self) -> None:
         self._write_cmd("CTRL STOP hard 3000")
-        self._write_cmd(f"CTRL AUTH deny {self.auth_ttl_ms}")
-        self._write_cmd("CTRL SLAC disarm 3000")
+        if self.mode != "standalone":
+            self._write_cmd(f"CTRL AUTH deny {self.auth_ttl_ms}")
+            self._write_cmd("CTRL SLAC disarm 3000")
         self._write_cmd("CTRL STATUS")
         with self._lock:
             self.state.stop_sent = True
@@ -350,18 +370,21 @@ class ControllerChargingRunner:
 
     def _tick_stop(self) -> None:
         now = time.time()
-        if (now - self._last_hb) * 1000.0 >= self.heartbeat_ms:
-            self._write_cmd(f"CTRL HB {self.heartbeat_timeout_ms}")
-            self._last_hb = now
+        if self.mode != "standalone":
+            if (now - self._last_hb) * 1000.0 >= self.heartbeat_ms:
+                self._write_cmd(f"CTRL HB {self.heartbeat_timeout_ms}")
+                self._last_hb = now
         if now - self._last_status >= 1.0:
             self._write_cmd("CTRL STATUS")
             self._last_status = now
-        if now - self._last_auth >= 0.8:
-            self._write_cmd(f"CTRL AUTH deny {self.auth_ttl_ms}")
-            self._last_auth = now
+        if self.mode != "standalone":
+            if now - self._last_auth >= 0.8:
+                self._write_cmd(f"CTRL AUTH deny {self.auth_ttl_ms}")
+                self._last_auth = now
         if now - self._last_arm >= 1.5:
             self._write_cmd("CTRL STOP hard 3000")
-            self._write_cmd("CTRL SLAC disarm 3000")
+            if self.mode != "standalone":
+                self._write_cmd("CTRL SLAC disarm 3000")
             self._last_arm = now
         if now - self._last_start >= 6.0:
             self._write_cmd("CTRL RESET")
@@ -404,7 +427,10 @@ class ControllerChargingRunner:
                 if stop_phase:
                     self._tick_stop()
                 else:
-                    self._tick_controller()
+                    if self.mode == "standalone":
+                        self._tick_standalone()
+                    else:
+                        self._tick_controller()
 
                 with self._lock:
                     s = self.state
@@ -428,7 +454,7 @@ class ControllerChargingRunner:
                     print(f"[FAIL] serial/runtime errors: {errs}", flush=True)
                     break
 
-                if (not stop_phase) and identity_seen and not auth_granted:
+                if (self.mode != "standalone") and (not stop_phase) and identity_seen and not auth_granted:
                     # edge-safe latch if identity arrived between tick windows
                     self._write_cmd(f"CTRL AUTH grant {self.auth_ttl_ms}")
                     with self._lock:
@@ -501,6 +527,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Controller-driven 10-minute charging validation")
     ap.add_argument("--port", default="/dev/ttyACM0")
     ap.add_argument("--baud", type=int, default=115200)
+    ap.add_argument("--mode", choices=["controller", "standalone"], default="controller")
     ap.add_argument("--duration-min", type=int, default=10)
     ap.add_argument("--max-total-min", type=int, default=30)
     ap.add_argument("--heartbeat-ms", type=int, default=400)
@@ -520,6 +547,7 @@ def main() -> int:
         heartbeat_ms=args.heartbeat_ms,
         auth_ttl_ms=args.auth_ttl_ms,
         arm_ms=args.arm_ms,
+        mode=args.mode,
         log_file=log_file,
     )
     return runner.run()
