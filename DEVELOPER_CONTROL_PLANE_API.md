@@ -389,6 +389,9 @@ All status frames are periodic and include version + sequence + CRC.
   - low nibble: active modules
   - high nibble: assigned modules
 
+This frame is the primary fast telemetry path for live charging electrical values
+(`V`, `I`) from PLC/module aggregation.
+
 ## 4.6 `PLC_SESSION_STATUS` (`0x18FF6050`, 500 ms)
 
 - `b2` bitfield:
@@ -403,6 +406,12 @@ All status frames are periodic and include version + sequence + CRC.
   - bit5 stop_complete
 - `b4..b5`: meter Wh (u16 little-endian)
 - `b6`: uptime seconds low byte
+- `b7`: last EV SoC percent (`0..100`, `0xFF` = unknown/not yet available)
+
+During active charging, controller should combine:
+
+- `PLC_POWER_STATUS` for `Voltage` + `Current`
+- `PLC_SESSION_STATUS` for `Energy(Wh)` + `SoC`
 
 ## 4.7 `PLC_IDENTITY_EVT` (`0x18FF6060`, event-driven)
 

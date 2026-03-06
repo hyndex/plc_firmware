@@ -59,6 +59,7 @@ Use the developer guide as the normative contract for:
   - Relay2/Relay3 command with timeout-off safety
 - TX to controller:
   - heartbeat, CP status, SLAC status, HLC/auth status, power status, session status
+  - charging telemetry uplink: `V/I` (power status) + `SoC/Wh` (session status)
   - command acknowledgements (CRC/version/seq/state/value validation)
   - segmented identity events (local MAC, EVCCID)
 

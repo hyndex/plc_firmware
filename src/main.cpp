@@ -77,7 +77,8 @@ constexpr int CP_TOPK = 12;
 
 constexpr uint32_t CP_STABLE_MS = 300;
 constexpr uint32_t CP_STATE_DEBOUNCE_MS = 80;
-constexpr uint32_t CP_DISCONNECT_DEBOUNCE_MS = 250;
+constexpr uint32_t CP_DISCONNECT_DEBOUNCE_MS = 1200;
+constexpr uint32_t CP_CONNECTED_HOLD_MS = 1500;
 constexpr uint32_t SLAC_HOLD_MS = 3000;
 constexpr uint32_t CP_EF_PULSE_MS = 4000;
 constexpr uint8_t EF_PULSE_AFTER_FAILURES = 2;
@@ -927,6 +928,8 @@ char g_last_cp_state = 'A';
 char g_cp_state_candidate = 'A';
 uint32_t g_cp_candidate_since_ms = 0;
 uint32_t g_cp_connected_since_ms = 0;
+uint32_t g_cp_last_seen_connected_ms = 0;
+uint32_t g_cp_next_spike_log_ms = 0;
 
 uint16_t g_last_cp_duty_pct = 100;
 bool g_ef_pulse_active = false;
@@ -987,6 +990,7 @@ double g_meter_wh_real = 0.0;
 uint32_t g_meter_last_sample_ms = 0;
 float g_last_measured_v = 0.0f;
 float g_last_measured_i = 0.0f;
+int16_t g_last_ev_soc_pct = -1;
 uint32_t g_last_module_runtime_log_ms = 0;
 
 portMUX_TYPE g_ctrl_rx_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -1392,6 +1396,92 @@ int64_t real_meter_wh_i64() {
     if (v <= 0.0) return 0;
     const long long iv = static_cast<long long>(llround(v));
     return (iv < 0) ? 0 : static_cast<int64_t>(iv);
+}
+
+void update_last_ev_soc_pct(int soc_pct) {
+    if (soc_pct < 0 || soc_pct > 100) {
+        g_last_ev_soc_pct = -1;
+        return;
+    }
+    g_last_ev_soc_pct = static_cast<int16_t>(soc_pct);
+}
+
+uint8_t encode_last_ev_soc_pct() {
+    if (g_last_ev_soc_pct < 0 || g_last_ev_soc_pct > 100) {
+        return 0xFFu;
+    }
+    return static_cast<uint8_t>(g_last_ev_soc_pct);
+}
+
+void update_last_ev_soc_from_request(jpv2g_message_type_t type, const jpv2g_secc_request_t* req) {
+    if (!req || !req->body) return;
+    if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
+        switch (type) {
+            case JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ: {
+                const auto* rq = static_cast<const iso2_ChargeParameterDiscoveryReqType*>(req->body);
+                if (rq->DC_EVChargeParameter_isUsed) {
+                    update_last_ev_soc_pct(static_cast<int>(rq->DC_EVChargeParameter.DC_EVStatus.EVRESSSOC));
+                }
+                break;
+            }
+            case JPV2G_CABLE_CHECK_REQ: {
+                const auto* rq = static_cast<const iso2_CableCheckReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            case JPV2G_PRE_CHARGE_REQ: {
+                const auto* rq = static_cast<const iso2_PreChargeReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            case JPV2G_CURRENT_DEMAND_REQ: {
+                const auto* rq = static_cast<const iso2_CurrentDemandReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            case JPV2G_WELDING_DETECTION_REQ: {
+                const auto* rq = static_cast<const iso2_WeldingDetectionReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            default:
+                break;
+        }
+        return;
+    }
+    if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
+        switch (type) {
+            case JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ: {
+                const auto* rq = static_cast<const din_ChargeParameterDiscoveryReqType*>(req->body);
+                if (rq->DC_EVChargeParameter_isUsed) {
+                    update_last_ev_soc_pct(static_cast<int>(rq->DC_EVChargeParameter.DC_EVStatus.EVRESSSOC));
+                }
+                break;
+            }
+            case JPV2G_CABLE_CHECK_REQ: {
+                const auto* rq = static_cast<const din_CableCheckReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            case JPV2G_PRE_CHARGE_REQ: {
+                const auto* rq = static_cast<const din_PreChargeReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            case JPV2G_CURRENT_DEMAND_REQ: {
+                const auto* rq = static_cast<const din_CurrentDemandReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            case JPV2G_WELDING_DETECTION_REQ: {
+                const auto* rq = static_cast<const din_WeldingDetectionReqType*>(req->body);
+                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                break;
+            }
+            default:
+                break;
+        }
+    }
 }
 
 void fill_iso_meter_info_real(iso2_MeterInfoType* meter) {
@@ -2451,6 +2541,7 @@ void controller_tx_session_status(uint32_t now_ms) {
     p[4] = static_cast<uint8_t>(wh & 0xFFu);
     p[5] = static_cast<uint8_t>((wh >> 8) & 0xFFu);
     p[6] = static_cast<uint8_t>((now_ms / 1000u) & 0xFFu);
+    p[7] = encode_last_ev_soc_pct();
     (void)can_send_ctrl_frame(CAN_ID_PLC_SESSION_STATUS, p);
 }
 
@@ -3328,6 +3419,7 @@ int hlc_handle_request(jpv2g_message_type_t type,
     HlcAppContext* ctx = static_cast<HlcAppContext*>(user_ctx);
     if (!ctx || !ctx->secc || !decoded) return -EINVAL;
     const jpv2g_secc_request_t* req = static_cast<const jpv2g_secc_request_t*>(decoded);
+    update_last_ev_soc_from_request(type, req);
     if (type == JPV2G_SESSION_SETUP_REQ && req->body) {
         if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
             const auto* rq = static_cast<const iso2_SessionSetupReqType*>(req->body);
@@ -3590,16 +3682,24 @@ void service_hlc_tcp_once() {
 
 void apply_cp_output(char state, uint32_t now_ms) {
     const bool connected = cp_connected(state);
+    const bool connected_hold =
+        (!connected && g_cp_last_seen_connected_ms != 0 &&
+         static_cast<int32_t>(now_ms - g_cp_last_seen_connected_ms) <= static_cast<int32_t>(CP_CONNECTED_HOLD_MS));
+    const bool pwm_connected = connected || connected_hold;
     if (g_ef_pulse_active && static_cast<int32_t>(now_ms - g_ef_pulse_until_ms) >= 0) {
         g_ef_pulse_active = false;
     }
 
     const bool hold_active = static_cast<int32_t>(now_ms - g_slac_hold_until_ms) < 0;
-    const bool pwm_ok = connected && !hold_active && !g_ef_pulse_active;
+    const bool pwm_ok = pwm_connected && !hold_active && !g_ef_pulse_active;
     uint16_t pct = g_ef_pulse_active ? 0u : (pwm_ok ? 5u : 100u);
     if (pct != g_last_cp_duty_pct) {
-        Serial.printf("[CP] duty -> %u%% (state=%c hold=%d ef=%d)\n", pct, state, hold_active ? 1 : 0,
-                      g_ef_pulse_active ? 1 : 0);
+        Serial.printf("[CP] duty -> %u%% (state=%c hold=%d ef=%d conn_hold=%d)\n",
+                      pct,
+                      state,
+                      hold_active ? 1 : 0,
+                      g_ef_pulse_active ? 1 : 0,
+                      connected_hold ? 1 : 0);
         g_last_cp_duty_pct = pct;
     }
     write_ledc_duty(cp_pct_to_duty(g_last_cp_duty_pct));
@@ -3625,6 +3725,7 @@ void stop_session(uint32_t now_ms) {
     g_bcd_entered = false;
     g_session_matched = false;
     g_last_fsm_state = slac::evse::State::Reset;
+    g_last_ev_soc_pct = -1;
 }
 
 void enter_hold_with_optional_ef_pulse(uint32_t now_ms, const char* reason) {
@@ -3688,8 +3789,29 @@ void process_cp_and_fsm(uint32_t now_ms) {
     const int cp_mv = read_cp_mv_robust();
     g_last_cp_mv = cp_mv;
     const char raw_cp_state = cp_state_from_mv(cp_mv);
-    if (raw_cp_state != g_cp_state_candidate) {
-        g_cp_state_candidate = raw_cp_state;
+    if (cp_connected(raw_cp_state)) {
+        g_cp_last_seen_connected_ms = now_ms;
+    }
+    char filtered_cp_state = raw_cp_state;
+    const bool was_connected_state = cp_connected(g_cp_state);
+    if (was_connected_state && !cp_connected(raw_cp_state) && g_cp_last_seen_connected_ms != 0) {
+        const bool within_hold =
+            static_cast<int32_t>(now_ms - g_cp_last_seen_connected_ms) <= static_cast<int32_t>(CP_CONNECTED_HOLD_MS);
+        if (within_hold) {
+            filtered_cp_state = g_cp_state;
+            if (raw_cp_state == 'A' &&
+                (g_cp_next_spike_log_ms == 0 || static_cast<int32_t>(now_ms - g_cp_next_spike_log_ms) >= 0)) {
+                Serial.printf("[CP] hold A-disconnect spike raw=%c stable=%c mv=%d hold_ms=%lu\n",
+                              raw_cp_state,
+                              g_cp_state,
+                              cp_mv,
+                              static_cast<unsigned long>(CP_CONNECTED_HOLD_MS));
+                g_cp_next_spike_log_ms = now_ms + 10000;
+            }
+        }
+    }
+    if (filtered_cp_state != g_cp_state_candidate) {
+        g_cp_state_candidate = filtered_cp_state;
         g_cp_candidate_since_ms = now_ms;
     }
     if (g_cp_state_candidate != g_cp_state) {
@@ -3708,10 +3830,12 @@ void process_cp_and_fsm(uint32_t now_ms) {
         const bool old_connected = cp_connected(g_last_cp_state);
         if (connected && !old_connected) {
             g_cp_connected_since_ms = now_ms;
+            g_cp_last_seen_connected_ms = now_ms;
             g_slac_failures_this_cp = 0;
             g_slac_hold_until_ms = 0;
         } else if (!connected && old_connected) {
             g_cp_connected_since_ms = 0;
+            g_cp_last_seen_connected_ms = 0;
             g_slac_hold_until_ms = 0;
             g_slac_failures_this_cp = 0;
             g_ctrl.slac_start_latched = false;
