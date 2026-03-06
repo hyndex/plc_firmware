@@ -1,0 +1,96 @@
+
+=== SERIAL CONNECT /dev/ttyACM0 115200 @ 2026-03-06T07:20:37 ===
+[2026-03-06T07:21:02.229] (+24.537s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T07:21:02.229] (+24.537s) [FSM] SignalError -> WaitForMatchingStart
+[2026-03-06T07:21:42.273] (+64.582s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T07:21:42.274] (+64.582s) [FSM] SignalError -> WaitForMatchingStart
+[2026-03-06T07:22:22.318] (+104.626s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T07:22:22.819] (+105.127s) [FSM] SignalError -> NoSlacPerformed
+[2026-03-06T07:22:22.819] (+105.127s) [CP] E/F pulse for 4000 ms
+[2026-03-06T07:22:22.819] (+105.127s) [SLAC] enter hold (fsm terminal failure) 3000 ms
+[2026-03-06T07:22:22.819] (+105.127s) [CP] duty -> 0% (state=B hold=1 ef=1)
+[2026-03-06T07:22:22.819] (+105.127s) [CP] state B -> F (106 mV)
+[2026-03-06T07:22:26.823] (+109.131s) [CP] duty -> 100% (state=F hold=0 ef=0)
+[2026-03-06T07:22:26.823] (+109.131s) [CP] state F -> B (2188 mV)
+[2026-03-06T07:22:26.823] (+109.131s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T07:22:26.823] (+109.131s) [SLAC] session start
+[2026-03-06T07:22:27.323] (+109.631s) [FSM] Reset -> Idle
+[2026-03-06T07:22:27.323] (+109.631s) [FSM] EnterBCD
+[2026-03-06T07:22:27.323] (+109.631s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T07:22:27.323] (+109.631s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-06T07:22:27.323] (+109.631s) [FSM] Matching -> Sounding
+[2026-03-06T07:22:28.324] (+110.632s) [FSM] Timeout in sounding, send results
+[2026-03-06T07:22:28.324] (+110.632s) [FSM] Sounding -> DoAttenChar
+[2026-03-06T07:22:28.825] (+111.133s) [FSM] No response to CM_ATTEN_CHAR.IND after retries
+[2026-03-06T07:22:28.825] (+111.133s) [FSM] DoAttenChar -> MatchingFailed
+[2026-03-06T07:22:28.825] (+111.133s) [SLAC] enter hold (fsm terminal failure) 3000 ms
+[2026-03-06T07:22:28.825] (+111.133s) [CP] duty -> 100% (state=B hold=1 ef=0)
+[2026-03-06T07:22:31.829] (+114.137s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T07:22:31.829] (+114.137s) [SLAC] session start
+[2026-03-06T07:22:31.829] (+114.137s) [FSM] Reset -> Idle
+[2026-03-06T07:22:31.829] (+114.137s) [FSM] EnterBCD
+[2026-03-06T07:22:31.829] (+114.137s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T07:22:32.329] (+114.638s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-06T07:22:32.830] (+115.138s) [FSM] Matching -> Sounding
+[2026-03-06T07:22:32.830] (+115.138s) [FSM] Timeout in sounding, send results
+[2026-03-06T07:22:32.830] (+115.138s) [FSM] Sounding -> DoAttenChar
+[2026-03-06T07:22:33.831] (+116.139s) [FSM] No response to CM_ATTEN_CHAR.IND after retries
+[2026-03-06T07:22:33.831] (+116.139s) [FSM] DoAttenChar -> MatchingFailed
+[2026-03-06T07:22:33.831] (+116.139s) [CP] E/F pulse for 4000 ms
+[2026-03-06T07:22:33.831] (+116.139s) [SLAC] enter hold (fsm terminal failure) 3000 ms
+[2026-03-06T07:22:33.831] (+116.139s) [CP] duty -> 0% (state=B hold=1 ef=1)
+[2026-03-06T07:22:33.831] (+116.139s) [CP] state B -> F (105 mV)
+[2026-03-06T07:22:37.835] (+120.144s) [CP] duty -> 100% (state=F hold=0 ef=0)
+[2026-03-06T07:22:37.836] (+120.144s) [CP] state F -> B (2184 mV)
+[2026-03-06T07:22:37.836] (+120.144s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T07:22:37.836] (+120.144s) [SLAC] session start
+[2026-03-06T07:22:38.336] (+120.644s) [FSM] Reset -> Idle
+[2026-03-06T07:22:38.336] (+120.644s) [FSM] EnterBCD
+[2026-03-06T07:22:38.336] (+120.644s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T07:22:38.336] (+120.644s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-06T07:22:38.336] (+120.644s) [FSM] Matching -> Sounding
+[2026-03-06T07:22:39.337] (+121.646s) [FSM] Timeout in sounding, send results
+[2026-03-06T07:22:39.338] (+121.646s) [FSM] Sounding -> DoAttenChar
+[2026-03-06T07:22:39.838] (+122.146s) [FSM] No response to CM_ATTEN_CHAR.IND after retries
+[2026-03-06T07:22:39.838] (+122.146s) [FSM] DoAttenChar -> MatchingFailed
+[2026-03-06T07:22:39.838] (+122.146s) [SLAC] enter hold (fsm terminal failure) 3000 ms
+[2026-03-06T07:22:39.838] (+122.146s) [CP] duty -> 100% (state=B hold=1 ef=0)
+[2026-03-06T07:22:42.842] (+125.150s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T07:22:42.842] (+125.150s) [SLAC] session start
+[2026-03-06T07:22:42.842] (+125.150s) [FSM] Reset -> Idle
+[2026-03-06T07:22:42.842] (+125.150s) [FSM] EnterBCD
+[2026-03-06T07:22:42.842] (+125.150s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T07:22:43.342] (+125.650s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-06T07:22:43.343] (+125.651s) [FSM] Matching -> Sounding
+[2026-03-06T07:22:43.843] (+126.151s) [FSM] Timeout in sounding, send results
+[2026-03-06T07:22:43.843] (+126.151s) [FSM] Sounding -> DoAttenChar
+[2026-03-06T07:22:44.844] (+127.152s) [FSM] No response to CM_ATTEN_CHAR.IND after retries
+[2026-03-06T07:22:44.844] (+127.152s) [FSM] DoAttenChar -> MatchingFailed
+[2026-03-06T07:22:44.844] (+127.152s) [CP] E/F pulse for 4000 ms
+[2026-03-06T07:22:44.844] (+127.152s) [SLAC] enter hold (fsm terminal failure) 3000 ms
+[2026-03-06T07:22:44.844] (+127.152s) [CP] duty -> 0% (state=B hold=1 ef=1)
+[2026-03-06T07:22:44.844] (+127.152s) [CP] state B -> F (106 mV)
+[2026-03-06T07:22:48.849] (+131.157s) [CP] duty -> 100% (state=F hold=0 ef=0)
+[2026-03-06T07:22:48.849] (+131.157s) [CP] state F -> B (2190 mV)
+[2026-03-06T07:22:48.849] (+131.157s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T07:22:48.849] (+131.157s) [SLAC] session start
+[2026-03-06T07:22:49.349] (+131.657s) [FSM] Reset -> Idle
+[2026-03-06T07:22:49.349] (+131.657s) [FSM] EnterBCD
+[2026-03-06T07:22:49.349] (+131.657s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T07:22:49.349] (+131.658s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-06T07:22:50.351] (+132.659s) [FSM] Matching -> Sounding
+[2026-03-06T07:22:50.351] (+132.659s) [FSM] Timeout in sounding, send results
+[2026-03-06T07:22:50.351] (+132.659s) [FSM] Sounding -> DoAttenChar
+[2026-03-06T07:22:50.851] (+133.159s) [FSM] No response to CM_ATTEN_CHAR.IND after retries
+[2026-03-06T07:22:50.851] (+133.160s) [FSM] DoAttenChar -> MatchingFailed
+[2026-03-06T07:22:50.852] (+133.160s) [SLAC] enter hold (fsm terminal failure) 3000 ms
+[2026-03-06T07:22:50.852] (+133.160s) [CP] duty -> 100% (state=B hold=1 ef=0)
+[2026-03-06T07:22:53.855] (+136.163s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T07:22:53.855] (+136.163s) [SLAC] session start
+[2026-03-06T07:22:53.855] (+136.163s) [FSM] Reset -> Idle
+[2026-03-06T07:22:53.855] (+136.163s) [FSM] EnterBCD
+[2026-03-06T07:22:53.855] (+136.163s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T07:23:33.902] (+176.210s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T07:23:33.902] (+176.210s) [FSM] SignalError -> WaitForMatchingStart
+[2026-03-06T07:24:13.948] (+216.256s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T07:24:13.948] (+216.256s) [FSM] SignalError -> WaitForMatchingStart

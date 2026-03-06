@@ -1,0 +1,622 @@
+
+=== SERIAL CONNECT /dev/ttyACM0 115200 @ 2026-03-06T08:29:02 ===
+[2026-03-06T08:29:03.882] (+1.819s) [SDP] req sec=0x10 tp=0x00 -> res port=15118 sec=0x10
+[2026-03-06T08:29:03.882] (+1.819s) [HLC] EVCC connected, processing session
+[2026-03-06T08:29:03.882] (+1.819s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:945: SAPP opt[0] schema=20 prio=1 ns=urn:iso:15118:2:2013:MsgDef
+[2026-03-06T08:29:03.882] (+1.819s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:948: SAPP selected proto=1 schema=20
+[2026-03-06T08:29:03.882] (+1.819s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX SupportedAppProtocolReq (proto=1)
+[2026-03-06T08:29:03.882] (+1.819s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX SupportedAppProtocolReq exi_len=36 exi_hex=8000EBAB9371D34B9B79D189A98989C1D191D191818999D26B9B3A232B30020000500040
+[2026-03-06T08:29:03.882] (+1.819s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:405: DECODED {"msg":"SupportedAppProtocol","req":{"protocols":[{"schema":20,"prio":1,"ns":"urn:iso:15118:2:2013:MsgDef"}]},"res":{"responseCode":0,"schema":20}}
+[2026-03-06T08:29:03.882] (+1.819s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX SupportedAppProtocolReq exi_len=4 exi_hex=80400500
+[2026-03-06T08:29:03.882] (+1.819s) [HLC] EVCC connected, handed off to worker
+[2026-03-06T08:29:03.882] (+1.819s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX SupportedAppProtocolReq bytes=12
+[2026-03-06T08:29:04.096] (+2.033s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX SessionSetupReq (proto=1)
+[2026-03-06T08:29:04.097] (+2.034s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX SessionSetupReq exi_len=21 exi_hex=809802000000000000000011D01800061CCEA70000
+[2026-03-06T08:29:04.097] (+2.034s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:439: DECODED ISO {"msg":"SessionSetup","req":{"evccId":""},"res":{"responseCode":"OK_NewSessionEstablished","evseId":"IN*JPE*E000100010001","sessionId":"103857839E6557C2"}}
+[2026-03-06T08:29:04.097] (+2.034s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX SessionSetupReq exi_len=36 exi_hex=809802040E15E0E79955F091E020592538A9294114A914C0C0C0C4C0C0C0C4C0C0C0C480
+[2026-03-06T08:29:04.097] (+2.034s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX SessionSetupReq bytes=44
+[2026-03-06T08:29:04.097] (+2.034s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX ServiceDiscoveryReq (proto=1)
+[2026-03-06T08:29:04.097] (+2.034s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX ServiceDiscoveryReq exi_len=13 exi_hex=809802040E15E0E79955F091B8
+[2026-03-06T08:29:04.309] (+2.246s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:471: DECODED ISO {"msg":"ServiceDiscovery","req":{"scope":"","category":-1},"res":{"responseCode":"OK","payments":["ExternalPayment"],"serviceId":1,"serviceName":"DCFC","freeService":0,"etm":["DC_core","DC_extended","DC_combo_core"]}}
+[2026-03-06T08:29:04.309] (+2.246s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX ServiceDiscoveryReq exi_len=27 exi_hex=809802040E15E0E79955F091C0012004019110D190C04040C21200
+[2026-03-06T08:29:04.309] (+2.246s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX ServiceDiscoveryReq bytes=35
+[2026-03-06T08:29:04.310] (+2.246s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX PaymentServiceSelectionReq (proto=1)
+[2026-03-06T08:29:04.310] (+2.246s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX PaymentServiceSelectionReq exi_len=16 exi_hex=809802040E15E0E79955F09132001280
+[2026-03-06T08:29:04.310] (+2.246s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:485: DECODED ISO {"msg":"PaymentServiceSelection","req":{"payment":"ExternalPayment","paymentRaw":1,"serviceId":1},"res":{"responseCode":"OK"}}
+[2026-03-06T08:29:04.310] (+2.247s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX PaymentServiceSelectionReq exi_len=14 exi_hex=809802040E15E0E79955F0914000
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX PaymentServiceSelectionReq bytes=22
+[2026-03-06T08:29:04.633] (+2.570s) [HLC][AUTH] proc=0
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX AuthorizationReq (proto=1)
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX AuthorizationReq exi_len=13 exi_hex=809802040E15E0E79955F09008
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:494: DECODED ISO {"msg":"Authorization","req":{"genChallengeLen":0},"res":{"responseCode":"OK","processing":"Finished"}}
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX AuthorizationReq exi_len=15 exi_hex=809802040E15E0E79955F090100000
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX AuthorizationReq bytes=23
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX ChargeParameterDiscoveryReq (proto=1)
+[2026-03-06T08:29:04.633] (+2.570s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX ChargeParameterDiscoveryReq exi_len=42 exi_hex=809802040E15E0E79955F0909016194000DC0830D00F028A180340420482700430000043000000000000
+[2026-03-06T08:29:04.860] (+2.797s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:522: DECODED ISO {"msg":"ChargeParameterDiscovery","req":{"etm":"DC_extended","evMaxA":200.0,"evMaxV":1000.0,"soc":55},"res":{"responseCode":"OK","processing":"Finished","scheduleCount":1,"evseMaxA":200.0,"evseMaxV":1000.0,"evseMaxkW":240.0}}
+[2026-03-06T08:29:04.860] (+2.797s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX ChargeParameterDiscoveryReq exi_len=55 exi_hex=809802040E15E0E79955F090A000000000002028C1418503C0AA00400408186190020C28780081881D00E061800018819002230C004400
+[2026-03-06T08:29:04.860] (+2.797s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX ChargeParameterDiscoveryReq bytes=63
+[2026-03-06T08:29:04.860] (+2.797s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CableCheckReq (proto=1)
+[2026-03-06T08:29:04.861] (+2.797s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CableCheckReq exi_len=16 exi_hex=809802040E15E0E79955F09031001B80
+[2026-03-06T08:29:04.861] (+2.798s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:533: DECODED ISO {"msg":"CableCheck","req":{"soc":0,"evReady":0},"res":{"responseCode":"OK","processing":"Finished","status":"EVSE_Ready"}}
+[2026-03-06T08:29:04.861] (+2.798s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CableCheckReq exi_len=19 exi_hex=809802040E15E0E79955F09040000200204000
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CableCheckReq bytes=27
+[2026-03-06T08:29:05.301] (+3.238s) [CP] state B -> C (1904 mV)
+[2026-03-06T08:29:05.301] (+3.238s) [HLC] PreChargeReq received
+[2026-03-06T08:29:05.301] (+3.238s) [RELAY] Relay1 -> CLOSED (PreCharge)
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX PreChargeReq (proto=1)
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX PreChargeReq exi_len=24 exi_hex=809802040E15E0E79955F09171001B81081104E04180A000
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:545: DECODED ISO {"msg":"PreCharge","req":{"targetV":500.0,"targetI":2.0,"soc":55},"res":{"responseCode":"OK","status":"EVSE_Ready","v":0.0}}
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX PreChargeReq exi_len=21 exi_hex=809802040E15E0E79955F091800002021031000000
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX PreChargeReq bytes=29
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX PreChargeReq (proto=1)
+[2026-03-06T08:29:05.301] (+3.238s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX PreChargeReq exi_len=24 exi_hex=809802040E15E0E79955F09171001B81081104E04180A000
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:545: DECODED ISO {"msg":"PreCharge","req":{"targetV":500.0,"targetI":2.0,"soc":55},"res":{"responseCode":"OK","status":"EVSE_Ready","v":0.0}}
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX PreChargeReq exi_len=21 exi_hex=809802040E15E0E79955F091800002021031000000
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX PreChargeReq bytes=29
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX PreChargeReq (proto=1)
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX PreChargeReq exi_len=24 exi_hex=809802040E15E0E79955F09171001B81081104E04180A000
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:545: DECODED ISO {"msg":"PreCharge","req":{"targetV":500.0,"targetI":2.0,"soc":55},"res":{"responseCode":"OK","status":"EVSE_Ready","v":0.0}}
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX PreChargeReq exi_len=21 exi_hex=809802040E15E0E79955F091800002021031000000
+[2026-03-06T08:29:05.704] (+3.641s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX PreChargeReq bytes=29
+[2026-03-06T08:29:05.940] (+3.877s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX PreChargeReq (proto=1)
+[2026-03-06T08:29:05.941] (+3.877s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX PreChargeReq exi_len=24 exi_hex=809802040E15E0E79955F09171001B81081104E04180A000
+[2026-03-06T08:29:05.941] (+3.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:545: DECODED ISO {"msg":"PreCharge","req":{"targetV":500.0,"targetI":2.0,"soc":55},"res":{"responseCode":"OK","status":"EVSE_Ready","v":0.0}}
+[2026-03-06T08:29:05.941] (+3.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX PreChargeReq exi_len=21 exi_hex=809802040E15E0E79955F091800002021031000000
+[2026-03-06T08:29:05.941] (+3.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX PreChargeReq bytes=29
+[2026-03-06T08:29:05.941] (+3.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX PowerDeliveryReq (proto=1)
+[2026-03-06T08:29:05.941] (+3.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX PowerDeliveryReq exi_len=20 exi_hex=809802040E15E0E79955F0915000022003700000
+[2026-03-06T08:29:05.941] (+3.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:559: DECODED ISO {"msg":"PowerDelivery","req":{"progress":"Start","saId":1,"chargingComplete":0},"res":{"responseCode":"OK","status":"n/a"}}
+[2026-03-06T08:29:06.378] (+4.315s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX PowerDeliveryReq exi_len=17 exi_hex=809802040E15E0E79955F0916000010000
+[2026-03-06T08:29:06.378] (+4.315s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX PowerDeliveryReq bytes=25
+[2026-03-06T08:29:06.378] (+4.315s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:06.378] (+4.315s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:06.378] (+4.315s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:06.378] (+4.315s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:06.378] (+4.315s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T08:29:06.378] (+4.315s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:06.798] (+4.735s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:06.799] (+4.735s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:06.799] (+4.736s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:06.799] (+4.736s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:06.799] (+4.736s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:06.799] (+4.736s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:06.799] (+4.736s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:06.799] (+4.736s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:07.234] (+5.171s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:07.234] (+5.171s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E0000202103102C0080C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:07.234] (+5.171s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:07.234] (+5.171s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:07.234] (+5.171s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:07.234] (+5.171s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:07.235] (+5.171s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:07.235] (+5.172s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:07.626] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:07.626] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:07.626] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:07.626] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:07.626] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:07.626] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:07.627] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:07.627] (+5.563s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:08.026] (+5.963s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:08.027] (+5.964s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:08.027] (+5.964s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:08.027] (+5.964s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:08.027] (+5.964s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:08.027] (+5.964s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:08.027] (+5.964s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:08.427] (+6.364s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:08.668] (+6.605s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:08.668] (+6.605s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:08.668] (+6.605s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:08.668] (+6.605s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:08.668] (+6.605s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:08.668] (+6.605s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:08.669] (+6.605s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:09.108] (+7.045s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:09.109] (+7.046s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:09.109] (+7.046s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:09.109] (+7.046s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:09.109] (+7.046s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:09.109] (+7.046s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:09.109] (+7.046s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:09.109] (+7.046s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:09.518] (+7.455s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:09.518] (+7.455s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:09.518] (+7.455s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:09.518] (+7.455s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:09.518] (+7.455s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:09.518] (+7.455s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:09.518] (+7.455s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:09.919] (+7.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:10.351] (+8.288s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:10.776] (+8.713s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:10.776] (+8.713s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:10.776] (+8.713s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:10.776] (+8.713s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:10.776] (+8.713s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:10.776] (+8.713s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:10.776] (+8.713s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:10.777] (+8.714s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:11.181] (+9.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:11.181] (+9.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:11.181] (+9.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:11.182] (+9.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:11.182] (+9.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:11.182] (+9.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:11.182] (+9.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:11.578] (+9.515s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:11.578] (+9.515s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:11.579] (+9.516s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:11.579] (+9.516s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T08:29:11.579] (+9.516s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:11.579] (+9.516s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:11.579] (+9.516s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:11.579] (+9.516s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:11.579] (+9.516s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:11.982] (+9.919s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:11.982] (+9.919s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:11.982] (+9.919s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:11.983] (+9.919s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:11.983] (+9.919s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:11.983] (+9.920s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:11.983] (+9.920s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:11.983] (+9.920s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:12.422] (+10.359s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:12.422] (+10.359s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:12.422] (+10.359s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:12.422] (+10.359s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:12.422] (+10.359s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:12.422] (+10.359s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:12.422] (+10.359s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:12.869] (+10.806s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:13.110] (+11.047s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:13.111] (+11.048s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:13.111] (+11.048s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:13.111] (+11.048s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:13.111] (+11.048s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:13.111] (+11.048s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:13.111] (+11.048s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:13.530] (+11.467s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:13.530] (+11.467s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:13.530] (+11.467s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:13.530] (+11.467s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:13.531] (+11.467s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:13.531] (+11.467s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:13.531] (+11.468s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:13.531] (+11.468s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E000020210310348180C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:13.940] (+11.877s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:13.940] (+11.877s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:13.941] (+11.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:13.941] (+11.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E000020210310348180C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:13.941] (+11.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:13.941] (+11.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:13.941] (+11.878s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E000020210310348180C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E000020210310348180C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:14.345] (+12.282s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:14.780] (+12.717s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:15.185] (+13.122s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:15.185] (+13.122s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:15.185] (+13.122s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:15.185] (+13.122s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:15.186] (+13.123s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:15.186] (+13.123s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:15.186] (+13.123s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:15.620] (+13.557s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:15.622] (+13.558s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:15.622] (+13.559s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:15.622] (+13.559s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:15.622] (+13.559s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:15.622] (+13.559s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:15.622] (+13.559s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:15.622] (+13.559s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:16.033] (+13.970s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:16.034] (+13.970s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:16.034] (+13.970s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:16.034] (+13.971s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:16.034] (+13.971s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:16.034] (+13.971s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:16.034] (+13.971s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:16.034] (+13.971s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:16.451] (+14.388s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:16.452] (+14.388s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:16.452] (+14.389s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:16.452] (+14.389s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:16.452] (+14.389s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:16.452] (+14.389s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:16.452] (+14.389s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:16.452] (+14.389s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T08:29:16.452] (+14.389s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:16.712] (+14.649s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:16.712] (+14.649s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:582: DECODED ISO {"msg":"CurrentDemand","loop":50,"req":{"targetV":850.0,"targetI":20.0,"soc":55,"chargingComplete":0,"bulkChargingComplete":0,"remainingFullS":0,"remainingBulkS":80},"res":{"responseCode":"OK","status":"EVSE_Ready","v":0.0,"i":0.0,"wh":0}}
+[2026-03-06T08:29:16.712] (+14.649s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:16.712] (+14.649s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:16.712] (+14.649s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:16.712] (+14.649s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:17.102] (+15.039s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:17.102] (+15.039s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:17.103] (+15.039s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:17.103] (+15.039s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:17.103] (+15.039s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:17.103] (+15.039s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:17.103] (+15.040s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:17.516] (+15.453s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:17.936] (+15.873s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:17.936] (+15.873s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:17.936] (+15.873s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:17.937] (+15.873s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:17.937] (+15.873s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:17.937] (+15.874s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:17.937] (+15.874s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:17.937] (+15.874s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:18.382] (+16.319s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:18.383] (+16.320s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:18.383] (+16.320s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:18.383] (+16.320s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:18.383] (+16.320s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:18.383] (+16.320s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:18.383] (+16.320s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:18.383] (+16.320s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:18.793] (+16.730s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:18.793] (+16.730s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:18.793] (+16.730s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:18.793] (+16.730s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:18.794] (+16.730s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:18.794] (+16.731s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:18.794] (+16.731s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:19.243] (+17.180s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:19.243] (+17.180s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:19.244] (+17.181s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:19.244] (+17.181s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:19.244] (+17.181s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:19.244] (+17.181s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:19.244] (+17.181s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:19.244] (+17.181s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:19.490] (+17.428s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:19.491] (+17.428s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:19.491] (+17.428s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:19.491] (+17.428s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:19.492] (+17.429s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:19.492] (+17.429s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:19.492] (+17.429s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:19.891] (+17.828s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:19.891] (+17.828s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:19.891] (+17.828s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:19.891] (+17.828s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:19.891] (+17.828s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:19.891] (+17.828s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:19.891] (+17.828s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:20.329] (+18.266s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:20.330] (+18.267s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:20.330] (+18.267s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:20.330] (+18.267s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:20.330] (+18.267s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:20.330] (+18.267s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:20.330] (+18.267s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:20.330] (+18.267s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:20.764] (+18.701s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:21.184] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:21.184] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:21.184] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:21.184] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:21.184] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:21.184] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:21.184] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:21.185] (+19.121s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:21.576] (+19.513s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:21.576] (+19.513s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:21.576] (+19.513s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:21.576] (+19.513s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:21.576] (+19.513s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:21.576] (+19.513s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T08:29:21.576] (+19.513s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:21.576] (+19.513s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:21.994] (+19.931s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:22.412] (+20.349s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:22.413] (+20.349s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:22.413] (+20.350s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:22.413] (+20.350s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:22.413] (+20.350s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:22.413] (+20.350s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:22.413] (+20.350s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:22.413] (+20.350s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:22.850] (+20.787s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:23.267] (+21.204s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:23.267] (+21.204s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:23.267] (+21.204s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:23.267] (+21.204s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:23.267] (+21.204s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:23.268] (+21.204s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:23.268] (+21.205s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:23.505] (+21.442s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:23.505] (+21.442s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:23.505] (+21.442s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:23.505] (+21.442s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:23.506] (+21.442s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:23.506] (+21.443s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:23.506] (+21.443s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:23.930] (+21.867s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:23.931] (+21.867s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:23.931] (+21.867s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:23.931] (+21.868s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:23.931] (+21.868s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:23.931] (+21.868s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:23.931] (+21.868s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:23.931] (+21.868s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:24.342] (+22.279s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:24.342] (+22.279s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:24.342] (+22.279s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:24.342] (+22.279s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:24.342] (+22.279s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:24.342] (+22.279s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:24.342] (+22.279s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:24.783] (+22.720s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:24.783] (+22.720s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:24.784] (+22.721s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:24.784] (+22.721s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:24.784] (+22.721s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:24.784] (+22.721s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:24.784] (+22.721s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:24.784] (+22.721s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:25.213] (+23.150s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:25.214] (+23.151s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:25.214] (+23.151s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:25.214] (+23.151s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:25.214] (+23.151s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:25.214] (+23.151s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:25.214] (+23.151s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:25.214] (+23.151s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:25.630] (+23.567s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:26.021] (+23.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:26.021] (+23.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:26.021] (+23.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:26.021] (+23.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:26.021] (+23.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:26.021] (+23.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:26.021] (+23.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:26.437] (+24.374s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:26.437] (+24.374s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:26.437] (+24.374s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:26.437] (+24.374s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:26.437] (+24.374s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:26.438] (+24.374s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:26.438] (+24.375s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:26.438] (+24.375s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:26.883] (+24.820s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:26.883] (+24.820s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:26.884] (+24.820s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:26.884] (+24.820s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T08:29:26.884] (+24.821s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:26.884] (+24.821s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:26.884] (+24.821s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:26.884] (+24.821s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:26.884] (+24.821s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:27.127] (+25.064s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:27.128] (+25.065s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:27.128] (+25.065s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:27.128] (+25.065s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:27.128] (+25.065s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:27.128] (+25.065s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:582: DECODED ISO {"msg":"CurrentDemand","loop":100,"req":{"targetV":850.0,"targetI":20.0,"soc":55,"chargingComplete":0,"bulkChargingComplete":0,"remainingFullS":0,"remainingBulkS":80},"res":{"responseCode":"OK","status":"EVSE_Ready","v":0.0,"i":0.0,"wh":0}}
+[2026-03-06T08:29:27.521] (+25.458s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:27.521] (+25.458s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:27.521] (+25.458s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:27.521] (+25.458s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:27.521] (+25.458s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:27.521] (+25.458s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:27.521] (+25.458s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:27.918] (+25.855s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:27.919] (+25.855s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:27.919] (+25.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:27.919] (+25.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:27.919] (+25.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:27.919] (+25.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:27.919] (+25.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:27.919] (+25.856s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:28.339] (+26.276s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:28.339] (+26.276s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:28.340] (+26.277s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:28.340] (+26.277s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:28.340] (+26.277s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:28.340] (+26.277s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:28.340] (+26.277s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:28.340] (+26.277s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:28.785] (+26.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:28.786] (+26.723s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:28.786] (+26.723s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:28.786] (+26.723s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:28.786] (+26.723s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:28.786] (+26.723s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:28.786] (+26.723s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:28.786] (+26.723s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:29.181] (+27.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:29.181] (+27.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:29.181] (+27.118s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:29.182] (+27.119s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:29.182] (+27.119s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:29.182] (+27.119s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:29.182] (+27.119s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:29.584] (+27.521s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:29.584] (+27.521s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:29.584] (+27.521s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:29.584] (+27.521s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:29.584] (+27.521s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:29.585] (+27.522s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:29.585] (+27.522s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:29.585] (+27.522s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:29.820] (+27.757s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:29.821] (+27.757s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:29.821] (+27.757s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:29.821] (+27.758s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:29.821] (+27.758s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:29.821] (+27.758s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:29.821] (+27.758s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:30.241] (+28.178s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:30.241] (+28.178s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:30.242] (+28.178s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:30.242] (+28.179s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:30.242] (+28.179s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:30.242] (+28.179s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:30.242] (+28.179s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:30.242] (+28.179s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:30.651] (+28.588s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:30.651] (+28.588s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:30.651] (+28.588s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:30.651] (+28.588s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:30.651] (+28.588s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:30.651] (+28.588s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:30.651] (+28.588s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:31.063] (+29.000s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:31.511] (+29.448s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:31.932] (+29.869s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:31.933] (+29.869s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T08:29:31.933] (+29.870s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:31.933] (+29.870s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:31.933] (+29.870s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:31.933] (+29.870s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:31.933] (+29.870s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:31.933] (+29.870s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:32.364] (+30.301s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E000020210310348180C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:32.785] (+30.722s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:33.201] (+31.138s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:33.202] (+31.139s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:33.202] (+31.139s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:33.202] (+31.139s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:33.202] (+31.139s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:33.202] (+31.139s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E000020210310348180C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:33.202] (+31.139s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:33.202] (+31.139s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:33.601] (+31.538s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:33.601] (+31.538s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:33.601] (+31.538s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:33.601] (+31.538s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:33.601] (+31.538s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:33.601] (+31.538s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:33.602] (+31.538s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=43 exi_hex=809802040E15E0E79955F090E000020210310348180C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=51
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:34.021] (+31.958s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:34.274] (+32.211s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:34.274] (+32.211s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:34.274] (+32.211s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:34.274] (+32.211s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:34.275] (+32.211s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:34.275] (+32.211s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:34.275] (+32.212s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX CurrentDemandReq bytes=50
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX CurrentDemandReq (proto=1)
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX CurrentDemandReq exi_len=47 exi_hex=809802040E15E0E79955F090D1001B81061900201081209C01061A01E0514300680002080000410500301081688400
+[2026-03-06T08:29:34.690] (+32.627s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX CurrentDemandReq exi_len=42 exi_hex=809802040E15E0E79955F090E0000202103100000C300000018087F80290D09353D10C0C0C4000200140

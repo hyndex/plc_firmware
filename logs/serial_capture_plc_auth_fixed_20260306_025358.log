@@ -1,0 +1,43 @@
+
+=== SERIAL CONNECT /dev/ttyACM0 115200 @ 2026-03-06T02:53:58 ===
+[2026-03-06T02:53:59.146] (+1.004s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-06T02:53:59.146] (+1.004s) [FSM] Matching -> Sounding
+[2026-03-06T02:54:00.147] (+2.005s) [CP] state B -> C (2032 mV)
+[2026-03-06T02:54:00.147] (+2.005s) [FSM] Timeout in sounding, send results
+[2026-03-06T02:54:00.147] (+2.005s) [FSM] Sounding -> DoAttenChar
+[2026-03-06T02:54:00.147] (+2.005s) [FSM] DoAttenChar -> WaitForSlacMatch
+[2026-03-06T02:54:00.147] (+2.005s) [SLAC] match request received, signaling link detected
+[2026-03-06T02:54:00.147] (+2.005s) [FSM] WaitForSlacMatch -> Matched
+[2026-03-06T02:54:00.147] (+2.005s) [SLAC] MATCHED - starting HLC stack
+[2026-03-06T02:54:00.147] (+2.005s) [HLC] bind iface=<default> (plc=pl2)
+[2026-03-06T02:54:00.148] (+2.005s) [HLC] worker task started stack_bytes=65536
+[2026-03-06T02:54:00.148] (+2.005s) [WARN ] /home/jpi/Desktop/EVSE/jpv2g/src/transport.c:137: IPV6_JOIN_GROUP failed on iface  (errno=125), continuing without multicast
+[2026-03-06T02:54:00.148] (+2.005s) [HLC] stack ready (SDP+TCP on 15118)
+[2026-03-06T02:54:00.148] (+2.005s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:00.148] (+2.005s) [CP] state C -> B (2104 mV)
+[2026-03-06T02:54:01.149] (+3.006s) [SDP] req sec=0x10 tp=0x00 -> res port=15118 sec=0x10
+[2026-03-06T02:54:01.649] (+3.506s) [HLC] EVCC connected, processing session
+[2026-03-06T02:54:01.649] (+3.506s) [HLC] EVCC connected, handed off to worker
+[2026-03-06T02:54:01.649] (+3.506s) [HLC][AUTH] proc=0
+[2026-03-06T02:54:02.150] (+4.007s) [HLC] client session done rc=-104
+[2026-03-06T02:54:03.652] (+5.509s) [CP] state B -> C (1821 mV)
+[2026-03-06T02:54:05.153] (+7.010s) [CP] state C -> B (2105 mV)
+[2026-03-06T02:54:05.153] (+7.010s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:05.153] (+7.010s) [CP] state B -> C (1982 mV)
+[2026-03-06T02:54:05.654] (+7.511s) [CP] state C -> B (2177 mV)
+[2026-03-06T02:54:09.658] (+11.515s) [CP] state B -> C (1807 mV)
+[2026-03-06T02:54:10.159] (+12.016s) [CP] state C -> B (2141 mV)
+[2026-03-06T02:54:10.159] (+12.016s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:11.661] (+13.518s) [CP] state B -> C (2045 mV)
+[2026-03-06T02:54:12.662] (+14.519s) [CP] state C -> B (2118 mV)
+[2026-03-06T02:54:15.165] (+17.022s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:20.170] (+22.027s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:22.173] (+24.030s) [CP] state B -> C (2019 mV)
+[2026-03-06T02:54:24.675] (+26.533s) [CP] state C -> B (2139 mV)
+[2026-03-06T02:54:25.176] (+27.033s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:30.182] (+32.039s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:35.187] (+37.045s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:39.700] (+41.558s) [CP] state B -> C (1875 mV)
+[2026-03-06T02:54:39.700] (+41.558s) [CP] state C -> B (2110 mV)
+[2026-03-06T02:54:40.201] (+42.058s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T02:54:45.216] (+47.073s) [HLC] waiting for EVCC TCP client...

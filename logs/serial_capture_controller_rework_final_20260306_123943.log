@@ -1,0 +1,69 @@
+[BOOT] waiting... 7000/10000 ms
+[BOOT] waiting... 8000/10000 ms
+[BOOT] waiting... 9000/10000 ms
+[NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[MOD] startup scan begin (single module MXR_1 addr=0x01)
+[MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[MOD] setup upsert=1 allocate=1 ready=1
+[QCA] transport ready
+[ 12088][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 0 - WIFI_READY
+[ 12129][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 2 - STA_START
+[NET] lwIP socket stack initialized (WiFi STA mode)
+[NET] PLC lwIP netif ready: pl2
+[APP] ready, waiting for CP B/C/D
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=29.3 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=5 V=29.3 I=0.00 alarm=0x00400000
+[ 12156][I][esp32-hal-adc.c:249] __analogReadMilliVolts(): ADC1: Characterized using Default Vref: 0
+
+[CP] state A -> B (2189 mV)
+[CP] duty -> 5% (state=B hold=0 ef=0)
+[SLAC] session start
+[FSM] Failed to setup NMK key
+[FSM] Reset -> Idle
+[FSM] EnterBCD
+[FSM] Idle -> WaitForMatchingStart
+[FSM] WaitForMatchingStart -> Matching
+[FSM] Matching -> Sounding
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=198.1 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=164 V=198.1 I=0.00 alarm=0x00400000
+[FSM] Timeout in sounding, send results
+[FSM] Sounding -> DoAttenChar
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=199.8 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=513 V=199.8 I=0.00 alarm=0x00400000
+[FSM] No response to CM_ATTEN_CHAR.IND after retries
+[FSM] DoAttenChar -> MatchingFailed
+[SLAC] enter hold (fsm terminal failure) 3000 ms
+[CP] duty -> 100% (state=B hold=1 ef=0)
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=199.9 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=265 V=199.9 I=0.00 alarm=0x00400000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.2 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=409 V=200.2 I=0.00 alarm=0x00400000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=104 V=200.1 I=0.00 alarm=0x00000000
+[CP] duty -> 5% (state=B hold=0 ef=0)
+[SLAC] session start
+[FSM] Reset -> Idle
+[FSM] EnterBCD
+[FSM] Idle -> WaitForMatchingStart
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=50 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=251 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=171 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=748 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=544 V=200.1 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=51 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=254 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=141 V=200.0 I=0.00 alarm=0x00000000
+[MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+[MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=311 V=200.0 I=0.00 alarm=0x00000000

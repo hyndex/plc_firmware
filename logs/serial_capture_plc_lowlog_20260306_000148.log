@@ -1,0 +1,209 @@
+[BOOT] waiting... 7002/10000 ms
+[BOOT] waiting... 8002/10000 ms
+[BOOT] waiting... 9002/10000 ms
+[NET] local MAC B8:F8:62:4B:C5:20
+[NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[ 10633][I][esp32-hal-i2c.c:75] i2cInit(): Initialising I2C Master: sda=12 scl=11 freq=100000
+[RELAY] Relay1 ready addr=0x20 pin=P00
+[MOD] MCP2515 ready @125 kbps osc=8MHz
+[MOD] startup scan begin (single module MXR_1 addr=0x01)
+[MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[MOD] scan id=MXR_1 discovered=1 type_match=1 addr_match=1 valid=1
+[MOD] setup upsert=1 allocate=1 low_bw=5.0kbps ready=1
+[QCA] transport ready
+[ 11940][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 0 - WIFI_READY
+[ 11980][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 2 - STA_START
+[NET] lwIP socket stack initialized (WiFi STA mode)
+[NET] PLC lwIP netif ready: pl2
+[APP] ready, waiting for CP B/C/D
+[ 11999][I][esp32-hal-adc.c:249] __analogReadMilliVolts(): ADC1: Characterized using Default Vref: 0
+
+[CP] state A -> B (2220 mV)
+[CP] duty -> 5% (state=B hold=0 ef=0)
+[SLAC] session start
+[FSM] Reset -> Idle
+[FSM] EnterBCD
+[FSM] Idle -> WaitForMatchingStart
+[CP] state B -> C (2060 mV)
+[CP] state C -> B (2161 mV)
+[FSM] WaitForMatchingStart -> Matching
+[FSM] Matching -> Sounding
+[FSM] Sounding -> DoAttenChar
+[FSM] DoAttenChar -> WaitForSlacMatch
+[SLAC] match request received, signaling link detected
+[FSM] WaitForSlacMatch -> Matched
+[SLAC] MATCHED - starting HLC stack
+[HLC] bind iface=<default> (plc=pl2)
+[HLC] worker task started stack_bytes=65536
+[WARN ] /home/jpi/Desktop/EVSE/jpv2g/src/transport.c:137: IPV6_JOIN_GROUP failed on iface  (errno=125), continuing without multicast
+[HLC] stack ready (SDP+TCP on 15118)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2014 mV)
+[SDP] req sec=0x10 tp=0x00 -> res port=15118 sec=0x10
+[HLC] EVCC connected, processing session
+[HLC] EVCC connected, handed off to worker[HLC] RX SupportedAppProtocol
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:926: SAPP opt[0] schema=1 prio=2 ns=urn:din:70121:2012:MsgDef
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:926: SAPP opt[1] schema=0 prio=1 ns=urn:iso:15118:2:2013:MsgDef
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:929: SAPP selected proto=1 schema=0
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX SupportedAppProtocolReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SupportedAppProtocolReq exi_len=68 exi_hex=8000DBAB9371D3234B71D1B981899189D191818991D26B9B3A232B30020000040401D75726E3A69736F3A31353131383A323A323031333A4D73674465660040000000080
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SupportedAppProtocolReq exi_len=4 exi_hex=80400000
+
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX SupportedAppProtocolReq bytes=12
+[HLC] RX SessionSetup
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX SessionSetupReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SessionSetupReq exi_len=14 exi_hex=8098004011D01A2326CDE4FDA000
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SessionSetupReq exi_len=36 exi_hex=8098020D491BD815DE3FA551E020592538A9294114A914C0C0C0C4C0C0C0C4C0C0C0C480
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX SessionSetupReq bytes=44
+[CP] state C -> B (2183 mV)
+[HLC] RX ServiceDiscovery
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX ServiceDiscoveryReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX ServiceDiscoveryReq exi_len=13 exi_hex=8098020D491BD815DE3FA551B8
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX ServiceDiscoveryReq exi_len=27 exi_hex=8098020D491BD815DE3FA551C0012004019110D190C04040C21200
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX ServiceDiscoveryReq bytes=35
+[HLC] RX PaymentServiceSelection
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX PaymentServiceSelectionReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX PaymentServiceSelectionReq exi_len=16 exi_hex=8098020D491BD815DE3FA55132001280
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX PaymentServiceSelectionReq exi_len=14 exi_hex=8098020D491BD815DE3FA5514000
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX PaymentServiceSelectionReq bytes=22
+[CP] state B -> C (2079 mV)
+[HLC] RX Authorization
+[HLC] Authorization #1 -> Finished
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX AuthorizationReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX AuthorizationReq exi_len=13 exi_hex=8098020D491BD815DE3FA55008
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX AuthorizationReq exi_len=15 exi_hex=8098020D491BD815DE3FA550100000
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX AuthorizationReq bytes=23
+[MOD] off request (ClientSessionDone) confirmed=1
+[HLC] current-demand loops=0
+[HLC] authorization requests=1
+[HLC] session rx_count=5 last_rx=Authorization
+[HLC] client session done rc=-104
+[CP] state C -> B (2180 mV)
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (1967 mV)
+[CP] state C -> B (2160 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (1812 mV)
+[CP] state C -> B (2127 mV)
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2084 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2168 mV)
+[CP] state B -> C (2060 mV)
+[CP] state C -> B (2172 mV)
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2087 mV)
+[CP] state C -> B (2165 mV)
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (1945 mV)
+[CP] state C -> B (2116 mV)
+[CP] state B -> C (1902 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2151 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2023 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2168 mV)
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2028 mV)
+[CP] state C -> B (2171 mV)
+[HLC] waiting for EVCC TCP client...
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (1997 mV)
+[CP] state C -> B (2159 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (1990 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2127 mV)
+[CP] state B -> C (1963 mV)
+[CP] state C -> B (2127 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2034 mV)
+[CP] state C -> B (2187 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2037 mV)
+[CP] state C -> B (2137 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (1905 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2174 mV)
+[CP] state B -> C (2001 mV)
+[CP] state C -> B (2170 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2096 mV)
+[CP] state C -> B (2163 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> A (2522 mV)
+[MOD] off request (StopHLC) confirmed=1
+[CP] duty -> 100% (state=A hold=0 ef=0)
+[CP] state A -> B (2221 mV)
+[CP] duty -> 5% (state=B hold=0 ef=0)
+[SLAC] session start
+[FSM] Reset -> Idle
+[FSM] EnterBCD
+[FSM] Idle -> WaitForMatchingStart
+[FSM] WaitForMatchingStart -> Matching
+[FSM] Matching -> Sounding
+[CP] state B -> C (1813 mV)
+[FSM] Sounding -> DoAttenChar
+[FSM] DoAttenChar -> WaitForSlacMatch
+[SLAC] match request received, signaling link detected
+[FSM] WaitForSlacMatch -> Matched
+[SLAC] MATCHED - starting HLC stack
+[HLC] bind iface=<default> (plc=pl2)
+[WARN ] /home/jpi/Desktop/EVSE/jpv2g/src/transport.c:137: IPV6_JOIN_GROUP failed on iface  (errno=125), continuing without multicast
+[HLC] stack ready (SDP+TCP on 15118)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2160 mV)
+[SDP] req sec=0x10 tp=0x00 -> res port=15118 sec=0x10
+[HLC] EVCC connected, processing session
+[HLC] EVCC connected, handed off to worker[HLC] RX SupportedAppProtocol
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:926: SAPP opt[0] schema=1 prio=2 ns=urn:din:70121:2012:MsgDef
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:926: SAPP opt[1] schema=0 prio=1 ns=urn:iso:15118:2:2013:MsgDef
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:929: SAPP selected proto=1 schema=0
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX SupportedAppProtocolReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SupportedAppProtocolReq exi_len=68 exi_hex=8000DBAB9371D3234B71D1B981899189D191818991D26B9B3A232B30020000040401D75726E3A69736F3A31353131383A323A323031333A4D73674465660040000000080
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SupportedAppProtocolReq exi_len=4 exi_hex=80400000
+
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX SupportedAppProtocolReq bytes=12
+[HLC] RX SessionSetup
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX SessionSetupReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SessionSetupReq exi_len=14 exi_hex=8098004011D01A2326CDE4FDA000
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SessionSetupReq exi_len=36 exi_hex=80980239FD821DCFCB2D3251E020592538A9294114A914C0C0C0C4C0C0C0C4C0C0C0C480
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX SessionSetupReq bytes=44
+[HLC] RX ServiceDiscovery
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX ServiceDiscoveryReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX ServiceDiscoveryReq exi_len=13 exi_hex=80980239FD821DCFCB2D3251B8
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX ServiceDiscoveryReq exi_len=27 exi_hex=80980239FD821DCFCB2D3251C0012004019110D190C04040C21200
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX ServiceDiscoveryReq bytes=35
+[HLC] RX PaymentServiceSelection
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX PaymentServiceSelectionReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX PaymentServiceSelectionReq exi_len=16 exi_hex=80980239FD821DCFCB2D325132001280
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX PaymentServiceSelectionReq exi_len=14 exi_hex=80980239FD821DCFCB2D32514000
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX PaymentServiceSelectionReq bytes=22
+[HLC] RX Authorization
+[HLC] Authorization #1 -> Finished
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1494: RX AuthorizationReq (proto=1)
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX AuthorizationReq exi_len=13 exi_hex=80980239FD821DCFCB2D325008
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX AuthorizationReq exi_len=15 exi_hex=80980239FD821DCFCB2D3250100000
+[INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1509: TX AuthorizationReq bytes=23
+[MOD] off request (ClientSessionDone) confirmed=1
+[HLC] current-demand loops=0
+[HLC] authorization requests=1
+[HLC] session rx_count=5 last_rx=Authorization
+[HLC] client session done rc=-104
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (2048 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2151 mV)
+[CP] state B -> C (2032 mV)
+[HLC] waiting for EVCC TCP client...
+[CP] state C -> B (2197 mV)

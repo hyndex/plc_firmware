@@ -1,0 +1,406 @@
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state B -> C (2073 mV)
+[CP] state C -> B (2148 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state B -> C (1891 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state C -> B (2178 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state B -> C (2044 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state C -> B (2176 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state B -> C (2096 mV)
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state C -> B (2173 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state B -> C (2051 mV)
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state C -> B (2182 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state B -> C (2027 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state C -> B (2164 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[CP] state B -> C (1923 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[CP] state C -> B (2182 mV)
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[HLC] waiting for EVCC TCP client...
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0

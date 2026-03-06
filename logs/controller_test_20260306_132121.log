@@ -1,0 +1,890 @@
+2026-03-06T13:21:21.516 [BOOT] waiting... 8000/10000 ms
+2026-03-06T13:21:22.516 [BOOT] waiting... 9000/10000 ms
+2026-03-06T13:21:23.517 [NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+2026-03-06T13:21:23.524 [MOD] startup scan begin (single module MXR_1 addr=0x01)
+2026-03-06T13:21:23.527 [MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+2026-03-06T13:21:23.528 [MOD] setup upsert=1 allocate=1 ready=1
+2026-03-06T13:21:23.529 [CTRL] controller mode active: starting with empty allowlist
+2026-03-06T13:21:24.662 [QCA] transport ready
+2026-03-06T13:21:24.819 [ 12072][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 0 - WIFI_READY
+2026-03-06T13:21:24.860 [ 12113][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 2 - STA_START
+2026-03-06T13:21:24.867 [NET] lwIP socket stack initialized (WiFi STA mode)
+2026-03-06T13:21:24.868 [NET] PLC lwIP netif ready: pl2
+2026-03-06T13:21:24.869 [APP] ready, waiting for CP B/C/D
+2026-03-06T13:21:24.870 [SERCTRL] MODE standalone=0 plc_id=1 controller_id=1 (use CTRL SAVE then reboot)
+2026-03-06T13:21:24.871 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:24.873 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=0 auth=0 allow_slac=0 allow_energy=0 alloc_sz=0
+2026-03-06T13:21:24.874 [SERCTRL] ALLOC1 txn=1 module=0x01
+2026-03-06T13:21:24.874 [SERCTRL] AUTH state=1 ttl_ms=3000
+2026-03-06T13:21:24.875 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:21:24.877 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=0 auth=0 allow_slac=0 allow_energy=0 alloc_sz=0
+2026-03-06T13:21:24.878 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:24.879 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=0 auth=0 allow_slac=0 allow_energy=0 alloc_sz=0
+2026-03-06T13:21:24.880 [SERCTRL] ALLOC1 txn=2 module=0x01
+2026-03-06T13:21:24.881 [SERCTRL] AUTH state=1 ttl_ms=3000
+2026-03-06T13:21:24.881 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:24.882 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:24.883 [SERCTRL] AUTH state=1 ttl_ms=3000
+2026-03-06T13:21:24.883 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:24.884 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:24.893 [ 12145][I][esp32-hal-adc.c:249] __analogReadMilliVolts(): ADC1: Characterized using Default Vref: 0
+2026-03-06T13:21:24.893 
+2026-03-06T13:21:24.928 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=27.9 cmbI=0.00 availI=100.0
+2026-03-06T13:21:24.930 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=27.9 I=0.00 alarm=0x00400000
+2026-03-06T13:21:24.962 [CP] state A -> B (2190 mV)
+2026-03-06T13:21:24.963 [CP] duty -> 5% (state=B hold=0 ef=0)
+2026-03-06T13:21:24.964 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:24.978 [SERCTRL] AUTH state=1 ttl_ms=2500
+2026-03-06T13:21:24.979 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:21:24.979 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:21:25.273 [SLAC] session start
+2026-03-06T13:21:25.297 [FSM] Reset -> Idle
+2026-03-06T13:21:25.297 [FSM] EnterBCD
+2026-03-06T13:21:25.330 [FSM] Idle -> WaitForMatchingStart
+2026-03-06T13:21:25.385 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:25.386 [SERCTRL] AUTH state=1 ttl_ms=3000
+2026-03-06T13:21:25.470 [FSM] WaitForMatchingStart -> Matching
+2026-03-06T13:21:25.711 [FSM] Matching -> Sounding
+2026-03-06T13:21:25.787 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:25.959 [FSM] Sounding -> DoAttenChar
+2026-03-06T13:21:25.974 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=197.8 cmbI=0.00 availI=100.0
+2026-03-06T13:21:25.977 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=223 V=197.8 I=0.00 alarm=0x00400000
+2026-03-06T13:21:26.185 [FSM] DoAttenChar -> WaitForSlacMatch
+2026-03-06T13:21:26.185 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:26.186 [SERCTRL] AUTH state=1 ttl_ms=3000
+2026-03-06T13:21:26.393 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=1 allow_slac=1 allow_energy=0 alloc_sz=1
+2026-03-06T13:21:26.394 [SERCTRL] ALLOC1 txn=3 module=0x01
+2026-03-06T13:21:26.590 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:27.003 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:27.004 [SERCTRL] AUTH state=1 ttl_ms=3000
+2026-03-06T13:21:27.017 [SLAC] match request received, signaling link detected
+2026-03-06T13:21:27.017 [FSM] WaitForSlacMatch -> Matched
+2026-03-06T13:21:27.018 [SLAC] EV_MAC 00:01:87:33:A9:C0
+2026-03-06T13:21:27.020 [SLAC] MATCHED - starting HLC stack
+2026-03-06T13:21:27.021 [HLC] bind iface=<default> (plc=pl2)
+2026-03-06T13:21:27.022 [HLC] worker task started stack_bytes=65536
+2026-03-06T13:21:27.024 [WARN ] /home/jpi/Desktop/EVSE/jpv2g/src/transport.c:137: IPV6_JOIN_GROUP failed on iface  (errno=125), continuing without multicast
+2026-03-06T13:21:27.024 [HLC] stack ready (SDP+TCP on 15118)
+2026-03-06T13:21:27.025 [HLC] waiting for EVCC TCP client...
+2026-03-06T13:21:27.039 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=199.9 cmbI=0.00 availI=100.0
+2026-03-06T13:21:27.042 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=41 V=199.9 I=0.00 alarm=0x00400000
+2026-03-06T13:21:27.042 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:27.396 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:27.807 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:27.808 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:28.046 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:28.049 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=200.1 I=0.00 alarm=0x00400000
+2026-03-06T13:21:28.194 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:28.604 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:28.604 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:28.906 [SERCTRL] ALLOC1 txn=4 module=0x01
+2026-03-06T13:21:28.993 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:29.048 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:29.050 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=188 V=200.1 I=0.00 alarm=0x00400000
+2026-03-06T13:21:29.401 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:29.401 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:29.520 [SDP] req sec=0x10 tp=0x00 -> res port=15118 sec=0x10
+2026-03-06T13:21:29.598 [HLC] EVCC connected, processing session
+2026-03-06T13:21:29.600 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:945: SAPP opt[0] schema=20 prio=1 ns=urn:iso:15118:2:2013:MsgDef
+2026-03-06T13:21:29.606 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:948: SAPP selected proto=1 schema=20
+2026-03-06T13:21:29.614 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX SupportedAppProtocolReq (proto=1)
+2026-03-06T13:21:29.628 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX SupportedAppProtocolReq exi_len=36 exi_hex=8000EBAB9371D34B9B79D189A98989C1D191D191818999D26B9B3A232B30020000500040
+2026-03-06T13:21:29.647 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:405: DECODED {"msg":"SupportedAppProtocol","req":{"protocols":[{"schema":20,"prio":1,"ns":"urn:iso:15118:2:2013:MsgDef"}]},"res":{"responseCode":0,"schema":20}}
+2026-03-06T13:21:29.657 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX SupportedAppProtocolReq exi_len=4 exi_hex=80400500
+2026-03-06T13:21:29.657 [HLC] EVCC connected, handed off to worker
+2026-03-06T13:21:29.664 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX SupportedAppProtocolReq bytes=12
+2026-03-06T13:21:29.732 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX SessionSetupReq (proto=1)
+2026-03-06T13:21:29.740 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX SessionSetupReq exi_len=21 exi_hex=809802000000000000000011D01800061CCEA70000
+2026-03-06T13:21:29.759 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:439: DECODED ISO {"msg":"SessionSetup","req":{"evccId":""},"res":{"responseCode":"OK_NewSessionEstablished","evseId":"IN*JPE*E000100010001","sessionId":"E976548FC772A187"}}
+2026-03-06T13:21:29.772 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX SessionSetupReq exi_len=36 exi_hex=8098023A5D9523F1DCA861D1E020592538A9294114A914C0C0C0C4C0C0C0C4C0C0C0C480
+2026-03-06T13:21:29.781 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX SessionSetupReq bytes=44
+2026-03-06T13:21:29.807 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:29.905 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX ServiceDiscoveryReq (proto=1)
+2026-03-06T13:21:29.913 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX ServiceDiscoveryReq exi_len=13 exi_hex=8098023A5D9523F1DCA861D1B8
+2026-03-06T13:21:29.936 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:471: DECODED ISO {"msg":"ServiceDiscovery","req":{"scope":"","category":-1},"res":{"responseCode":"OK","payments":["ExternalPayment"],"serviceId":1,"serviceName":"DCFC","freeService":0,"etm":["DC_core","DC_extended","DC_combo_core"]}}
+2026-03-06T13:21:29.949 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX ServiceDiscoveryReq exi_len=27 exi_hex=8098023A5D9523F1DCA861D1C0012004019110D190C04040C21200
+2026-03-06T13:21:29.958 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX ServiceDiscoveryReq bytes=35
+2026-03-06T13:21:30.054 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:30.056 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=83 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:30.120 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX PaymentServiceSelectionReq (proto=1)
+2026-03-06T13:21:30.129 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX PaymentServiceSelectionReq exi_len=16 exi_hex=8098023A5D9523F1DCA861D132001280
+2026-03-06T13:21:30.145 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:485: DECODED ISO {"msg":"PaymentServiceSelection","req":{"payment":"ExternalPayment","paymentRaw":1,"serviceId":1},"res":{"responseCode":"OK"}}
+2026-03-06T13:21:30.158 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX PaymentServiceSelectionReq exi_len=14 exi_hex=8098023A5D9523F1DCA861D14000
+2026-03-06T13:21:30.166 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX PaymentServiceSelectionReq bytes=22
+2026-03-06T13:21:30.201 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:30.201 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:30.324 [HLC][AUTH][ISO] rc=0 proc=1 standalone=0 ctrl_auth=2 hb=1
+2026-03-06T13:21:30.326 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX AuthorizationReq (proto=1)
+2026-03-06T13:21:30.332 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX AuthorizationReq exi_len=13 exi_hex=8098023A5D9523F1DCA861D008
+2026-03-06T13:21:30.346 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:494: DECODED ISO {"msg":"Authorization","req":{"genChallengeLen":0},"res":{"responseCode":"OK","processing":"Ongoing"}}
+2026-03-06T13:21:30.358 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX AuthorizationReq exi_len=15 exi_hex=8098023A5D9523F1DCA861D0100100
+2026-03-06T13:21:30.365 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX AuthorizationReq bytes=23
+2026-03-06T13:21:30.522 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX Authori[HLC][AUTH][ISO] rc=0 proc=0 standalone=0 ctrl_auth=2 hb=1
+2026-03-06T13:21:30.522 zationReq (proto=1)
+2026-03-06T13:21:30.529 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX AuthorizationReq exi_len=13 exi_hex=8098023A5D9523F1DCA861D008
+2026-03-06T13:21:30.542 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:494: DECODED ISO {"msg":"Authorization","req":{"genChallengeLen":0},"res":{"responseCode":"OK","processing":"Finished"}}
+2026-03-06T13:21:30.554 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX AuthorizationReq exi_len=15 exi_hex=8098023A5D9523F1DCA861D0100000
+2026-03-06T13:21:30.561 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX AuthorizationReq bytes=23
+2026-03-06T13:21:30.629 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:30.717 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1511: RX ChargeParameterDiscoveryReq (proto=1)
+2026-03-06T13:21:30.729 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: RX ChargeParameterDiscoveryReq exi_len=42 exi_hex=8098023A5D9523F1DCA861D09016194000DC0830D00F028A180340420482700430000043000000000000
+2026-03-06T13:21:30.754 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:522: DECODED ISO {"msg":"ChargeParameterDiscovery","req":{"etm":"DC_extended","evMaxA":200.0,"evMaxV":1000.0,"soc":55},"res":{"responseCode":"OK","processing":"Finished","scheduleCount":1,"evseMaxA":200.0,"evseMaxV":1000.0,"evseMaxkW":240.0}}
+2026-03-06T13:21:30.774 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:165: TX ChargeParameterDiscoveryReq exi_len=55 exi_hex=8098023A5D9523F1DCA861D0A000000000002028C1418503C0AA00400408186190020C28780081881D00E061800018819002230C004400
+2026-03-06T13:21:30.782 [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1526: TX ChargeParameterDiscoveryReq bytes=63
+2026-03-06T13:21:31.021 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:31.022 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:31.102 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:31.105 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=53 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:31.426 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:31.428 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:21:31.428 [SERCTRL] ALLOC1 txn=5 module=0x01
+2026-03-06T13:21:31.803 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:31.803 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:32.033 [HLC] waiting for EVCC TCP client...
+2026-03-06T13:21:32.108 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:32.111 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=192 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:32.210 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:32.613 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:32.613 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:33.009 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:33.123 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:33.125 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=134 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:33.440 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:33.441 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:33.824 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:33.927 [SERCTRL] ALLOC1 txn=6 module=0x01
+2026-03-06T13:21:34.141 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:34.144 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=75 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:34.229 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:34.230 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:34.629 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:35.033 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:35.034 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:35.147 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:35.149 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=3 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:35.410 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:35.811 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:35.812 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:36.159 [CTRL] waiting SLAC start auth (hb=0 armed=0 start=0)
+2026-03-06T13:21:36.165 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:36.171 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=169 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:36.430 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:36.432 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=0 allow_slac=0 allow_energy=0 alloc_sz=1
+2026-03-06T13:21:36.432 [SERCTRL] ALLOC1 txn=7 module=0x01
+2026-03-06T13:21:36.630 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:36.630 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:37.171 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:37.173 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:37.175 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=119 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:37.821 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:37.821 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:37.822 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:37.837 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:38.204 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:38.207 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=46 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:38.229 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:38.229 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:39.043 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:39.043 [SERCTRL] ALLOC1 txn=8 module=0x01
+2026-03-06T13:21:39.223 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:39.223 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:39.226 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:39.228 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=5 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:39.835 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:39.835 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:39.836 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:40.225 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:40.227 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:40.230 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=121 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:40.252 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:40.643 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:40.644 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:41.038 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:41.261 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:41.263 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=47 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:41.458 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:41.462 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:21:41.464 [SERCTRL] ALLOC1 txn=9 module=0x01
+2026-03-06T13:21:41.465 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:41.876 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:41.886 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:42.246 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:42.247 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:42.275 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:42.277 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=200 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:42.641 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:43.058 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:43.059 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:43.282 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:43.285 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=122 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:43.453 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:43.845 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:43.846 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:43.908 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:43.948 [SERCTRL] ALLOC1 txn=10 module=0x01
+2026-03-06T13:21:44.291 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:44.294 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:44.296 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=49 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:44.662 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:44.663 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:45.058 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:45.302 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:45.304 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=170 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:45.447 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:45.448 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:45.863 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:45.924 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:46.307 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:46.307 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:46.309 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:46.312 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=75 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:46.480 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:21:46.481 [SERCTRL] ALLOC1 txn=11 module=0x01
+2026-03-06T13:21:46.681 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:47.075 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:47.076 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:47.325 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:47.327 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=6 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:47.468 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:47.861 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:47.862 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:47.948 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:48.257 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:48.333 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:48.335 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=122 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:48.681 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:48.682 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:48.974 [SERCTRL] ALLOC1 txn=12 module=0x01
+2026-03-06T13:21:49.100 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:49.348 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:49.350 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=71 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:49.471 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:49.472 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:49.864 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:49.968 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:50.283 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:50.284 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:50.363 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:50.365 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=205 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:50.673 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:51.066 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:51.067 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:51.369 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:51.372 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=376 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:51.488 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:51.490 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:21:51.491 [SERCTRL] ALLOC1 txn=13 module=0x01
+2026-03-06T13:21:51.889 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:51.890 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:51.974 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:52.280 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:52.386 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:52.388 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=127 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:52.696 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:52.697 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:53.113 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:53.392 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:53.394 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=78 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:53.488 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:53.489 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:53.882 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:53.978 [SERCTRL] ALLOC1 txn=14 module=0x01
+2026-03-06T13:21:53.991 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:54.297 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:54.298 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:54.405 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:54.407 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=6 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:54.691 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:55.084 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:55.085 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:55.406 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:55.408 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=121 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:55.896 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:55.897 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:55.897 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:56.010 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:56.289 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:56.410 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:56.413 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=290 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:56.493 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:21:56.493 [SERCTRL] ALLOC1 txn=15 module=0x01
+2026-03-06T13:21:56.688 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:56.689 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:57.085 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:57.433 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:57.439 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:57.498 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:57.500 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:57.887 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:58.023 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:21:58.305 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:58.306 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:58.434 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:21:58.436 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=151 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:21:58.727 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:58.996 [SERCTRL] ALLOC1 txn=16 module=0x01
+2026-03-06T13:21:59.105 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:21:59.106 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:21:59.443 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:21:59.446 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=97 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:21:59.493 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:00.042 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:00.043 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:00.305 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:00.306 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:00.473 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:00.476 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=47 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:01.115 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:01.116 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:01.116 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:01.487 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:01.490 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=5 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:01.505 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:01.507 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:01.508 [SERCTRL] ALLOC1 txn=17 module=0x01
+2026-03-06T13:22:01.508 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:02.064 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:02.065 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:02.305 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:02.306 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:02.498 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:02.501 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=166 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:02.724 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:03.503 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:03.506 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:03.511 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:03.517 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=117 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:03.518 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:03.927 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:03.928 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:04.047 [SERCTRL] ALLOC1 txn=18 module=0x01
+2026-03-06T13:22:04.085 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:04.519 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:04.527 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:04.532 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=70 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:04.736 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:04.738 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:05.128 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:05.531 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:05.534 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=6 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:05.924 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:05.925 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:05.925 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:06.101 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:06.340 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:06.341 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:06.539 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:06.541 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=147 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:06.543 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:06.544 [SERCTRL] ALLOC1 txn=19 module=0x01
+2026-03-06T13:22:06.733 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:07.128 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:07.129 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:07.524 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:07.553 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:07.555 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=100 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:07.942 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:07.943 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:08.124 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:08.329 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:08.557 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:08.559 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=47 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:08.749 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:08.750 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:09.026 [SERCTRL] ALLOC1 txn=20 module=0x01
+2026-03-06T13:22:09.130 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:09.544 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:09.545 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:09.573 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:09.575 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=180 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:09.933 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:10.148 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:10.351 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:10.352 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:10.579 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:10.581 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=127 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:10.749 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:11.141 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:11.143 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:11.557 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:11.559 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:11.560 [SERCTRL] ALLOC1 txn=21 module=0x01
+2026-03-06T13:22:11.589 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:11.591 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=57 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:11.974 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:11.975 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:12.187 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:12.350 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:12.603 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:12.605 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=3 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:13.163 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:13.164 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:13.164 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:13.549 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:13.550 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:13.603 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:13.605 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=173 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:13.945 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:14.043 [SERCTRL] ALLOC1 txn=22 module=0x01
+2026-03-06T13:22:14.210 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:14.346 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:14.347 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:14.613 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:14.616 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=119 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:14.764 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:15.181 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:15.182 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:15.552 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:15.626 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:15.632 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=45 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:15.971 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:15.972 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:16.248 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:16.364 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:16.560 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:16.561 [SERCTRL] ALLOC1 txn=23 module=0x01
+2026-03-06T13:22:16.637 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:16.639 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=196 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:16.763 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:16.764 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:17.573 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:17.574 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:17.574 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:17.649 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:17.652 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=122 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:17.967 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:18.274 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:18.365 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:18.366 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:18.657 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:18.659 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=45 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:18.784 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:19.078 [SERCTRL] ALLOC1 txn=24 module=0x01
+2026-03-06T13:22:19.180 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:19.181 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:19.576 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:19.678 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:19.681 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=197 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:19.970 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:19.971 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:20.276 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:20.391 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:20.692 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:20.698 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=97 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:21.181 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:21.182 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:21.571 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:21.572 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:21.574 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:21.575 [SERCTRL] ALLOC1 txn=25 module=0x01
+2026-03-06T13:22:21.575 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:21.700 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:21.702 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=46 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:21.971 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:22.277 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:22.385 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:22.386 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:22.719 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:22.721 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=5 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:22.786 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:23.177 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:23.178 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:23.574 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:23.722 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:23.724 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=122 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:23.987 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:23.988 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:24.090 [SERCTRL] ALLOC1 txn=26 module=0x01
+2026-03-06T13:22:24.391 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:24.391 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:24.758 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:24.760 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=490 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:25.200 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:25.201 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:25.201 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:25.617 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:25.618 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:25.771 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:25.773 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=176 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:25.991 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:26.319 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:26.385 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:26.387 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:26.612 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=0 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:26.614 [SERCTRL] ALLOC1 txn=27 module=0x01
+2026-03-06T13:22:26.784 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:26.790 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=72 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:26.806 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:27.200 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:27.202 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:27.617 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:27.798 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:27.804 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=200 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:27.990 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:27.992 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:28.342 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:28.406 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:28.797 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:28.800 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=96 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:28.800 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:28.801 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:29.095 [SERCTRL] ALLOC1 txn=28 module=0x01
+2026-03-06T13:22:29.200 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:29.616 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:29.617 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:29.817 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:29.819 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=48 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:30.012 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:30.343 [CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+2026-03-06T13:22:30.409 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:30.410 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:30.783 [HLC] client session done rc=0
+2026-03-06T13:22:30.804 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:30.805 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:30.805 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:30.818 [SLAC] session start
+2026-03-06T13:22:30.821 [FSM] Reset -> Idle
+2026-03-06T13:22:30.821 [FSM] EnterBCD
+2026-03-06T13:22:30.836 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:30.838 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=178 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:30.847 [FSM] Idle -> WaitForMatchingStart
+2026-03-06T13:22:31.215 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:31.216 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:31.614 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:31.616 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:31.617 [SERCTRL] ALLOC1 txn=29 module=0x01
+2026-03-06T13:22:31.837 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:31.839 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=338 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:32.005 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:32.006 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:32.806 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:32.807 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:32.807 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:32.889 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:32.891 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=145 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:33.617 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:33.618 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:33.620 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:33.949 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:33.951 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=157 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:34.018 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:34.128 [SERCTRL] ALLOC1 txn=30 module=0x01
+2026-03-06T13:22:34.832 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:34.833 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:34.833 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:34.834 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:34.834 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:34.991 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:34.993 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=119 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:35.216 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:35.217 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:35.616 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:36.004 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:36.006 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=234 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:36.015 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:36.016 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:36.424 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:36.641 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:36.641 [SERCTRL] ALLOC1 txn=31 module=0x01
+2026-03-06T13:22:36.823 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:36.824 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:37.046 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:37.049 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=145 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:37.221 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:37.622 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:37.623 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:38.072 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:38.074 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:38.076 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=100 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:38.430 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:38.431 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:38.831 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:38.833 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:38.834 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:39.118 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:39.121 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:39.129 [SERCTRL] ALLOC1 txn=32 module=0x01
+2026-03-06T13:22:39.224 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:39.225 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:39.634 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:40.032 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:40.033 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:40.171 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:40.173 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=162 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:40.454 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:40.837 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:40.838 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:41.210 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:41.212 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=297 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:41.239 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:41.647 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:41.649 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:41.650 [SERCTRL] ALLOC1 txn=33 module=0x01
+2026-03-06T13:22:41.650 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:42.258 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:42.260 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:42.263 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=201 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:42.438 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:42.439 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:42.838 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:42.839 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:42.839 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:43.239 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:43.240 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:43.290 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:43.292 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=164 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:43.639 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:44.044 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:44.046 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:44.316 [SERCTRL] ALLOC1 txn=34 module=0x01
+2026-03-06T13:22:44.319 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:44.321 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=389 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:44.448 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:44.848 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:44.849 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:45.250 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:45.347 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:45.349 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=151 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:45.660 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:45.661 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:46.370 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:46.373 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:46.375 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=270 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:46.450 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:46.451 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:46.659 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:46.659 [SERCTRL] ALLOC1 txn=35 module=0x01
+2026-03-06T13:22:46.856 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:46.856 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:46.857 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:47.265 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:47.266 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:47.382 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:47.384 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=170 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:47.672 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:48.066 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:48.067 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:48.395 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:48.397 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=52 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:48.857 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:48.858 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:48.858 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:49.165 [SERCTRL] ALLOC1 txn=36 module=0x01
+2026-03-06T13:22:49.260 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:49.417 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:49.422 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=255 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:49.667 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:49.668 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:50.076 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:50.427 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:50.429 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:50.475 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:50.476 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:50.875 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:50.876 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:50.877 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:51.291 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:51.292 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:51.457 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:51.459 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=171 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:51.675 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:51.677 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:51.678 [SERCTRL] ALLOC1 txn=37 module=0x01
+2026-03-06T13:22:52.460 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:52.461 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:52.463 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:52.465 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=53 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:52.491 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:52.874 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:52.875 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:53.279 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:53.487 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:53.489 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=181 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:53.690 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:53.691 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:54.091 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:54.179 [SERCTRL] ALLOC1 txn=38 module=0x01
+2026-03-06T13:22:54.478 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:54.479 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:54.507 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:54.509 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=57 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:54.895 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:54.895 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:54.896 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:55.298 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:55.299 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:55.519 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:55.521 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=386 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:55.686 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:56.098 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:56.099 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:56.570 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:56.573 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:56.575 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=103 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:56.692 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:22:56.692 [SERCTRL] ALLOC1 txn=39 module=0x01
+2026-03-06T13:22:56.883 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:56.884 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:57.626 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:57.629 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:57.631 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=114 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:57.710 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:57.711 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:58.088 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:58.497 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:58.498 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:58.668 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:22:58.670 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=53 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:22:58.894 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:58.895 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:22:58.896 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:22:59.197 [SERCTRL] ALLOC1 txn=40 module=0x01
+2026-03-06T13:22:59.686 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:22:59.687 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:22:59.689 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:22:59.691 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=166 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:22:59.700 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:00.099 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:00.101 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:00.500 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:00.739 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:23:00.741 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=301 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:23:00.905 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:00.906 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:01.316 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:01.714 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:01.716 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:23:01.716 [SERCTRL] ALLOC1 txn=41 module=0x01
+2026-03-06T13:23:01.717 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:01.774 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:01.776 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=4 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:02.132 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:02.538 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:02.539 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:02.822 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:02.825 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=121 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:02.931 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:02.932 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:23:02.933 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:23:03.316 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:03.317 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:03.716 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:03.825 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:03.827 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=252 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:04.116 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:04.117 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:04.226 [SERCTRL] ALLOC1 txn=42 module=0x01
+2026-03-06T13:23:04.516 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:04.868 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:04.870 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=236 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:04.917 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:04.918 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:05.327 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:05.726 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:05.727 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:05.897 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:05.899 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=30 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:06.523 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:06.523 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:06.524 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:06.730 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:23:06.731 [SERCTRL] ALLOC1 txn=43 module=0x01
+2026-03-06T13:23:06.938 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:06.941 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=168 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:06.942 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:06.942 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:23:06.943 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:23:07.326 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:07.327 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:07.726 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:07.946 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:07.948 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=30 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:08.133 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:08.134 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:08.530 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:08.942 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:08.942 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:08.983 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:23:08.985 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=172 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:23:09.238 [SERCTRL] ALLOC1 txn=44 module=0x01
+2026-03-06T13:23:09.347 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:09.755 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:09.756 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:10.034 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:10.036 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=89 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:10.533 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:10.535 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:10.537 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:10.820 [FSM] WaitForMatchingStart -> SignalError
+2026-03-06T13:23:10.869 [FSM] SignalError -> WaitForMatchingStart
+2026-03-06T13:23:10.943 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:10.944 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:23:10.945 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:23:11.041 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:23:11.043 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=40 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:23:11.334 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:11.335 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:11.745 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:11.747 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:23:11.748 [SERCTRL] ALLOC1 txn=45 module=0x01
+2026-03-06T13:23:12.048 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:23:12.050 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=30 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:23:12.144 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:12.145 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:12.544 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:12.942 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:12.943 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:13.089 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:13.091 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=223 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:13.344 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:13.756 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:13.757 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:14.132 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:14.134 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=105 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:14.156 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:14.249 [SERCTRL] ALLOC1 txn=46 module=0x01
+2026-03-06T13:23:14.548 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:14.549 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:14.960 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:14.960 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:23:14.961 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:23:15.140 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:23:15.142 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=234 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:23:15.375 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:15.375 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:15.752 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:16.163 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:16.164 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:16.195 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.1 cmbI=0.00 availI=100.0
+2026-03-06T13:23:16.201 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=413 V=200.1 I=0.00 alarm=0x00000000
+2026-03-06T13:23:16.565 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:16.784 [SERCTRL] STATUS standalone=0 plc_id=1 controller_id=1 hb=1 auth=2 allow_slac=1 allow_energy=1 alloc_sz=1
+2026-03-06T13:23:16.786 [SERCTRL] ALLOC1 txn=47 module=0x01
+2026-03-06T13:23:16.966 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:16.967 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:17.195 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:17.200 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=54 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:17.374 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:17.766 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:17.768 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:18.164 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:18.203 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:18.206 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=382 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:18.566 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:18.567 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:18.990 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:18.990 [SERCTRL] SLAC cmd=1 arm_ms=12000
+2026-03-06T13:23:18.991 [SERCTRL] SLAC cmd=2 arm_ms=12000
+2026-03-06T13:23:19.208 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:19.210 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=112 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:19.287 [SERCTRL] ALLOC1 txn=48 module=0x01
+2026-03-06T13:23:19.768 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:19.769 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:19.770 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:20.177 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:20.178 [SERCTRL] AUTH state=2 ttl_ms=3000
+2026-03-06T13:23:20.218 [MODRT][GRP] valid=1 en=0 assigned=1 active=0 sat=0 degr=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 cmbV=200.0 cmbI=0.00 availI=100.0
+2026-03-06T13:23:20.221 [MODRT][MOD] id=MXR_1 lc=Allocated grp=G_MAIN lease=0 iso=0 off=0 fault=0 online=1 fresh=1 ageMs=514 V=200.0 I=0.00 alarm=0x00000000
+2026-03-06T13:23:20.577 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:20.988 [SERCTRL] HB timeout_ms=3200
+2026-03-06T13:23:20.988 [SERCTRL] AUTH state=2 ttl_ms=3000

@@ -1,0 +1,210 @@
+[BOOT] waiting... 9000/10000 ms
+[NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[MOD] startup scan begin (single module MXR_1 addr=0x01)
+[MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[MOD] setup upsert=1 allocate=1 ready=1
+
+Stack smashing protect failure!
+
+
+Backtrace: 0x40377e66:0x3fcb21f0 0x4037d25d:0x3fcb2210 0x403774fa:0x3fcb2230 0x42030fdf:0x3fcb2250 0x42034e87:0x3fcb2290 0x42042b66:0x3fcb22e0
+
+
+
+
+ELF file SHA256: e80337202f81f54b
+
+Rebooting...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x420ba09a
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce3808,len:0x4bc
+load:0x403c9700,len:0xbd8
+load:0x403cc700,len:0x2a0c
+entry 0x403c98d0
+[   436][I][esp32-hal-psram.c:96] psramInit(): PSRAM enabled
+
+cbslac + jpv2g ESP32-S3 SLAC/HLC (to PreCharge)
+[   651][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+[CFG] NVS open failed for read, using defaults
+[CFG] standalone=1 slac_ctrl=1 plc_id=0 controller_id=1 hb_to=1200 auth_ttl=2500 alloc_ttl=3000 slac_arm_to=10000
+[NET] local MAC B8:F8:62:4B:C5:20
+[   657][I][esp32-hal-i2c.c:75] i2cInit(): Initialising I2C Master: sda=12 scl=11 freq=100000
+[RELAY] ready addr=0x20 pin=P00/P01/P02, SW4=P06
+[CFG] SW4 boot state: released
+[BOOT] startup log hold 10000 ms
+[BOOT] waiting... 1001/10000 ms
+[BOOT] waiting... 2001/10000 ms
+[BOOT] waiting... 3001/10000 ms
+[BOOT] waiting... 4001/10000 ms
+[BOOT] waiting... 5001/10000 ms
+[BOOT] waiting... 6001/10000 ms
+[BOOT] waiting... 7001/10000 ms
+[BOOT] waiting... 8001/10000 ms
+[BOOT] waiting... 9001/10000 ms
+[NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[MOD] startup scan begin (single module MXR_1 addr=0x01)
+[MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[MOD] setup upsert=1 allocate=1 ready=1
+
+Stack smashing protect failure!
+
+
+Backtrace: 0x40377e66:0x3fcb21f0 0x4037d25d:0x3fcb2210 0x403774fa:0x3fcb2230 0x42030fdf:0x3fcb2250 0x42034e87:0x3fcb2290 0x42042b66:0x3fcb22e0
+
+
+
+
+ELF file SHA256: e80337202f81f54b
+
+Rebooting...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x420ba09a
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce3808,len:0x4bc
+load:0x403c9700,len:0xbd8
+load:0x403cc700,len:0x2a0c
+entry 0x403c98d0
+[   436][I][esp32-hal-psram.c:96] psramInit(): PSRAM enabled
+
+cbslac + jpv2g ESP32-S3 SLAC/HLC (to PreCharge)
+[   651][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+[CFG] NVS open failed for read, using defaults
+[CFG] standalone=1 slac_ctrl=1 plc_id=0 controller_id=1 hb_to=1200 auth_ttl=2500 alloc_ttl=3000 slac_arm_to=10000
+[NET] local MAC B8:F8:62:4B:C5:20
+[   657][I][esp32-hal-i2c.c:75] i2cInit(): Initialising I2C Master: sda=12 scl=11 freq=100000
+[RELAY] ready addr=0x20 pin=P00/P01/P02, SW4=P06
+[CFG] SW4 boot state: released
+[BOOT] startup log hold 10000 ms
+[BOOT] waiting... 1001/10000 ms
+[BOOT] waiting... 2001/10000 ms
+[BOOT] waiting... 3001/10000 ms
+[BOOT] waiting... 4001/10000 ms
+[BOOT] waiting... 5001/10000 ms
+[BOOT] waiting... 6001/10000 ms
+[BOOT] waiting... 7001/10000 ms
+[BOOT] waiting... 8001/10000 ms
+[BOOT] waiting... 9001/10000 ms
+[NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[MOD] startup scan begin (single module MXR_1 addr=0x01)
+[MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+
+Stack smashing protect failure!
+
+
+Backtrace: 0x40377e66:0x3fcb21f0 0x4037d25d:0x3fcb2210 0x403774fa:0x3fcb2230 0x42030fdf:0x3fcb2250 0x42034e87:0x3fcb2290 0x42042b66:0x3fcb22e0
+
+
+
+
+ELF file SHA256: e80337202f81f54b
+
+Rebooting...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x420ba09a
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce3808,len:0x4bc
+load:0x403c9700,len:0xbd8
+load:0x403cc700,len:0x2a0c
+entry 0x403c98d0
+[   436][I][esp32-hal-psram.c:96] psramInit(): PSRAM enabled
+
+cbslac + jpv2g ESP32-S3 SLAC/HLC (to PreCharge)
+[   651][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+[CFG] NVS open failed for read, using defaults
+[CFG] standalone=1 slac_ctrl=1 plc_id=0 controller_id=1 hb_to=1200 auth_ttl=2500 alloc_ttl=3000 slac_arm_to=10000
+[NET] local MAC B8:F8:62:4B:C5:20
+[   657][I][esp32-hal-i2c.c:75] i2cInit(): Initialising I2C Master: sda=12 scl=11 freq=100000
+[RELAY] ready addr=0x20 pin=P00/P01/P02, SW4=P06
+[CFG] SW4 boot state: released
+[BOOT] startup log hold 10000 ms
+[BOOT] waiting... 1000/10000 ms
+[BOOT] waiting... 2000/10000 ms
+[BOOT] waiting... 3000/10000 ms
+[BOOT] waiting... 4000/10000 ms
+[BOOT] waiting... 5000/10000 ms
+[BOOT] waiting... 6000/10000 ms
+[BOOT] waiting... 7000/10000 ms
+[BOOT] waiting... 8000/10000 ms
+[BOOT] waiting... 9000/10000 ms
+[NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[MOD] startup scan begin (single module MXR_1 addr=0x01)
+[MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[MOD] setup upsert=1 allocate=1 ready=1
+
+Stack smashing protect failure!
+
+
+Backtrace: 0x40377e66:0x3fcb21f0 0x4037d25d:0x3fcb2210 0x403774fa:0x3fcb2230 0x42030fdf:0x3fcb2250 0x42034e87:0x3fcb2290 0x42042b66:0x3fcb22e0
+
+
+
+
+ELF file SHA256: e80337202f81f54b
+
+Rebooting...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x420ba09a
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce3808,len:0x4bc
+load:0x403c9700,len:0xbd8
+load:0x403cc700,len:0x2a0c
+entry 0x403c98d0
+[   436][I][esp32-hal-psram.c:96] psramInit(): PSRAM enabled
+
+cbslac + jpv2g ESP32-S3 SLAC/HLC (to PreCharge)
+[   651][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+[CFG] NVS open failed for read, using defaults
+[CFG] standalone=1 slac_ctrl=1 plc_id=0 controller_id=1 hb_to=1200 auth_ttl=2500 alloc_ttl=3000 slac_arm_to=10000
+[NET] local MAC B8:F8:62:4B:C5:20
+[   657][I][esp32-hal-i2c.c:75] i2cInit(): Initialising I2C Master: sda=12 scl=11 freq=100000
+[RELAY] ready addr=0x20 pin=P00/P01/P02, SW4=P06
+[CFG] SW4 boot state: released
+[BOOT] startup log hold 10000 ms
+[BOOT] waiting... 1001/10000 ms
+[BOOT] waiting... 2001/10000 ms
+[BOOT] waiting... 3001/10000 ms
+[BOOT] waiting... 4001/10000 ms
+[BOOT] waiting... 5001/10000 ms
+[BOOT] waiting... 6001/10000 ms
+[BOOT] waiting... 7001/10000 ms
+[BOOT] waiting... 8001/10000 ms
+[BOOT] waiting... 9001/10000 ms
+[NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[MOD] startup scan begin (single module MXR_1 addr=0x01)
+[MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[MOD] setup upsert=1 allocate=1 ready=1
+
+Stack smashing protect failure!
+
+
+Backtrace: 0x40377e66:0x3fcb21f0 0x4037d25d:0x3fcb2210 0x403774fa:0x3fcb2230 0x42030fdf:0x3fcb2250 0x42034e87:0x3fcb2290 0x42042b66:0x3fcb22e0
+
+
+
+
+ELF file SHA256: e80337202f81f54b
+
+Rebooting...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x420ba09a
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce3808,len:0x4bc
+load:0x403c9700,len:0xbd8
+load:0x403cc700,len:0x2a0c
+entry 0x403c98d0

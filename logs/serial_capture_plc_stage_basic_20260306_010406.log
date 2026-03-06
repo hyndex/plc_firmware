@@ -1,0 +1,151 @@
+
+=== SERIAL CONNECT /dev/ttyACM0 115200 @ 2026-03-06T01:04:06 ===
+[2026-03-06T01:04:07.367] (+0.502s) [   416][I][esp32-hal-psram.c:96] psramInit(): PSRAM enabled
+[2026-03-06T01:04:07.367] (+0.503s) 
+[2026-03-06T01:04:07.367] (+0.503s) cbslac + jpv2g ESP32-S3 SLAC/HLC (to PreCharge)
+[2026-03-06T01:04:07.367] (+0.503s) [BOOT] startup log hold 10000 ms
+[2026-03-06T01:04:08.368] (+1.504s) [BOOT] waiting... 1009/10000 ms
+[2026-03-06T01:04:09.369] (+2.505s) [BOOT] waiting... 2009/10000 ms
+[2026-03-06T01:04:10.370] (+3.506s) [BOOT] waiting... 3009/10000 ms
+[2026-03-06T01:04:11.371] (+4.507s) [BOOT] waiting... 4009/10000 ms
+[2026-03-06T01:04:12.373] (+5.508s) [BOOT] waiting... 5009/10000 ms
+[2026-03-06T01:04:13.374] (+6.509s) [BOOT] waiting... 6009/10000 ms
+[2026-03-06T01:04:14.375] (+7.510s) [BOOT] waiting... 7009/10000 ms
+[2026-03-06T01:04:15.376] (+8.511s) [BOOT] waiting... 8009/10000 ms
+[2026-03-06T01:04:16.376] (+9.512s) [BOOT] waiting... 9009/10000 ms
+[2026-03-06T01:04:17.377] (+10.513s) [NET] local MAC B8:F8:62:4B:C5:20
+[2026-03-06T01:04:17.377] (+10.513s) [NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[2026-03-06T01:04:17.378] (+10.513s) [ 10640][I][esp32-hal-i2c.c:75] i2cInit(): Initialising I2C Master: sda=12 scl=11 freq=100000
+[2026-03-06T01:04:17.378] (+10.513s) [RELAY] Relay1 ready addr=0x20 pin=P00
+[2026-03-06T01:04:17.378] (+10.513s) [MOD] startup scan begin (single module MXR_1 addr=0x01)
+[2026-03-06T01:04:17.378] (+10.513s) [MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[2026-03-06T01:04:17.378] (+10.513s) [MOD] setup upsert=1 allocate=1 ready=1
+[2026-03-06T01:04:18.378] (+11.514s) [QCA] transport ready
+[2026-03-06T01:04:18.879] (+12.014s) [ 11947][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 0 - WIFI_READY
+[2026-03-06T01:04:18.879] (+12.014s) [ 11986][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 2 - STA_START
+[2026-03-06T01:04:18.879] (+12.014s) [NET] lwIP socket stack initialized (WiFi STA mode)
+[2026-03-06T01:04:18.879] (+12.014s) [NET] PLC lwIP netif ready: pl2
+[2026-03-06T01:04:18.879] (+12.014s) [APP] ready, waiting for CP B/C/D
+[2026-03-06T01:04:18.879] (+12.014s) [ 12010][I][esp32-hal-adc.c:249] __analogReadMilliVolts(): ADC1: Characterized using Default Vref: 0
+[2026-03-06T01:04:18.879] (+12.014s) 
+[2026-03-06T01:04:18.879] (+12.014s) [CP] state A -> B (2218 mV)
+[2026-03-06T01:04:18.879] (+12.014s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T01:04:19.380] (+12.515s) [SLAC] session start
+[2026-03-06T01:04:19.380] (+12.515s) [FSM] Reset -> Idle
+[2026-03-06T01:04:19.380] (+12.515s) [FSM] EnterBCD
+[2026-03-06T01:04:19.380] (+12.515s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T01:04:22.884] (+16.019s) [CP] state B -> C (1982 mV)
+[2026-03-06T01:04:23.885] (+17.020s) [CP] state C -> B (2157 mV)
+[2026-03-06T01:04:24.386] (+17.521s) [CP] state B -> C (1943 mV)
+[2026-03-06T01:04:30.894] (+24.029s) [CP] state C -> B (2121 mV)
+[2026-03-06T01:04:57.422] (+50.557s) [CP] state B -> C (1804 mV)
+[2026-03-06T01:04:58.924] (+52.059s) [CP] state C -> B (2116 mV)
+[2026-03-06T01:04:59.425] (+52.560s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T01:04:59.425] (+52.560s) [FSM] SignalError -> WaitForMatchingStart
+[2026-03-06T01:05:05.431] (+58.566s) [CP] state B -> C (1858 mV)
+[2026-03-06T01:05:05.931] (+59.067s) [CP] state C -> B (2183 mV)
+[2026-03-06T01:05:08.434] (+61.569s) [CP] state B -> C (1902 mV)
+[2026-03-06T01:05:11.941] (+65.076s) [CP] state C -> B (2153 mV)
+[2026-03-06T01:05:18.448] (+71.583s) [CP] state B -> C (2011 mV)
+[2026-03-06T01:05:19.449] (+72.584s) [CP] state C -> B (2126 mV)
+[2026-03-06T01:05:26.958] (+80.093s) [CP] state B -> C (2099 mV)
+[2026-03-06T01:05:29.962] (+83.097s) [CP] state C -> B (2166 mV)
+[2026-03-06T01:05:33.466] (+86.601s) [CP] state B -> C (2065 mV)
+[2026-03-06T01:05:33.967] (+87.102s) [CP] state C -> B (2152 mV)
+[2026-03-06T01:05:34.967] (+88.103s) [CP] state B -> C (2071 mV)
+[2026-03-06T01:05:36.469] (+89.604s) [CP] state C -> B (2166 mV)
+[2026-03-06T01:05:37.470] (+90.606s) [CP] state B -> C (1823 mV)
+[2026-03-06T01:05:38.471] (+91.607s) [CP] state C -> B (2180 mV)
+[2026-03-06T01:05:39.472] (+92.607s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T01:05:39.472] (+92.608s) [FSM] SignalError -> WaitForMatchingStart
+[2026-03-06T01:05:46.483] (+99.618s) [CP] state B -> C (2077 mV)
+[2026-03-06T01:05:46.983] (+100.119s) [CP] state C -> B (2135 mV)
+[2026-03-06T01:05:57.995] (+111.130s) [CP] state B -> C (2082 mV)
+[2026-03-06T01:05:58.496] (+111.631s) [CP] state C -> B (2110 mV)
+[2026-03-06T01:06:10.009] (+123.144s) [CP] state B -> C (2051 mV)
+[2026-03-06T01:06:11.510] (+124.646s) [CP] state C -> B (2166 mV)
+[2026-03-06T01:06:16.016] (+129.151s) [CP] state B -> C (2078 mV)
+[2026-03-06T01:06:17.017] (+130.152s) [CP] state C -> B (2156 mV)
+[2026-03-06T01:06:19.520] (+132.655s) [FSM] WaitForMatchingStart -> SignalError
+[2026-03-06T01:06:19.520] (+132.655s) [FSM] SignalError -> NoSlacPerformed
+[2026-03-06T01:06:19.520] (+132.655s) [SLAC] enter hold (fsm terminal failure) 3000 ms
+[2026-03-06T01:06:19.520] (+132.655s) [CP] duty -> 100% (state=B hold=1 ef=0)
+[2026-03-06T01:06:22.523] (+135.659s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-06T01:06:22.524] (+135.659s) [SLAC] session start
+[2026-03-06T01:06:22.524] (+135.659s) [FSM] Reset -> Idle
+[2026-03-06T01:06:22.524] (+135.659s) [FSM] EnterBCD
+[2026-03-06T01:06:22.524] (+135.659s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-06T01:06:27.028] (+140.164s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-06T01:06:27.529] (+140.664s) [FSM] Matching -> Sounding
+[2026-03-06T01:06:28.030] (+141.165s) [FSM] Timeout in sounding, send results
+[2026-03-06T01:06:28.030] (+141.165s) [FSM] Sounding -> DoAttenChar
+[2026-03-06T01:06:28.030] (+141.165s) [FSM] DoAttenChar -> WaitForSlacMatch
+[2026-03-06T01:06:28.030] (+141.165s) [SLAC] match request received, signaling link detected
+[2026-03-06T01:06:28.030] (+141.165s) [FSM] WaitForSlacMatch -> Matched
+[2026-03-06T01:06:28.030] (+141.165s) [SLAC] MATCHED - starting HLC stack
+[2026-03-06T01:06:28.030] (+141.165s) [HLC] bind iface=<default> (plc=pl2)
+[2026-03-06T01:06:28.030] (+141.165s) [HLC] worker task started stack_bytes=65536
+[2026-03-06T01:06:28.030] (+141.165s) [WARN ] /home/jpi/Desktop/EVSE/jpv2g/src/transport.c:137: IPV6_JOIN_GROUP failed on iface  (errno=125), continuing without multicast
+[2026-03-06T01:06:28.030] (+141.165s) [HLC] stack ready (SDP+TCP on 15118)
+[2026-03-06T01:06:28.030] (+141.165s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:06:29.259] (+142.394s) [SDP] req sec=0x10 tp=0x00 -> res port=15118 sec=0x10
+[2026-03-06T01:06:29.259] (+142.394s) [HLC] EVCC connected, processing session
+[2026-03-06T01:06:29.259] (+142.394s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:923: SAPP opt[0] schema=1 prio=2 ns=urn:din:70121:2012:MsgDef
+[2026-03-06T01:06:29.259] (+142.394s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:923: SAPP opt[1] schema=0 prio=1 ns=urn:iso:15118:2:2013:MsgDef
+[2026-03-06T01:06:29.259] (+142.394s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:926: SAPP selected proto=1 schema=0
+[2026-03-06T01:06:29.259] (+142.394s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1480: RX SupportedAppProtocolReq (proto=1)
+[2026-03-06T01:06:29.259] (+142.394s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SupportedAppProtocolReq exi_len=68 exi_hex=8000DBAB9371D3234B71D1B981899189D191818991D26B9B3A232B30020000040401D75726E3A69736F3A31353131383A323A323031333A4D73674465660040000000080
+[2026-03-06T01:06:29.259] (+142.394s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:399: DECODED {"msg":"SupportedAppProtocol","req":{"protocols":[{"schema":1,"prio":2,"ns":"urn:din:70121:2012:MsgDef"},{"schema":0,"prio":1,"ns":"urn:iso:15118:2:2013:MsgDef"}]},"res":{"responseCode":0,"schema":0}}
+[2026-03-06T01:06:29.483] (+142.619s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SupportedAppProtocolReq exi_len=4 exi_hex=80400000
+[2026-03-06T01:06:29.483] (+142.619s) [HLC] EVCC connected, handed off to worker
+[2026-03-06T01:06:29.484] (+142.619s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: TX SupportedAppProtocolReq bytes=12
+[2026-03-06T01:06:29.484] (+142.619s) [HLC][STAGE] WaitSessionSetup -> WaitServiceDiscovery (SessionSetup)
+[2026-03-06T01:06:29.484] (+142.619s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1480: RX SessionSetupReq (proto=1)
+[2026-03-06T01:06:29.484] (+142.619s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SessionSetupReq exi_len=14 exi_hex=8098004011D01A2326CDE4FDA000
+[2026-03-06T01:06:29.484] (+142.619s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:433: DECODED ISO {"msg":"SessionSetup","req":{"evccId":""},"res":{"responseCode":"OK_NewSessionEstablished","evseId":"IN*JPE*E000100010001","sessionId":"0568DE3AF2A653AF"}}
+[2026-03-06T01:06:29.484] (+142.619s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SessionSetupReq exi_len=36 exi_hex=809802015A378EBCA994EBD1E020592538A9294114A914C0C0C0C4C0C0C0C4C0C0C0C480
+[2026-03-06T01:06:29.484] (+142.619s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: TX SessionSetupReq bytes=44
+[2026-03-06T01:06:29.630] (+142.765s) [HLC][STAGE] WaitServiceDiscovery -> WaitPaymentSelection (ServiceDiscovery)
+[2026-03-06T01:06:29.630] (+142.765s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1480: RX ServiceDiscoveryReq (proto=1)
+[2026-03-06T01:06:29.630] (+142.765s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX ServiceDiscoveryReq exi_len=13 exi_hex=809802015A378EBCA994EBD1B8
+[2026-03-06T01:06:29.630] (+142.765s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:465: DECODED ISO {"msg":"ServiceDiscovery","req":{"scope":"","category":-1},"res":{"responseCode":"OK","payments":["ExternalPayment"],"serviceId":1,"serviceName":"DCFC","freeService":0,"etm":["DC_core","DC_extended","DC_combo_core"]}}
+[2026-03-06T01:06:29.630] (+142.765s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX ServiceDiscoveryReq exi_len=27 exi_hex=809802015A378EBCA994EBD1C0012004019110D190C04040C21200
+[2026-03-06T01:06:29.630] (+142.765s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: TX ServiceDiscoveryReq bytes=35
+[2026-03-06T01:06:29.630] (+142.765s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1480: RX Payment[HLC][STAGE] WaitPaymentSelection -> WaitAuthorization (PaymentSelection)
+[2026-03-06T01:06:29.630] (+142.765s) ServiceSelectionReq (proto=1)
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX PaymentServiceSelectionReq exi_len=16 exi_hex=809802015A378EBCA994EBD132001280
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:478: DECODED ISO {"msg":"PaymentServiceSelection","req":{"payment":"Contract","serviceId":1},"res":{"responseCode":"OK"}}
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX PaymentServiceSelectionReq exi_len=14 exi_hex=809802015A378EBCA994EBD14000
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: TX PaymentServiceSelectionReq bytes=22
+[2026-03-06T01:06:29.765] (+142.900s) [HLC][STAGE] WaitAuthorization -> WaitChargeParams (Authorization)
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1480: RX AuthorizationReq (proto=1)
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX AuthorizationReq exi_len=13 exi_hex=809802015A378EBCA994EBD008
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:487: DECODED ISO {"msg":"Authorization","req":{"genChallengeLen":0},"res":{"responseCode":"OK","processing":"Finished"}}
+[2026-03-06T01:06:29.765] (+142.900s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX AuthorizationReq exi_len=15 exi_hex=809802015A378EBCA994EBD0100000
+[2026-03-06T01:06:30.266] (+143.401s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: TX AuthorizationReq bytes=23
+[2026-03-06T01:06:30.266] (+143.401s) [HLC] client session done rc=-104
+[2026-03-06T01:06:31.267] (+144.402s) [CP] state B -> C (1933 mV)
+[2026-03-06T01:06:32.769] (+145.904s) [CP] state C -> B (2161 mV)
+[2026-03-06T01:06:33.270] (+146.405s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:06:38.275] (+151.411s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:06:43.281] (+156.416s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:06:48.287] (+161.422s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:06:49.288] (+162.423s) [CP] state B -> C (2028 mV)
+[2026-03-06T01:06:49.789] (+162.924s) [CP] state C -> B (2188 mV)
+[2026-03-06T01:06:53.293] (+166.428s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:06:58.299] (+171.435s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:01.302] (+174.438s) [CP] state B -> C (2067 mV)
+[2026-03-06T01:07:01.303] (+174.438s) [CP] state C -> B (2109 mV)
+[2026-03-06T01:07:03.305] (+176.440s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:08.311] (+181.446s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:08.311] (+181.446s) [CP] state B -> C (2028 mV)
+[2026-03-06T01:07:08.311] (+181.446s) [CP] state C -> B (2125 mV)
+[2026-03-06T01:07:13.317] (+186.452s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:18.323] (+191.458s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:23.329] (+196.464s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:28.335] (+201.470s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:32.839] (+205.975s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:37.845] (+210.981s) [HLC] waiting for EVCC TCP client...
+[2026-03-06T01:07:39.848] (+212.983s) [CP] state B -> C (2098 mV)
+[2026-03-06T01:07:42.350] (+215.486s) [CP] state C -> B (2153 mV)
+[2026-03-06T01:07:42.851] (+215.986s) [HLC] waiting for EVCC TCP client...

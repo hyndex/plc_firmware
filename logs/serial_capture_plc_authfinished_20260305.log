@@ -1,0 +1,256 @@
+
+=== SERIAL CONNECT /dev/ttyACM0 115200 @ 2026-03-05T23:34:32 ===
+[2026-03-05T23:34:33.717] (+1.004s) [BOOT] waiting... 6000/10000 ms
+[2026-03-05T23:34:34.718] (+2.005s) [BOOT] waiting... 7000/10000 ms
+[2026-03-05T23:34:35.719] (+3.006s) [BOOT] waiting... 8000/10000 ms
+[2026-03-05T23:34:36.720] (+4.007s) [BOOT] waiting... 9000/10000 ms
+[2026-03-05T23:34:37.721] (+5.008s) [NET] local MAC B8:F8:62:4B:C5:20
+[2026-03-05T23:34:37.721] (+5.009s) [NET] SECC IPv6 LL fe80::baf8:62ff:fe4b:c520
+[2026-03-05T23:34:37.721] (+5.009s) [ 10631][I][esp32-hal-i2c.c:75] i2cInit(): Initialising I2C Master: sda=12 scl=11 freq=100000
+[2026-03-05T23:34:37.721] (+5.009s) [RELAY] Relay1 ready addr=0x20 pin=P00
+[2026-03-05T23:34:37.721] (+5.009s) [MOD] MCP2515 ready @125 kbps osc=8MHz
+[2026-03-05T23:34:37.721] (+5.009s) [MOD] startup scan begin (single module MXR_1 addr=0x01)
+[2026-03-05T23:34:37.721] (+5.009s) [MOD] scan complete=1 expected=1 discovered=1 validated=1 missing=0 mismatch=0
+[2026-03-05T23:34:37.721] (+5.009s) [MOD] scan id=MXR_1 discovered=1 type_match=1 addr_match=1 valid=1
+[2026-03-05T23:34:37.721] (+5.009s) [MOD] setup upsert=1 allocate=1 low_bw=5.0kbps ready=1
+[2026-03-05T23:34:38.722] (+6.009s) [QCA] transport ready
+[2026-03-05T23:34:39.223] (+6.510s) [ 11938][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 0 - WIFI_READY
+[2026-03-05T23:34:39.223] (+6.510s) [ 11978][D][WiFiGeneric.cpp:1040] _eventCallback(): Arduino Event: 2 - STA_START
+[2026-03-05T23:34:39.223] (+6.510s) [NET] lwIP socket stack initialized (WiFi STA mode)
+[2026-03-05T23:34:39.223] (+6.510s) [NET] PLC lwIP netif ready: pl2
+[2026-03-05T23:34:39.223] (+6.510s) [APP] ready, waiting for CP B/C/D
+[2026-03-05T23:34:39.223] (+6.510s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:39.223] (+6.510s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:39.223] (+6.510s) [ 11997][I][esp32-hal-adc.c:249] __analogReadMilliVolts(): ADC1: Characterized using Default Vref: 0
+[2026-03-05T23:34:39.223] (+6.510s) 
+[2026-03-05T23:34:39.223] (+6.510s) [CP] state A -> B (2219 mV)
+[2026-03-05T23:34:39.223] (+6.510s) [CP] duty -> 5% (state=B hold=0 ef=0)
+[2026-03-05T23:34:39.723] (+7.011s) [SLAC] session start
+[2026-03-05T23:34:39.723] (+7.011s) [FSM] Reset -> Idle
+[2026-03-05T23:34:39.723] (+7.011s) [FSM] EnterBCD
+[2026-03-05T23:34:39.724] (+7.011s) [FSM] Idle -> WaitForMatchingStart
+[2026-03-05T23:34:40.224] (+7.511s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:40.224] (+7.511s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:41.225] (+8.513s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:41.225] (+8.513s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:42.226] (+9.513s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:42.226] (+9.513s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:43.227] (+10.514s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:43.227] (+10.514s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:43.227] (+10.514s) [CP] state B -> C (2029 mV)
+[2026-03-05T23:34:43.728] (+11.015s) [FSM] WaitForMatchingStart -> Matching
+[2026-03-05T23:34:44.228] (+11.515s) [FSM] Matching -> Sounding
+[2026-03-05T23:34:44.228] (+11.515s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:44.228] (+11.515s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:44.228] (+11.515s) [CP] state C -> B (2166 mV)
+[2026-03-05T23:34:44.228] (+11.515s) [FSM] Sounding -> DoAttenChar
+[2026-03-05T23:34:44.228] (+11.515s) [FSM] DoAttenChar -> WaitForSlacMatch
+[2026-03-05T23:34:44.729] (+12.016s) [SLAC] match request received, signaling link detected
+[2026-03-05T23:34:44.729] (+12.016s) [FSM] WaitForSlacMatch -> Matched
+[2026-03-05T23:34:44.729] (+12.016s) [SLAC] MATCHED - starting HLC stack
+[2026-03-05T23:34:44.729] (+12.016s) [HLC] bind iface=<default> (plc=pl2)
+[2026-03-05T23:34:44.729] (+12.017s) [HLC] worker task started stack_bytes=65536
+[2026-03-05T23:34:44.729] (+12.017s) [WARN ] /home/jpi/Desktop/EVSE/jpv2g/src/transport.c:137: IPV6_JOIN_GROUP failed on iface  (errno=125), continuing without multicast
+[2026-03-05T23:34:44.729] (+12.017s) [HLC] stack ready (SDP+TCP on 15118)
+[2026-03-05T23:34:44.729] (+12.017s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:34:45.230] (+12.517s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:45.230] (+12.517s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:45.723] (+13.011s) [SDP] req sec=0x10 tp=0x00 -> res port=15118 sec=0x10
+[2026-03-05T23:34:45.723] (+13.011s) [HLC] EVCC connected, processing session
+[2026-03-05T23:34:45.723] (+13.011s) [HLC] EVCC connected, handed off to worker
+[2026-03-05T23:34:45.723] (+13.011s) [HLC] RX SupportedAppProtocol
+[2026-03-05T23:34:45.723] (+13.011s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:926: SAPP opt[0] schema=1 prio=2 ns=urn:din:70121:2012:MsgDef
+[2026-03-05T23:34:45.723] (+13.011s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:926: SAPP opt[1] schema=0 prio=1 ns=urn:iso:15118:2:2013:MsgDef
+[2026-03-05T23:34:45.723] (+13.011s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:929: SAPP selected proto=1 schema=0
+[2026-03-05T23:34:45.723] (+13.011s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: RX SupportedAppProtocolReq (proto=1)
+[2026-03-05T23:34:45.724] (+13.011s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SupportedAppProtocolReq exi_len=68 exi_hex=8000DBAB9371D3234B71D1B981899189D191818991D26B9B3A232B30020000040401D75726E3A69736F3A31353131383A323A323031333A4D73674465660040000000080
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:399: DECODED {"msg":"SupportedAppProtocol","req":{"protocols":[{"schema":1,"prio":2,"ns":"urn:din:70121:2012:MsgDef"},{"schema":0,"prio":1,"ns":"urn:iso:15118:2:2013:MsgDef"}]},"res":{"responseCode":0,"schema":0}}
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SupportedAppProtocolReq exi_len=4 exi_hex=80400000
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1510: TX SupportedAppProtocolReq bytes=12
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: RX Session[HLC] RX SessionSetup
+[2026-03-05T23:34:45.934] (+13.221s) SetupReq (proto=1)
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX SessionSetupReq exi_len=14 exi_hex=8098004011D01A2326CDE4FDA000
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:433: DECODED ISO {"msg":"SessionSetup","req":{"evccId":""},"res":{"responseCode":"OK_NewSessionEstablished","evseId":"IN*JPE*E000100010001","sessionId":"C75DC1B9441F42AC"}}
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX SessionSetupReq exi_len=36 exi_hex=80980231D7706E5107D0AB11E020592538A9294114A914C0C0C0C4C0C0C0C4C0C0C0C480
+[2026-03-05T23:34:45.934] (+13.221s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1510: TX SessionSetupReq bytes=44
+[2026-03-05T23:34:46.061] (+13.348s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: RX Service[HLC] RX ServiceDiscovery
+[2026-03-05T23:34:46.061] (+13.348s) DiscoveryReq (proto=1)
+[2026-03-05T23:34:46.061] (+13.348s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX ServiceDiscoveryReq exi_len=13 exi_hex=80980231D7706E5107D0AB11B8
+[2026-03-05T23:34:46.061] (+13.348s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:465: DECODED ISO {"msg":"ServiceDiscovery","req":{"scope":"","category":-1},"res":{"responseCode":"OK","payments":["Contract","ExternalPayment"],"serviceId":1,"serviceName":"DCFC","freeService":0,"etm":["DC_core","DC_extended","DC_combo_core"]}}
+[2026-03-05T23:34:46.061] (+13.348s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX ServiceDiscoveryReq exi_len=27 exi_hex=80980231D7706E5107D0AB11C00008004019110D190C04040C2120
+[2026-03-05T23:34:46.061] (+13.348s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1510: TX ServiceDiscoveryReq bytes=35
+[2026-03-05T23:34:46.061] (+13.348s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:46.061] (+13.348s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:46.061] (+13.348s) [HLC] RX PaymentServiceSelection
+[2026-03-05T23:34:46.061] (+13.348s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: RX PaymentServiceSelectionReq (proto=1)
+[2026-03-05T23:34:46.198] (+13.485s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX PaymentServiceSelectionReq exi_len=16 exi_hex=80980231D7706E5107D0AB1132001280
+[2026-03-05T23:34:46.198] (+13.485s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:478: DECODED ISO {"msg":"PaymentServiceSelection","req":{"payment":"Contract","serviceId":1},"res":{"responseCode":"OK"}}
+[2026-03-05T23:34:46.198] (+13.485s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX PaymentServiceSelectionReq exi_len=14 exi_hex=80980231D7706E5107D0AB114000
+[2026-03-05T23:34:46.198] (+13.485s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1510: TX PaymentServiceSelectionReq bytes=22
+[2026-03-05T23:34:46.198] (+13.485s) [HLC] RX Authorization
+[2026-03-05T23:34:46.198] (+13.485s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1495: RX AuthorizationReq (proto=1)
+[2026-03-05T23:34:46.198] (+13.485s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: RX AuthorizationReq exi_len=13 exi_hex=80980231D7706E5107D0AB1008
+[2026-03-05T23:34:46.198] (+13.486s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:487: DECODED ISO {"msg":"Authorization","req":{"genChallengeLen":0},"res":{"responseCode":"OK","processing":"Finished"}}
+[2026-03-05T23:34:46.198] (+13.486s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:164: TX AuthorizationReq exi_len=15 exi_hex=80980231D7706E5107D0AB10100000
+[2026-03-05T23:34:46.699] (+13.986s) [INFO ] /home/jpi/Desktop/EVSE/jpv2g/src/secc.c:1510: TX AuthorizationReq bytes=23
+[2026-03-05T23:34:46.699] (+13.986s) [MOD] off request (ClientSessionDone) confirmed=1
+[2026-03-05T23:34:46.699] (+13.986s) [HLC] current-demand loops=0
+[2026-03-05T23:34:46.699] (+13.986s) [HLC] session rx_count=5 last_rx=Authorization
+[2026-03-05T23:34:46.699] (+13.986s) [HLC] client session done rc=-104
+[2026-03-05T23:34:47.199] (+14.487s) [CP] state B -> C (2084 mV)
+[2026-03-05T23:34:47.199] (+14.487s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:47.199] (+14.487s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:48.200] (+15.488s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:48.200] (+15.488s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:48.701] (+15.988s) [CP] state C -> B (2149 mV)
+[2026-03-05T23:34:49.201] (+16.489s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:49.202] (+16.489s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:49.702] (+16.989s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:34:49.702] (+16.989s) [CP] state B -> C (2033 mV)
+[2026-03-05T23:34:50.202] (+17.490s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:50.203] (+17.490s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:50.703] (+17.990s) [CP] state C -> B (2126 mV)
+[2026-03-05T23:34:51.203] (+18.491s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:51.203] (+18.491s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:52.204] (+19.492s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:52.204] (+19.492s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:53.205] (+20.493s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:53.205] (+20.493s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:54.206] (+21.494s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:54.206] (+21.494s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:54.707] (+21.994s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:34:55.207] (+22.495s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:55.207] (+22.495s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:56.208] (+23.496s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:56.209] (+23.496s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:57.209] (+24.497s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:57.210] (+24.497s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:58.712] (+25.999s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:58.712] (+25.999s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:59.713] (+27.000s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:34:59.713] (+27.000s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:34:59.713] (+27.000s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:00.714] (+28.002s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:00.714] (+28.002s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:01.715] (+29.002s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:01.715] (+29.002s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:02.716] (+30.004s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:02.717] (+30.004s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:03.718] (+31.005s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:03.718] (+31.005s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:04.719] (+32.007s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:04.719] (+32.007s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:04.719] (+32.007s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:05.720] (+33.008s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:05.721] (+33.008s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:06.722] (+34.009s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:06.722] (+34.009s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:07.723] (+35.010s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:07.723] (+35.010s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:08.724] (+36.012s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:08.724] (+36.012s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:09.726] (+37.013s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:09.726] (+37.013s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:09.726] (+37.013s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:10.727] (+38.014s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:10.727] (+38.014s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:11.728] (+39.015s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:11.728] (+39.015s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:12.729] (+40.016s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:12.729] (+40.017s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:13.730] (+41.018s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:13.730] (+41.018s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:14.731] (+42.018s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:14.731] (+42.019s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:14.731] (+42.019s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:15.732] (+43.020s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:15.732] (+43.020s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:16.733] (+44.020s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:16.733] (+44.020s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:17.733] (+45.021s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:17.734] (+45.021s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:18.734] (+46.022s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:18.734] (+46.022s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:19.735] (+47.023s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:19.735] (+47.023s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:19.735] (+47.023s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:20.736] (+48.024s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:20.737] (+48.024s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:21.737] (+49.025s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:21.737] (+49.025s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:22.738] (+50.026s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:22.738] (+50.026s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:23.739] (+51.027s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:23.739] (+51.027s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:24.740] (+52.028s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:24.740] (+52.028s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:24.740] (+52.028s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:25.741] (+53.029s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:25.741] (+53.029s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:26.742] (+54.030s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:26.742] (+54.030s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:28.244] (+55.532s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:28.244] (+55.532s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:29.246] (+56.533s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:29.246] (+56.533s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:29.746] (+57.034s) [CP] state B -> C (2073 mV)
+[2026-03-05T23:35:29.746] (+57.034s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:30.247] (+57.534s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:30.247] (+57.534s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:30.247] (+57.534s) [CP] state C -> B (2192 mV)
+[2026-03-05T23:35:31.248] (+58.536s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:31.249] (+58.536s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:32.250] (+59.537s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:32.250] (+59.537s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:33.264] (+60.551s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:33.264] (+60.551s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:34.265] (+61.552s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:34.265] (+61.553s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:34.766] (+62.053s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:35.266] (+62.553s) [CP] state B -> C (1834 mV)
+[2026-03-05T23:35:35.266] (+62.553s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:35.266] (+62.553s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:35.266] (+62.553s) [CP] state C -> B (2181 mV)
+[2026-03-05T23:35:36.267] (+63.555s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:36.267] (+63.555s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:36.268] (+63.555s) [CP] state B -> C (1882 mV)
+[2026-03-05T23:35:36.769] (+64.056s) [CP] state C -> B (2141 mV)
+[2026-03-05T23:35:36.769] (+64.056s) [CP] state B -> C (2043 mV)
+[2026-03-05T23:35:37.269] (+64.557s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:37.270] (+64.557s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:37.771] (+65.058s) [CP] state C -> B (2140 mV)
+[2026-03-05T23:35:38.272] (+65.559s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:38.272] (+65.559s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:39.273] (+66.561s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:39.273] (+66.561s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:39.774] (+67.061s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:40.274] (+67.562s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:40.274] (+67.562s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:41.275] (+68.563s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:41.275] (+68.563s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:42.276] (+69.564s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:42.277] (+69.564s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:43.278] (+70.565s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:43.278] (+70.565s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:43.778] (+71.066s) [CP] state B -> C (2052 mV)
+[2026-03-05T23:35:44.279] (+71.566s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:44.279] (+71.567s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:44.780] (+72.067s) [CP] state C -> B (2153 mV)
+[2026-03-05T23:35:44.780] (+72.067s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:45.280] (+72.568s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:45.280] (+72.568s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:46.281] (+73.569s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:46.281] (+73.569s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:47.282] (+74.570s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:47.282] (+74.570s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:48.283] (+75.571s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:48.284] (+75.571s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:49.285] (+76.572s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:49.285] (+76.572s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:49.785] (+77.072s) [HLC] waiting for EVCC TCP client...
+[2026-03-05T23:35:50.285] (+77.573s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:50.286] (+77.573s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:51.286] (+78.574s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:51.287] (+78.574s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0
+[2026-03-05T23:35:52.287] (+79.575s) [MOD] grp valid=1 en=0 assigned=1 active=0 reqV=0.0 reqI=0.0 appV=0.0 appI=0.0 sat=0
+[2026-03-05T23:35:52.287] (+79.575s) [MOD] id=MXR_1 lc=3 online=0 fault=0 V=0.0 I=0.00 availI=100.0

@@ -1,9 +1,6 @@
 # PlatformIO build output
 .pio/
 
-# Runtime logs and captures
-logs/
-
 # Python cache
 __pycache__/
 *.pyc
