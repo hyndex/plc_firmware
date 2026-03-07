@@ -144,7 +144,7 @@ constexpr char MODULE_ID_1[] = "MXR_1";
 constexpr uint32_t CFG_MAGIC = 0x4342504Cu; // "CBPL"
 constexpr uint16_t CFG_VERSION = 1u;
 
-constexpr bool DEFAULT_STANDALONE_MODE = false;
+constexpr bool DEFAULT_STANDALONE_MODE = true;
 constexpr bool DEFAULT_SLAC_REQUIRES_CONTROLLER_START = true;
 constexpr uint8_t DEFAULT_PLC_ID = 1u;
 constexpr uint8_t DEFAULT_CONTROLLER_ID = 1u;
@@ -2423,19 +2423,24 @@ void controller_service_watchdogs(uint32_t now_ms) {
     if (!g_runtime_cfg.standalone_mode) {
         const bool hb_alive = controller_heartbeat_alive(now_ms);
         if (!hb_alive) {
-            if (g_ctrl.hb_lost_since_ms == 0u) {
-                g_ctrl.hb_lost_since_ms = now_ms;
-            }
-            g_ctrl.slac_start_latched = false;
-            g_ctrl.slac_armed = false;
+            if (g_ctrl.heartbeat_seen) {
+                if (g_ctrl.hb_lost_since_ms == 0u) {
+                    g_ctrl.hb_lost_since_ms = now_ms;
+                }
+                // Preserve a freshly received SLAC start until the first heartbeat is
+                // actually established. Only clear controller authorization after a
+                // real heartbeat loss.
+                g_ctrl.slac_start_latched = false;
+                g_ctrl.slac_armed = false;
 
-            const uint32_t lost_ms =
-                (now_ms >= g_ctrl.hb_lost_since_ms) ? (now_ms - g_ctrl.hb_lost_since_ms) : 0u;
-            const bool energy_path_active = g_module_output_enabled || g_relay1_closed;
-            if ((energy_path_active && lost_ms >= CONTROLLER_HB_SOFT_STOP_GRACE_MS) ||
-                ((g_session_started || g_hlc_active) && lost_ms >= CONTROLLER_HB_HARD_STOP_GRACE_MS)) {
-                controller_force_safe_stop("CtrlHeartbeatTimeout");
-                g_ctrl.auth_state = ControllerAuthState::Unknown;
+                const uint32_t lost_ms =
+                    (now_ms >= g_ctrl.hb_lost_since_ms) ? (now_ms - g_ctrl.hb_lost_since_ms) : 0u;
+                const bool energy_path_active = g_module_output_enabled || g_relay1_closed;
+                if ((energy_path_active && lost_ms >= CONTROLLER_HB_SOFT_STOP_GRACE_MS) ||
+                    ((g_session_started || g_hlc_active) && lost_ms >= CONTROLLER_HB_HARD_STOP_GRACE_MS)) {
+                    controller_force_safe_stop("CtrlHeartbeatTimeout");
+                    g_ctrl.auth_state = ControllerAuthState::Unknown;
+                }
             }
         } else {
             g_ctrl.hb_lost_since_ms = 0u;
@@ -3995,7 +4000,7 @@ void setup() {
 }
 
 void loop() {
-    const uint32_t now_ms = millis();
+    uint32_t now_ms = millis();
     service_serial_commands();
     if (!g_fsm && static_cast<int32_t>(now_ms - g_next_qca_init_ms) >= 0) {
         (void)try_init_qca_and_fsm(now_ms);
@@ -4005,6 +4010,9 @@ void loop() {
     }
     controller_poll_can_raw_once();
     controller_service_rx();
+    // Re-sample time after controller RX so same-iteration heartbeats do not
+    // look "from the future" to the watchdog/session gate logic.
+    now_ms = millis();
     controller_service_watchdogs(now_ms);
     process_cp_and_fsm(now_ms);
     service_lwip_tx_queue_once();
