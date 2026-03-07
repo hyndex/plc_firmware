@@ -199,6 +199,16 @@ constexpr uint8_t CTRL_SESSION_STOP_SOFT = 1u;
 constexpr uint8_t CTRL_SESSION_STOP_HARD = 2u;
 constexpr uint8_t CTRL_SESSION_CLEAR = 3u;
 
+constexpr uint8_t CP_PHASE_UNKNOWN = 0u;
+constexpr uint8_t CP_PHASE_A = 1u;
+constexpr uint8_t CP_PHASE_B = 2u;
+constexpr uint8_t CP_PHASE_B1 = 3u;
+constexpr uint8_t CP_PHASE_B2 = 4u;
+constexpr uint8_t CP_PHASE_C = 5u;
+constexpr uint8_t CP_PHASE_D = 6u;
+constexpr uint8_t CP_PHASE_E = 7u;
+constexpr uint8_t CP_PHASE_F = 8u;
+
 constexpr uint8_t ACK_OK = 0u;
 constexpr uint8_t ACK_BAD_CRC = 1u;
 constexpr uint8_t ACK_BAD_VERSION = 2u;
@@ -737,6 +747,50 @@ uint32_t cp_pct_to_duty(uint16_t pct) {
     return (CP_1_MAX_DUTY_CYCLE * static_cast<uint32_t>(pct)) / 100u;
 }
 
+uint8_t cp_phase_code(char state, uint16_t duty_pct) {
+    switch (state) {
+        case 'A':
+            return CP_PHASE_A;
+        case 'B':
+            if (duty_pct >= 100u) return CP_PHASE_B1;
+            if (duty_pct > 0u) return CP_PHASE_B2;
+            return CP_PHASE_B;
+        case 'C':
+            return CP_PHASE_C;
+        case 'D':
+            return CP_PHASE_D;
+        case 'E':
+            return CP_PHASE_E;
+        case 'F':
+            return CP_PHASE_F;
+        default:
+            return CP_PHASE_UNKNOWN;
+    }
+}
+
+const char* cp_phase_label(char state, uint16_t duty_pct) {
+    switch (cp_phase_code(state, duty_pct)) {
+        case CP_PHASE_A:
+            return "A";
+        case CP_PHASE_B:
+            return "B";
+        case CP_PHASE_B1:
+            return "B1";
+        case CP_PHASE_B2:
+            return "B2";
+        case CP_PHASE_C:
+            return "C";
+        case CP_PHASE_D:
+            return "D";
+        case CP_PHASE_E:
+            return "E";
+        case CP_PHASE_F:
+            return "F";
+        default:
+            return "U";
+    }
+}
+
 static uint32_t g_last_ledc_duty = 0xFFFFFFFFu;
 
 void write_ledc_duty(uint32_t duty) {
@@ -1132,8 +1186,7 @@ bool controller_allows_slac_start(uint32_t now_ms) {
     if (g_runtime_cfg.standalone_mode) return true;
     if (!g_runtime_cfg.slac_requires_controller_start) return controller_heartbeat_alive(now_ms);
     if (!controller_heartbeat_alive(now_ms)) return false;
-    if (g_ctrl.slac_start_latched) return true;
-    if (!g_ctrl.slac_armed) return false;
+    if (!g_ctrl.slac_start_latched) return false;
     if (g_ctrl.slac_arm_expiry_ms == 0) return false;
     return static_cast<int32_t>(now_ms - g_ctrl.slac_arm_expiry_ms) <= 0;
 }
@@ -1935,6 +1988,53 @@ void controller_force_safe_stop(const char* reason) {
     stop_session(millis());
 }
 
+void controller_reset_runtime_state() {
+    g_ctrl.slac_armed = false;
+    g_ctrl.slac_start_latched = false;
+    g_ctrl.slac_arm_expiry_ms = 0;
+    g_ctrl.auth_state = ControllerAuthState::Denied;
+    g_ctrl.auth_expiry_ms = 0;
+    g_ctrl.heartbeat_seen = false;
+    g_ctrl.last_heartbeat_ms = 0;
+    g_ctrl.hb_lost_since_ms = 0;
+    g_ctrl.alloc_txn_active = false;
+    g_ctrl.staged_allowlist.clear();
+    g_ctrl.alloc_txn_expiry_ms = 0;
+    g_ctrl.last_seq_heartbeat = 0;
+    g_ctrl.last_seq_auth = 0;
+    g_ctrl.last_seq_slac = 0;
+    g_ctrl.last_seq_alloc = 0;
+    g_ctrl.last_seq_aux = 0;
+    g_ctrl.last_seq_session = 0;
+    g_ctrl.seq_seen_heartbeat = false;
+    g_ctrl.seq_seen_auth = false;
+    g_ctrl.seq_seen_slac = false;
+    g_ctrl.seq_seen_alloc = false;
+    g_ctrl.seq_seen_aux = false;
+    g_ctrl.seq_seen_session = false;
+    g_ctrl.stop_active = false;
+    g_ctrl.stop_hard = false;
+    g_ctrl.stop_force_issued = false;
+    g_ctrl.stop_reason = 0;
+    g_ctrl.stop_deadline_ms = 0;
+    g_last_seen_ev_mac_valid = false;
+}
+
+void controller_apply_mode_transition(bool next_standalone) {
+    const bool mode_changed = (g_runtime_cfg.standalone_mode != next_standalone);
+    g_runtime_cfg.standalone_mode = next_standalone;
+    if (!mode_changed) {
+        return;
+    }
+
+    const char* reason = next_standalone ? "ModeStandalone" : "ModeController";
+    controller_force_safe_stop(reason);
+    if (!g_module_allowlist.empty()) {
+        (void)apply_new_allowlist({}, reason);
+    }
+    controller_reset_runtime_state();
+}
+
 bool controller_stop_is_complete() {
     return (!g_relay1_closed) && (!g_module_output_enabled) && (!g_session_started) &&
            (!g_hlc_active) && g_module_allowlist.empty();
@@ -2485,6 +2585,7 @@ void controller_tx_cp_status(uint32_t now_ms) {
     p[5] = static_cast<uint8_t>((cp_mv >> 8) & 0xFF);
     const uint32_t since = g_cp_connected_since_ms ? (now_ms - g_cp_connected_since_ms) : 0u;
     p[6] = static_cast<uint8_t>((since / 100u) & 0xFFu);
+    p[7] = cp_phase_code(g_cp_state, g_last_cp_duty_pct);
     (void)can_send_ctrl_frame(CAN_ID_PLC_CP_STATUS, p);
 }
 
@@ -2744,35 +2845,7 @@ void serial_ctrl_handle_line(String line) {
         return;
     }
     if (op == "RESET") {
-        g_ctrl.slac_start_latched = false;
-        g_ctrl.slac_armed = false;
-        g_ctrl.slac_arm_expiry_ms = 0;
-        g_ctrl.auth_state = ControllerAuthState::Denied;
-        g_ctrl.auth_expiry_ms = 0;
-        g_ctrl.heartbeat_seen = false;
-        g_ctrl.last_heartbeat_ms = 0;
-        g_ctrl.alloc_txn_active = false;
-        g_ctrl.staged_allowlist.clear();
-        g_ctrl.alloc_txn_expiry_ms = 0;
-        g_ctrl.hb_lost_since_ms = 0;
-        g_ctrl.last_seq_heartbeat = 0;
-        g_ctrl.last_seq_auth = 0;
-        g_ctrl.last_seq_slac = 0;
-        g_ctrl.last_seq_alloc = 0;
-        g_ctrl.last_seq_aux = 0;
-        g_ctrl.last_seq_session = 0;
-        g_ctrl.seq_seen_heartbeat = false;
-        g_ctrl.seq_seen_auth = false;
-        g_ctrl.seq_seen_slac = false;
-        g_ctrl.seq_seen_alloc = false;
-        g_ctrl.seq_seen_aux = false;
-        g_ctrl.seq_seen_session = false;
-        g_ctrl.stop_active = false;
-        g_ctrl.stop_hard = false;
-        g_ctrl.stop_force_issued = false;
-        g_ctrl.stop_reason = 0;
-        g_ctrl.stop_deadline_ms = 0;
-        g_last_seen_ev_mac_valid = false;
+        controller_reset_runtime_state();
         g_serial_cmd_seq = 1u;
         controller_force_safe_stop("CtrlReset");
         Serial.println("[SERCTRL] RESET done");
@@ -2877,7 +2950,8 @@ void serial_ctrl_handle_line(String line) {
             Serial.println("[SERCTRL] MODE <standalone0|1> <plc_id> [controller_id]");
             return;
         }
-        g_runtime_cfg.standalone_mode = parse_u32_token(t[2], 0u) ? true : false;
+        const bool next_standalone = parse_u32_token(t[2], 0u) ? true : false;
+        controller_apply_mode_transition(next_standalone);
         g_runtime_cfg.plc_id = static_cast<uint8_t>(parse_u32_token(t[3], g_runtime_cfg.plc_id) & 0x0Fu);
         if (t.size() >= 5) {
             g_runtime_cfg.controller_id = static_cast<uint8_t>(parse_u32_token(t[4], g_runtime_cfg.controller_id) & 0x0Fu);
@@ -2895,14 +2969,18 @@ void serial_ctrl_handle_line(String line) {
         return;
     }
     if (op == "STATUS") {
-        Serial.printf("[SERCTRL] STATUS standalone=%d plc_id=%u controller_id=%u hb=%d auth=%u allow_slac=%d allow_energy=%d alloc_sz=%u stop_active=%d stop_hard=%d stop_done=%d\n",
+        Serial.printf("[SERCTRL] STATUS standalone=%d plc_id=%u controller_id=%u cp=%s duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d alloc_sz=%u stop_active=%d stop_hard=%d stop_done=%d\n",
                       g_runtime_cfg.standalone_mode ? 1 : 0,
                       static_cast<unsigned>(g_runtime_cfg.plc_id),
                       static_cast<unsigned>(g_runtime_cfg.controller_id),
+                      cp_phase_label(g_cp_state, g_last_cp_duty_pct),
+                      static_cast<unsigned>(g_last_cp_duty_pct),
                       controller_heartbeat_alive(millis()) ? 1 : 0,
                       static_cast<unsigned>(g_ctrl.auth_state),
                       controller_allows_slac_start(millis()) ? 1 : 0,
                       controller_allows_energy(millis()) ? 1 : 0,
+                      g_ctrl.slac_armed ? 1 : 0,
+                      g_ctrl.slac_start_latched ? 1 : 0,
                       static_cast<unsigned>(g_module_allowlist.size()),
                       g_ctrl.stop_active ? 1 : 0,
                       g_ctrl.stop_hard ? 1 : 0,
@@ -3696,15 +3774,19 @@ void apply_cp_output(char state, uint32_t now_ms) {
     }
 
     const bool hold_active = static_cast<int32_t>(now_ms - g_slac_hold_until_ms) < 0;
-    const bool pwm_ok = pwm_connected && !hold_active && !g_ef_pulse_active;
+    const bool controller_permits_pwm =
+        g_runtime_cfg.standalone_mode || g_session_started || g_hlc_active || controller_allows_slac_start(now_ms);
+    const bool pwm_ok = pwm_connected && !hold_active && !g_ef_pulse_active && controller_permits_pwm;
     uint16_t pct = g_ef_pulse_active ? 0u : (pwm_ok ? 5u : 100u);
     if (pct != g_last_cp_duty_pct) {
-        Serial.printf("[CP] duty -> %u%% (state=%c hold=%d ef=%d conn_hold=%d)\n",
+        Serial.printf("[CP] duty -> %u%% (phase=%s state=%c hold=%d ef=%d conn_hold=%d ctrl_pwm=%d)\n",
                       pct,
+                      cp_phase_label(state, pct),
                       state,
                       hold_active ? 1 : 0,
                       g_ef_pulse_active ? 1 : 0,
-                      connected_hold ? 1 : 0);
+                      connected_hold ? 1 : 0,
+                      controller_permits_pwm ? 1 : 0);
         g_last_cp_duty_pct = pct;
     }
     write_ledc_duty(cp_pct_to_duty(g_last_cp_duty_pct));

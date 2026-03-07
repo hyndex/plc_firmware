@@ -37,6 +37,7 @@ except Exception as exc:
 CURRENT_DEMAND_RE = re.compile(r'"msg":"CurrentDemand"')
 CP_CONNECTED_RE = re.compile(r"\[CP\] state .* -> ([BCD])")
 CP_DISCONNECT_RE = re.compile(r"\[CP\] state .* -> ([AEF])")
+CTRL_STATUS_RE = re.compile(r"\[SERCTRL\] STATUS .*cp=([A-Z0-9]+)\s+duty=(\d+)")
 SESSION_SETUP_EVCCID_RE = re.compile(r'"msg":"SessionSetup".*?"evccId":"([0-9A-Fa-f]+)"')
 EV_MAC_RE = re.compile(r"(?:EV[_ ]?MAC|ev_mac|evmac)[^0-9A-Fa-f]*([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})")
 SOC_RE = re.compile(r'"soc"\s*:\s*(-?\d+)')
@@ -71,6 +72,9 @@ class SessionState:
     group_active_modules: Optional[int] = None
     module1_off: Optional[bool] = None
     module1_current_a: Optional[float] = None
+    cp_phase: str = "U"
+    cp_duty_pct: Optional[int] = None
+    b1_since_ts: Optional[float] = None
     last_soc: Optional[int] = None
     last_meter_wh: Optional[int] = None
     errors: list[str] = field(default_factory=list)
@@ -117,12 +121,14 @@ class ControllerChargingRunner:
         self._last_status = 0.0
         self._last_meter_print = 0.0
         self._stop_verify_deadline: Optional[float] = None
+        self._remote_start_sent = False
 
     def _clear_session_observation(self) -> None:
         with self._lock:
             errs = list(self.state.errors)
             self.state = SessionState()
             self.state.errors = errs
+        self._remote_start_sent = False
 
     def _wait_for_quiescent(self, timeout_s: float, quiet_s: float) -> bool:
         deadline = time.time() + timeout_s
@@ -265,6 +271,22 @@ class ControllerChargingRunner:
                 except ValueError:
                     pass
 
+            m_status = CTRL_STATUS_RE.search(line)
+            if m_status:
+                self.state.cp_phase = m_status.group(1)
+                try:
+                    self.state.cp_duty_pct = int(m_status.group(2))
+                except ValueError:
+                    self.state.cp_duty_pct = None
+                if self.state.cp_phase == "B1":
+                    if self.state.b1_since_ts is None:
+                        self.state.b1_since_ts = now
+                    self.state.cp_connected = True
+                elif self.state.cp_phase in ("B2", "C", "D"):
+                    self.state.cp_connected = True
+                else:
+                    self.state.b1_since_ts = None
+
             m = CP_CONNECTED_RE.search(line)
             if m:
                 self.state.cp_connected = True
@@ -274,6 +296,10 @@ class ControllerChargingRunner:
                 self.state.slac_matched = False
                 self.state.hlc_connected = False
                 self.state.charging_window_start = None
+                self.state.cp_phase = m.group(1)
+                self.state.cp_duty_pct = None
+                self.state.b1_since_ts = None
+                self._remote_start_sent = False
 
     def _controller_bootstrap(self) -> None:
         # Force a clean start in case a previous run left session state active.
@@ -305,7 +331,6 @@ class ControllerChargingRunner:
         self._write_cmd("CTRL STATUS")
         self._write_cmd("CTRL ALLOC1")
         self._write_cmd(f"CTRL AUTH pending {self.auth_ttl_ms}")
-        self._write_cmd(f"CTRL SLAC arm {self.arm_ms}")
         self._write_cmd("CTRL STATUS")
 
     def _tick_controller(self) -> None:
@@ -315,7 +340,14 @@ class ControllerChargingRunner:
             self._write_cmd(f"CTRL HB {self.heartbeat_timeout_ms}")
             self._last_hb = now
 
-        if now - self._last_status >= 5.0:
+        with self._lock:
+            slac_matched = self.state.slac_matched
+            hlc_connected = self.state.hlc_connected
+            cp_phase = self.state.cp_phase
+            b1_since_ts = self.state.b1_since_ts
+
+        status_interval_s = 1.0 if (not slac_matched) and (not hlc_connected) else 5.0
+        if now - self._last_status >= status_interval_s:
             self._write_cmd("CTRL STATUS")
             self._last_status = now
 
@@ -324,17 +356,24 @@ class ControllerChargingRunner:
             self._write_cmd("CTRL ALLOC1")
             self._last_alloc = now
 
-        with self._lock:
-            slac_matched = self.state.slac_matched
-            hlc_connected = self.state.hlc_connected
+        waiting_for_slac = (not slac_matched) and (not hlc_connected)
+        at_b1 = cp_phase == "B1"
 
-        if (not slac_matched) and (not hlc_connected) and now - self._last_arm >= 4.0:
+        if waiting_for_slac and at_b1 and now - self._last_arm >= 4.0:
             self._write_cmd(f"CTRL SLAC arm {self.arm_ms}")
             self._last_arm = now
 
-        if (not slac_matched) and (not hlc_connected) and now - self._last_start >= 4.0:
+        # Simulate the remote app authorizing start only after the PLC reports B1.
+        if waiting_for_slac and at_b1 and (not self._remote_start_sent) and b1_since_ts is not None and (now - b1_since_ts) >= 0.6:
             self._write_cmd(f"CTRL SLAC start {self.arm_ms}")
             self._last_start = now
+            self._remote_start_sent = True
+            print("[CTRL] remote start -> B1 to B2", flush=True)
+        elif waiting_for_slac and at_b1 and now - self._last_start >= 4.0:
+            self._write_cmd(f"CTRL SLAC start {self.arm_ms}")
+            self._last_start = now
+        elif not at_b1:
+            self._remote_start_sent = False
 
         # pending first; grant only after vehicle identity is received.
         if now - self._last_auth >= 0.8:
@@ -441,6 +480,8 @@ class ControllerChargingRunner:
                     cp = s.cp_connected
                     matched = s.slac_matched
                     hlc = s.hlc_connected
+                    cp_phase = s.cp_phase
+                    cp_duty = s.cp_duty_pct
                     done = s.session_done_count
                     identity_seen = s.identity_seen
                     identity_src = s.identity_source
@@ -490,7 +531,8 @@ class ControllerChargingRunner:
 
                 if now - last_progress_print >= 5.0:
                     print(
-                        f"[PROGRESS] cp={int(cp)} matched={int(matched)} hlc={int(hlc)} "
+                        f"[PROGRESS] cp={int(cp)} phase={cp_phase} duty={cp_duty if cp_duty is not None else -1} "
+                        f"matched={int(matched)} hlc={int(hlc)} "
                         f"identity={int(identity_seen)} auth={int(auth_granted)} "
                         f"currentDemand={cd_count} window_s={charge_elapsed:.1f} sessionDone={done}",
                         flush=True,
@@ -504,6 +546,7 @@ class ControllerChargingRunner:
                 print(
                     "[SUMMARY] "
                     f"app_ready={int(s.app_ready_seen)} cp={int(s.cp_connected)} "
+                    f"phase={s.cp_phase} duty={s.cp_duty_pct if s.cp_duty_pct is not None else -1} "
                     f"matched={int(s.slac_matched)} hlc={int(s.hlc_connected)} "
                     f"precharge={int(s.precharge_seen)} currentDemand={s.current_demand_count} "
                     f"sessionDone={s.session_done_count} identity={s.identity_source}:{s.identity_value} "
