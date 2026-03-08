@@ -48,6 +48,77 @@ extern "C" {
 
 namespace {
 
+SemaphoreHandle_t g_serial_mutex = nullptr;
+portMUX_TYPE g_serial_init_mux = portMUX_INITIALIZER_UNLOCKED;
+
+void ensure_serial_mutex() {
+    if (g_serial_mutex) {
+        return;
+    }
+    portENTER_CRITICAL(&g_serial_init_mux);
+    if (!g_serial_mutex) {
+        g_serial_mutex = xSemaphoreCreateMutex();
+    }
+    portEXIT_CRITICAL(&g_serial_init_mux);
+}
+
+class LockedSerialProxy {
+public:
+    void begin(unsigned long baud) {
+        ::Serial.begin(baud);
+        ensure_serial_mutex();
+    }
+
+    int available() {
+        return ::Serial.available();
+    }
+
+    int read() {
+        return ::Serial.read();
+    }
+
+    template <typename... Args>
+    size_t printf(const char* format, Args... args) {
+        Lock guard;
+        return ::Serial.printf(format, args...);
+    }
+
+    size_t println() {
+        Lock guard;
+        return ::Serial.println();
+    }
+
+    template <typename T>
+    size_t println(const T& value) {
+        Lock guard;
+        return ::Serial.println(value);
+    }
+
+private:
+    class Lock {
+    public:
+        Lock() {
+            ensure_serial_mutex();
+            if (g_serial_mutex && xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+                taken_ = xSemaphoreTake(g_serial_mutex, pdMS_TO_TICKS(100)) == pdTRUE;
+            }
+        }
+
+        ~Lock() {
+            if (taken_ && g_serial_mutex) {
+                xSemaphoreGive(g_serial_mutex);
+            }
+        }
+
+    private:
+        bool taken_{false};
+    };
+};
+
+LockedSerialProxy g_locked_serial;
+
+#define Serial g_locked_serial
+
 // Hardware profile aligned to Basic/src/defs.h
 constexpr int PIN_QCA700X_INT = 2;
 constexpr int PIN_QCA700X_CS = 10;
@@ -964,7 +1035,7 @@ struct RuntimeConfig {
 };
 
 enum class ControllerAuthState : uint8_t {
-    Unknown = 0,
+    Unknown = 0xFFu,
     Denied = CTRL_AUTH_DENY,
     Pending = CTRL_AUTH_PENDING,
     Granted = CTRL_AUTH_GRANTED,
@@ -1122,7 +1193,16 @@ uint32_t g_ctrl_rx_count = 0;
 
 SemaphoreHandle_t g_can_mutex = nullptr;
 String g_serial_cmd_buf{};
-uint8_t g_serial_cmd_seq = 1u;
+struct SerialControllerSeqState {
+    uint8_t heartbeat{1u};
+    uint8_t auth{1u};
+    uint8_t slac{1u};
+    uint8_t alloc{1u};
+    uint8_t aux{1u};
+    uint8_t session{1u};
+};
+
+SerialControllerSeqState g_serial_ctrl_seq{};
 uint8_t g_serial_alloc_txn_id = 1u;
 
 uint32_t can_with_plc_id(uint32_t base_id) {
@@ -1294,6 +1374,23 @@ bool ctrl_seq_accept(uint8_t seq, uint8_t* last_seq, bool* seq_seen) {
     if (delta > 127u) return false;
     *last_seq = seq;
     return true;
+}
+
+void controller_reset_command_seq_state(bool include_heartbeat) {
+    if (include_heartbeat) {
+        g_ctrl.last_seq_heartbeat = 0;
+        g_ctrl.seq_seen_heartbeat = false;
+    }
+    g_ctrl.last_seq_auth = 0;
+    g_ctrl.last_seq_slac = 0;
+    g_ctrl.last_seq_alloc = 0;
+    g_ctrl.last_seq_aux = 0;
+    g_ctrl.last_seq_session = 0;
+    g_ctrl.seq_seen_auth = false;
+    g_ctrl.seq_seen_slac = false;
+    g_ctrl.seq_seen_alloc = false;
+    g_ctrl.seq_seen_aux = false;
+    g_ctrl.seq_seen_session = false;
 }
 
 bool controller_heartbeat_alive(uint32_t now_ms) {
@@ -2180,18 +2277,7 @@ void controller_reset_runtime_state() {
     g_ctrl.alloc_txn_active = false;
     g_ctrl.staged_allowlist.clear();
     g_ctrl.alloc_txn_expiry_ms = 0;
-    g_ctrl.last_seq_heartbeat = 0;
-    g_ctrl.last_seq_auth = 0;
-    g_ctrl.last_seq_slac = 0;
-    g_ctrl.last_seq_alloc = 0;
-    g_ctrl.last_seq_aux = 0;
-    g_ctrl.last_seq_session = 0;
-    g_ctrl.seq_seen_heartbeat = false;
-    g_ctrl.seq_seen_auth = false;
-    g_ctrl.seq_seen_slac = false;
-    g_ctrl.seq_seen_alloc = false;
-    g_ctrl.seq_seen_aux = false;
-    g_ctrl.seq_seen_session = false;
+    controller_reset_command_seq_state(true);
     g_ctrl.stop_active = false;
     g_ctrl.stop_hard = false;
     g_ctrl.stop_force_issued = false;
@@ -2405,6 +2491,10 @@ bool apply_new_allowlist(const std::vector<std::string>& next, const char* reaso
 
 void controller_handle_heartbeat(const CtrlRxFrame& f) {
     const uint8_t seq = f.data[1];
+    const bool resync_needed = !controller_heartbeat_alive(f.rx_ms);
+    if (resync_needed) {
+        controller_reset_command_seq_state(true);
+    }
     if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_heartbeat, &g_ctrl.seq_seen_heartbeat)) {
         send_ctrl_ack(0x10u, seq, ACK_BAD_SEQ, 0, 0);
         return;
@@ -2422,6 +2512,12 @@ void controller_handle_heartbeat(const CtrlRxFrame& f) {
 void controller_handle_auth(const CtrlRxFrame& f) {
     const uint8_t seq = f.data[1];
     if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_auth, &g_ctrl.seq_seen_auth)) {
+        Serial.printf("[CTRLRX] AUTH reject bad-seq=%u last=%u seen=%d state=%d hb=%d\n",
+                      static_cast<unsigned>(seq),
+                      static_cast<unsigned>(g_ctrl.last_seq_auth),
+                      g_ctrl.seq_seen_auth ? 1 : 0,
+                      static_cast<int>(g_ctrl.auth_state),
+                      controller_heartbeat_alive(f.rx_ms) ? 1 : 0);
         send_ctrl_ack(0x11u, seq, ACK_BAD_SEQ, 0, 0);
         return;
     }
@@ -2923,7 +3019,32 @@ uint32_t parse_u32_token(const String& token, uint32_t fallback) {
 void serial_inject_controller_frame(uint32_t base_id, uint8_t payload[8]) {
     if (!payload) return;
     payload[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    payload[1] = g_serial_cmd_seq++;
+    uint8_t* seq = &g_serial_ctrl_seq.session;
+    switch (base_id & 0x1FFFFFF0u) {
+        case (CAN_ID_CTRL_HEARTBEAT & 0x1FFFFFF0u):
+            seq = &g_serial_ctrl_seq.heartbeat;
+            break;
+        case (CAN_ID_CTRL_AUTH & 0x1FFFFFF0u):
+            seq = &g_serial_ctrl_seq.auth;
+            break;
+        case (CAN_ID_CTRL_SLAC & 0x1FFFFFF0u):
+            seq = &g_serial_ctrl_seq.slac;
+            break;
+        case (CAN_ID_CTRL_ALLOC_BEGIN & 0x1FFFFFF0u):
+        case (CAN_ID_CTRL_ALLOC_DATA & 0x1FFFFFF0u):
+        case (CAN_ID_CTRL_ALLOC_COMMIT & 0x1FFFFFF0u):
+        case (CAN_ID_CTRL_ALLOC_ABORT & 0x1FFFFFF0u):
+            seq = &g_serial_ctrl_seq.alloc;
+            break;
+        case (CAN_ID_CTRL_AUX_RELAY & 0x1FFFFFF0u):
+            seq = &g_serial_ctrl_seq.aux;
+            break;
+        case (CAN_ID_CTRL_SESSION & 0x1FFFFFF0u):
+        default:
+            seq = &g_serial_ctrl_seq.session;
+            break;
+    }
+    payload[1] = (*seq)++;
     payload[2] = static_cast<uint8_t>(g_runtime_cfg.controller_id & 0x0Fu);
     payload[7] = crc8_07(payload, 7);
     tap_controller_rx_frame(can_with_plc_id(base_id), true, 8, payload, millis());
@@ -3081,7 +3202,7 @@ void serial_ctrl_handle_line(String line) {
     }
     if (op == "RESET") {
         controller_reset_runtime_state();
-        g_serial_cmd_seq = 1u;
+        g_serial_ctrl_seq = {};
         controller_force_safe_stop("CtrlReset");
         Serial.println("[SERCTRL] RESET done");
         return;
