@@ -14,7 +14,9 @@
 #include <cerrno>
 #include <cmath>
 #include <cstring>
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -160,6 +162,8 @@ constexpr int HLC_IDLE_TIMEOUT_MS = 60000;
 constexpr uint32_t HLC_TASK_STACK_WORDS = 65536;
 constexpr UBaseType_t HLC_CLIENT_QUEUE_DEPTH = 2;
 constexpr UBaseType_t LWIP_TX_QUEUE_DEPTH = 12;
+constexpr uint8_t LWIP_TX_MAX_FRAMES_PER_LOOP = 4u;
+constexpr int LWIP_TX_WRITE_TIMEOUT_MS = 5;
 constexpr bool ENABLE_DECODED_LOGS = true;
 
 constexpr uint16_t QCA7K_SPI_READ = (1u << 15);
@@ -186,7 +190,7 @@ constexpr float PRECHARGE_CURRENT_LIMIT_A = 2.0f;
 constexpr float MODULE_MAX_VOLTAGE_V = 1000.0f;
 constexpr float MODULE_MAX_CURRENT_A = 100.0f;
 constexpr float MODULE_MAX_POWER_KW = 30.0f;
-constexpr uint32_t MODULE_ALLOWLIST_LEASE_MS = 1200;
+constexpr uint32_t MODULE_ALLOWLIST_LEASE_MS = 3000;
 constexpr uint32_t MODULE_TELEMETRY_FRESH_MS = 10000;
 constexpr uint32_t MODULE_RUNTIME_LOG_INTERVAL_MS = 1000;
 constexpr uint32_t MODULE_SERVICE_INTERVAL_MS = 10;
@@ -329,8 +333,8 @@ void tap_controller_rx_frame(uint32_t id, bool extended, uint8_t dlc, const uint
 uint8_t crc8_07(const uint8_t* data, size_t len);
 uint32_t can_with_plc_id(uint32_t base_id);
 bool is_controller_rx_base(uint32_t base_id);
-bool is_local_module_can_frame(uint32_t id, bool extended, uint8_t dlc, const uint8_t data[8]);
-bool apply_new_allowlist(const std::vector<std::string>& next, const char* reason);
+bool is_allowed_module_can_frame(uint32_t id, bool extended, uint8_t dlc, const uint8_t data[8]);
+bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, const char* reason);
 void stop_hlc_stack();
 void stop_session(uint32_t now_ms);
 
@@ -382,6 +386,9 @@ public:
 
     bool receive(cbmodules::CanFrame& frame_out) override {
         if (!inited_) return false;
+        if (pop_buffered_module_frame(frame_out)) {
+            return true;
+        }
         if (!g_can_mutex) return false;
         uint8_t drain_budget = 24u;
         while (drain_budget-- > 0u) {
@@ -411,7 +418,7 @@ public:
                 }
             }
 
-            if (!is_local_module_can_frame(in.id, in.extended, candidate.dlc, candidate.data)) {
+            if (!is_allowed_module_can_frame(in.id, in.extended, candidate.dlc, candidate.data)) {
                 continue;
             }
 
@@ -421,11 +428,51 @@ public:
         return false;
     }
 
+    void poll_controller_frames(uint8_t budget = 16u) {
+        if (!inited_ || !g_can_mutex) return;
+        while (budget-- > 0u) {
+            if (xSemaphoreTake(g_can_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {
+                return;
+            }
+            if (!mcp2515_receive_available(&dev_)) {
+                xSemaphoreGive(g_can_mutex);
+                return;
+            }
+            enr_can_frame_t in{};
+            if (mcp2515_receive(&dev_, &in) != ENR_OK) {
+                xSemaphoreGive(g_can_mutex);
+                return;
+            }
+            xSemaphoreGive(g_can_mutex);
+
+            cbmodules::CanFrame candidate{};
+            candidate.id = in.id & 0x1FFFFFFFu;
+            candidate.extended = in.extended;
+            candidate.dlc = static_cast<uint8_t>(std::min<uint8_t>(8, in.dlc));
+            for (uint8_t i = 0; i < candidate.dlc; ++i) candidate.data[i] = in.data[i];
+
+            if (in.extended) {
+                const uint32_t base = in.id & 0x1FFFFFF0u;
+                if (is_controller_rx_base(base)) {
+                    tap_controller_rx_frame(in.id, true, candidate.dlc, candidate.data, millis());
+                    continue;
+                }
+            }
+
+            if (!is_allowed_module_can_frame(in.id, in.extended, candidate.dlc, candidate.data)) {
+                continue;
+            }
+            push_buffered_module_frame(candidate);
+        }
+    }
+
     uint32_t now_ms() const override {
         return millis();
     }
 
 private:
+    static constexpr size_t BUFFERED_MODULE_FRAME_CAPACITY = 32u;
+
     static void hal_cs_select(void* ctx) {
         (void)ctx;
         g_can_spi.beginTransaction(SPISettings(CAN_SPI_HZ, MSBFIRST, SPI_MODE0));
@@ -480,10 +527,43 @@ private:
         return true;
     }
 
+    bool push_buffered_module_frame(const cbmodules::CanFrame& frame) {
+        if (buffered_module_count_ >= BUFFERED_MODULE_FRAME_CAPACITY) {
+            buffered_module_head_ = (buffered_module_head_ + 1u) % BUFFERED_MODULE_FRAME_CAPACITY;
+            buffered_module_count_--;
+            const uint32_t now_ms = millis();
+            if (buffered_module_overflow_log_ms_ == 0u ||
+                static_cast<int32_t>(now_ms - buffered_module_overflow_log_ms_) >= 0) {
+                Serial.printf("[CAN] buffered module frame overflow cap=%u\n",
+                              static_cast<unsigned>(BUFFERED_MODULE_FRAME_CAPACITY));
+                buffered_module_overflow_log_ms_ = now_ms + 5000u;
+            }
+        }
+        buffered_module_frames_[buffered_module_tail_] = frame;
+        buffered_module_tail_ = (buffered_module_tail_ + 1u) % BUFFERED_MODULE_FRAME_CAPACITY;
+        buffered_module_count_++;
+        return true;
+    }
+
+    bool pop_buffered_module_frame(cbmodules::CanFrame& frame) {
+        if (buffered_module_count_ == 0u) {
+            return false;
+        }
+        frame = buffered_module_frames_[buffered_module_head_];
+        buffered_module_head_ = (buffered_module_head_ + 1u) % BUFFERED_MODULE_FRAME_CAPACITY;
+        buffered_module_count_--;
+        return true;
+    }
+
     mcp2515_t dev_{};
     mcp2515_hal_t hal_{};
     bool inited_{false};
     uint8_t active_osc_mhz_{0};
+    std::array<cbmodules::CanFrame, BUFFERED_MODULE_FRAME_CAPACITY> buffered_module_frames_{};
+    size_t buffered_module_head_{0};
+    size_t buffered_module_tail_{0};
+    size_t buffered_module_count_{0};
+    uint32_t buffered_module_overflow_log_ms_{0};
 };
 
 void lwip_ingress_ethernet_frame(const uint8_t* frame, uint16_t len);
@@ -1049,12 +1129,14 @@ struct ControllerRuntimeState {
     uint32_t alloc_txn_expiry_ms{0};
     uint32_t hb_lost_since_ms{0};
     bool heartbeat_seen{false};
+    uint32_t heartbeat_session_marker{0};
     bool slac_armed{false};
     bool slac_start_latched{false};
     ControllerAuthState auth_state{ControllerAuthState::Unknown};
     bool alloc_txn_active{false};
     uint8_t alloc_txn_id{0};
     std::vector<std::string> staged_allowlist{};
+    float staged_power_limit_kw{0.0f};
     uint8_t last_seq_heartbeat{0};
     uint8_t last_seq_auth{0};
     uint8_t last_seq_slac{0};
@@ -1100,6 +1182,7 @@ Preferences g_cfg_prefs{};
 std::string g_local_group_id = "PLC_GROUP_1";
 std::string g_local_module_id = "PLC1_MXR_01";
 uint8_t g_local_module_group = 1u;
+std::map<uint8_t, std::string> g_known_module_ids{};
 
 char g_cp_state = 'A';
 char g_last_cp_state = 'A';
@@ -1162,6 +1245,7 @@ uint32_t g_relay2_deadline_ms = 0;
 uint32_t g_relay3_deadline_ms = 0;
 float g_last_module_target_v = 380.0f;
 float g_last_module_target_i = PRECHARGE_CURRENT_LIMIT_A;
+float g_assignment_power_limit_kw = 0.0f;
 bool g_module_output_enabled = false;
 std::vector<std::string> g_module_allowlist{};
 double g_meter_wh_real = 0.0;
@@ -1260,6 +1344,73 @@ const std::string& runtime_local_module_id() {
     return g_local_module_id;
 }
 
+std::string runtime_module_id_for_addr(uint8_t module_addr) {
+    if (module_addr == g_runtime_cfg.local_module_address) {
+        return runtime_local_module_id();
+    }
+    char module_buf[24];
+    snprintf(module_buf, sizeof(module_buf), "LEASED_MXR_%02X", static_cast<unsigned>(module_addr));
+    return std::string(module_buf);
+}
+
+uint8_t module_addr_from_id(const std::string& module_id) {
+    for (const auto& [addr, known_id] : g_known_module_ids) {
+        if (known_id == module_id) {
+            return addr;
+        }
+    }
+    return 0u;
+}
+
+cbmodules::ModuleSpec build_module_spec_for_addr(uint8_t module_addr) {
+    cbmodules::ModuleSpec spec;
+    spec.id = runtime_module_id_for_addr(module_addr);
+    spec.type = cbmodules::ModuleType::MaxwellMxr;
+    spec.slot_id = g_runtime_cfg.connector_id;
+    spec.slot_index = g_runtime_cfg.connector_id;
+    spec.address = module_addr;
+    spec.group = DEFAULT_LOCAL_MODULE_CAN_GROUP;
+    spec.rated_current_a = MODULE_MAX_CURRENT_A;
+    spec.rated_power_kw = MODULE_MAX_POWER_KW;
+    spec.min_operating_voltage_v = 200.0f;
+    spec.max_operating_voltage_v = MODULE_MAX_VOLTAGE_V;
+    return spec;
+}
+
+
+bool ensure_known_module_registered(uint8_t module_addr) {
+    if (module_addr == 0u) {
+        return false;
+    }
+    const auto spec = build_module_spec_for_addr(module_addr);
+    if (!g_module_mgr.upsert_module(spec)) {
+        return false;
+    }
+    g_module_mgr.set_module_hard_limits(spec.id, MODULE_MAX_CURRENT_A, MODULE_MAX_POWER_KW);
+    g_known_module_ids[module_addr] = spec.id;
+    return true;
+}
+
+bool module_addr_allowed_for_rx(uint8_t module_addr) {
+    if (module_addr == 0u) {
+        return false;
+    }
+    if (module_addr == g_runtime_cfg.local_module_address) {
+        return true;
+    }
+    for (const auto& id : g_module_allowlist) {
+        if (module_addr_from_id(id) == module_addr) {
+            return true;
+        }
+    }
+    for (const auto& id : g_ctrl.staged_allowlist) {
+        if (module_addr_from_id(id) == module_addr) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool is_controller_rx_base(uint32_t base_id) {
     return base_id == (CAN_ID_CTRL_HEARTBEAT & 0x1FFFFFF0u) ||
            base_id == (CAN_ID_CTRL_AUTH & 0x1FFFFFF0u) ||
@@ -1272,20 +1423,20 @@ bool is_controller_rx_base(uint32_t base_id) {
            base_id == (CAN_ID_CTRL_SESSION & 0x1FFFFFF0u);
 }
 
-bool is_local_module_can_frame(uint32_t id, bool extended, uint8_t dlc, const uint8_t data[8]) {
+bool is_allowed_module_can_frame(uint32_t id, bool extended, uint8_t dlc, const uint8_t data[8]) {
     if (!extended) return false;
     const uint32_t raw_id = id & 0x1FFFFFFFu;
     const uint16_t proto = static_cast<uint16_t>((raw_id >> 20) & 0x1FFu);
     if (proto == MAXWELL_CAN_PROTOCOL_ID) {
         const uint8_t src = static_cast<uint8_t>((raw_id >> 3) & 0xFFu);
-        return src == g_runtime_cfg.local_module_address;
+        return module_addr_allowed_for_rx(src);
     }
 
     if (!data || dlc < 8u) return false;
     const uint32_t family = raw_id & MODULE_OWNERSHIP_CAN_ID_MASK;
     if (family == MODULE_OWNERSHIP_CAN_ID_BASE || family == MODULE_OWNERSHIP_EPOCH_CAN_ID_BASE) {
         const auto type = static_cast<cbmodules::ModuleType>(data[1]);
-        return type == cbmodules::ModuleType::MaxwellMxr && data[2] == g_runtime_cfg.local_module_address;
+        return type == cbmodules::ModuleType::MaxwellMxr && module_addr_allowed_for_rx(data[2]);
     }
     return false;
 }
@@ -1477,6 +1628,16 @@ void unlock_modules() {
 float sane_non_negative(float v) {
     if (!std::isfinite(v)) return 0.0f;
     return std::max(0.0f, v);
+}
+
+float clamp_current_for_assignment_limit(float voltage_v, float current_a) {
+    const float sane_current = sane_non_negative(current_a);
+    if (g_assignment_power_limit_kw <= 0.0f) {
+        return sane_current;
+    }
+    const float sane_voltage = std::max(50.0f, sane_non_negative(voltage_v));
+    const float limit_current_a = (g_assignment_power_limit_kw * 1000.0f) / sane_voltage;
+    return std::max(0.0f, std::min(sane_current, limit_current_a));
 }
 
 void clear_last_bms_request() {
@@ -1676,6 +1837,43 @@ void apply_fresh_measurements_from_states(cbmodules::GroupStatus* st, uint32_t n
     st->combined_current_a = sum_i;
     st->combined_voltage_v = (count_v > 0) ? (sum_v / static_cast<float>(count_v)) : 0.0f;
     st->combined_power_kw = (st->combined_voltage_v * st->combined_current_a) / 1000.0f;
+}
+
+bool module_telemetry_fresh(const cbmodules::ModuleStateView& s, uint32_t now_ms) {
+    if (s.telemetry.last_update_ms == 0 || now_ms < s.telemetry.last_update_ms) {
+        return false;
+    }
+    return (now_ms - s.telemetry.last_update_ms) <= MODULE_TELEMETRY_FRESH_MS;
+}
+
+bool local_module_isolation_clearable(const cbmodules::ModuleStateView& s, uint32_t now_ms) {
+    if (!s.isolation_latched) return false;
+    if (s.id != runtime_local_module_id()) return false;
+    if (s.lease_active || !s.group_id.empty()) return false;
+    if (s.telemetry.faulted) return false;
+    if (!s.telemetry.online || !module_telemetry_fresh(s, now_ms)) return false;
+    if (!s.telemetry.module_off) return false;
+    if (std::fabs(s.telemetry.current_a) > 0.20f) return false;
+    if (g_module_output_enabled || std::fabs(g_last_module_target_i) > 0.05f) return false;
+    if (g_relay1_closed) return false;
+    return true;
+}
+
+bool try_clear_local_module_isolation_locked(uint32_t now_ms, const char* reason) {
+    const auto states = g_module_mgr.module_states();
+    for (const auto& s : states) {
+        if (!local_module_isolation_clearable(s, now_ms)) {
+            continue;
+        }
+        if (!g_module_mgr.clear_module_isolation(s.id)) {
+            return false;
+        }
+        Serial.printf("[MOD] cleared local isolation (%s) id=%s\n",
+                      reason ? reason : "Recovery",
+                      s.id.c_str());
+        return true;
+    }
+    return false;
 }
 
 bool snapshot_group_status(cbmodules::GroupStatus* out, uint32_t* out_now_ms = nullptr) {
@@ -2085,17 +2283,17 @@ bool init_module_manager() {
     cfg.telemetry_stale_ms = 12000;
     cfg.startup_scan_default_timeout_ms = 3000;
     cfg.startup_probe_retry_ms = 200;
-    cfg.runtime_probe_interval_ms = 200;
+    cfg.runtime_probe_interval_ms = 300;
     cfg.module_quarantine_ms = 2000;
     cfg.drain_timeout_ms = 2500;
-    cfg.can_bandwidth_cap_kbps = 5.0f;
+    cfg.can_bandwidth_cap_kbps = 20.0f;
     cfg.can_max_frames_per_second = 300.0f;
-    cfg.can_max_tx_per_tick = 40;
+    cfg.can_max_tx_per_tick = 96;
     cfg.can_probe_tx_max_per_tick = 12;
-    cfg.can_control_tx_reserve_per_tick = 8;
-    cfg.can_control_bit_reserve_kbps = 1.0f;
-    cfg.command_keepalive_ms = 600;
-    cfg.command_keepalive_stable_ms = 1500;
+    cfg.can_control_tx_reserve_per_tick = 24;
+    cfg.can_control_bit_reserve_kbps = 4.0f;
+    cfg.command_keepalive_ms = 1500;
+    cfg.command_keepalive_stable_ms = 3000;
     cfg.command_settle_window_ms = 2000;
     cfg.preventive_current_margin_pct = 0.025f;
     cfg.preventive_power_margin_pct = 0.025f;
@@ -2107,18 +2305,10 @@ bool init_module_manager() {
     new (&g_module_mgr) cbmodules::ModuleManager(cfg);
     g_module_mgr.set_transport(&g_can);
 
-    cbmodules::ModuleSpec m1;
-    m1.id = runtime_local_module_id();
-    m1.type = cbmodules::ModuleType::MaxwellMxr;
-    m1.slot_id = g_runtime_cfg.connector_id;
-    m1.slot_index = g_runtime_cfg.connector_id;
-    m1.address = g_runtime_cfg.local_module_address;
-    m1.group = DEFAULT_LOCAL_MODULE_CAN_GROUP;
-    m1.rated_current_a = MODULE_MAX_CURRENT_A;
-    m1.rated_power_kw = MODULE_MAX_POWER_KW;
-    m1.min_operating_voltage_v = 200.0f;
-    m1.max_operating_voltage_v = MODULE_MAX_VOLTAGE_V;
-    g_module_mgr.set_inventory({m1});
+    g_known_module_ids.clear();
+    const auto local_spec = build_module_spec_for_addr(g_runtime_cfg.local_module_address);
+    g_module_mgr.set_inventory({local_spec});
+    g_known_module_ids[g_runtime_cfg.local_module_address] = local_spec.id;
 
     Serial.printf("[MOD] startup scan begin (connector=%u plc=%u module=%s addr=0x%02X logical_group=%u module_can_group=%u owner_id=0x%04X)\n",
                   static_cast<unsigned>(g_runtime_cfg.connector_id),
@@ -2139,18 +2329,16 @@ bool init_module_manager() {
 
     cbmodules::GroupConfig group;
     group.id = runtime_local_group_id();
-    group.min_modules = 1;
-    group.max_modules = 1;
+    group.min_modules = 0;
+    group.max_modules = MAX_STAGED_ALLOC_MODULES;
     group.efficient_module_usage = true;
     group.hard_safety_clamp = true;
-    group.max_group_current_a = MODULE_MAX_CURRENT_A;
-    group.max_group_power_kw = MODULE_MAX_POWER_KW;
+    group.max_group_current_a = MODULE_MAX_CURRENT_A * static_cast<float>(MAX_STAGED_ALLOC_MODULES);
+    group.max_group_power_kw = MODULE_MAX_POWER_KW * static_cast<float>(MAX_STAGED_ALLOC_MODULES);
 
     const bool upsert_ok = g_module_mgr.upsert_group(group);
-    const bool alloc_ok = g_module_mgr.allocate_module(runtime_local_module_id(), runtime_local_group_id());
-    if (alloc_ok) {
-        g_module_mgr.set_module_hard_limits(runtime_local_module_id(), MODULE_MAX_CURRENT_A, MODULE_MAX_POWER_KW);
-    }
+    const bool alloc_ok = true;
+    g_module_mgr.set_module_hard_limits(runtime_local_module_id(), MODULE_MAX_CURRENT_A, MODULE_MAX_POWER_KW);
     g_module_mgr.set_group_target(runtime_local_group_id(), cbmodules::GroupTarget{false, 0.0f, 0.0f});
     g_module_mgr.tick(millis());
     g_module_ready = upsert_ok && alloc_ok;
@@ -2173,7 +2361,8 @@ bool modules_apply_target(bool enable, float target_v, float target_i, const cha
     cbmodules::GroupTarget tgt{};
     tgt.enable = enable;
     tgt.voltage_v = std::max(0.0f, std::min(MODULE_MAX_VOLTAGE_V, target_v));
-    tgt.current_a = std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, target_i));
+    tgt.current_a = std::max(0.0f, std::min(MODULE_MAX_CURRENT_A,
+                                            clamp_current_for_assignment_limit(tgt.voltage_v, target_i)));
     if (!enable) {
         tgt.current_a = 0.0f;
     }
@@ -2206,6 +2395,14 @@ void request_modules_off(const char* reason) {
         return;
     }
     const bool ok = modules_apply_target(false, 0.0f, 0.0f, reason);
+    Serial.printf("[MOD] off request (%s) result=%d relay2=%d session=%d hlc=%d gc=%d allow=%u\n",
+                  reason ? reason : "-",
+                  ok ? 1 : 0,
+                  g_relay2_closed ? 1 : 0,
+                  g_session_started ? 1 : 0,
+                  g_hlc_active ? 1 : 0,
+                  g_relay1_closed ? 1 : 0,
+                  static_cast<unsigned>(g_module_allowlist.size()));
     g_module_output_enabled = false;
     g_last_module_target_i = 0.0f;
     if (!ok) {
@@ -2215,6 +2412,11 @@ void request_modules_off(const char* reason) {
 
 void service_module_manager_once(uint32_t now_ms) {
     if (!g_module_ready) return;
+    const bool module_control_active = g_runtime_cfg.standalone_mode || !g_module_allowlist.empty() || g_session_started ||
+                                       g_hlc_active || g_relay1_closed;
+    if (!module_control_active) {
+        return;
+    }
     static uint32_t next_due_ms = 0;
     const bool slac_critical = g_session_started && !g_session_matched;
     const uint32_t interval = slac_critical ? MODULE_SERVICE_SLAC_CRITICAL_MS : MODULE_SERVICE_INTERVAL_MS;
@@ -2225,6 +2427,10 @@ void service_module_manager_once(uint32_t now_ms) {
     if (!lock_modules(4)) return;
     g_module_mgr.poll_rx(slac_critical ? 4u : 16u);
     g_module_mgr.tick(now_ms);
+    if (try_clear_local_module_isolation_locked(now_ms, "IdleRecover")) {
+        g_module_mgr.poll_rx(8);
+        g_module_mgr.tick(millis());
+    }
     const uint32_t sample_ms = millis();
     auto st = g_module_mgr.group_status(runtime_local_group_id());
     apply_fresh_measurements_from_states(&st, sample_ms);
@@ -2234,28 +2440,29 @@ void service_module_manager_once(uint32_t now_ms) {
 }
 
 void controller_poll_can_raw_once() {
-    if (g_module_ready) return;
-    cbmodules::CanFrame frame{};
-    uint32_t budget = 16u;
-    while (budget-- > 0u && g_can.receive(frame)) {
-    }
+    g_can.poll_controller_frames(16u);
 }
 
 bool module_id_known(const std::string& module_id) {
     if (module_id.empty()) return false;
-    if (!g_module_ready) return false;
-    if (!lock_modules(10)) return false;
-    const auto states = g_module_mgr.module_states();
-    unlock_modules();
-    for (const auto& s : states) {
-        if (s.id == module_id) return true;
+    for (const auto& [addr, known_id] : g_known_module_ids) {
+        (void)addr;
+        if (known_id == module_id) {
+            return true;
+        }
     }
     return false;
 }
 
 std::string module_id_from_addr(uint8_t addr) {
-    if (addr == g_runtime_cfg.local_module_address) return runtime_local_module_id();
-    return std::string();
+    if (addr == 0u) {
+        return std::string();
+    }
+    if (!ensure_known_module_registered(addr)) {
+        return std::string();
+    }
+    const auto it = g_known_module_ids.find(addr);
+    return it == g_known_module_ids.end() ? std::string() : it->second;
 }
 
 void controller_force_safe_stop(const char* reason) {
@@ -2276,6 +2483,7 @@ void controller_reset_runtime_state() {
     g_ctrl.hb_lost_since_ms = 0;
     g_ctrl.alloc_txn_active = false;
     g_ctrl.staged_allowlist.clear();
+    g_ctrl.staged_power_limit_kw = 0.0f;
     g_ctrl.alloc_txn_expiry_ms = 0;
     controller_reset_command_seq_state(true);
     g_ctrl.stop_active = false;
@@ -2283,6 +2491,7 @@ void controller_reset_runtime_state() {
     g_ctrl.stop_force_issued = false;
     g_ctrl.stop_reason = 0;
     g_ctrl.stop_deadline_ms = 0;
+    g_assignment_power_limit_kw = 0.0f;
     g_last_seen_ev_mac_valid = false;
 }
 
@@ -2296,9 +2505,9 @@ void controller_apply_mode_transition(bool next_standalone) {
     const char* reason = next_standalone ? "ModeStandalone" : "ModeController";
     controller_force_safe_stop(reason);
     if (!next_standalone && !g_module_allowlist.empty()) {
-        (void)apply_new_allowlist({}, reason);
+        (void)apply_new_allowlist({}, 0.0f, reason);
     } else if (next_standalone && g_module_ready) {
-        (void)apply_new_allowlist({runtime_local_module_id()}, reason);
+        (void)apply_new_allowlist({runtime_local_module_id()}, MODULE_MAX_POWER_KW, reason);
     }
     controller_reset_runtime_state();
 }
@@ -2321,10 +2530,10 @@ void controller_begin_stop(uint32_t now_ms, bool hard, uint32_t timeout_ms, uint
     g_ctrl.slac_start_latched = false;
     g_ctrl.slac_arm_expiry_ms = 0;
 
-    // Release module ownership for multi-PLC handover safety.
-    (void)apply_new_allowlist({}, hard ? "CtrlStopHard" : "CtrlStopSoft");
     clear_last_bms_request();
     request_modules_off(hard ? "CtrlStopHard" : "CtrlStopSoft");
+    // Release module ownership after we have driven the currently leased set to zero.
+    (void)apply_new_allowlist({}, 0.0f, hard ? "CtrlStopHard" : "CtrlStopSoft");
     (void)relay1_set(false, hard ? "CtrlStopHard" : "CtrlStopSoft");
 }
 
@@ -2337,11 +2546,11 @@ void controller_apply_stop_policy(uint32_t now_ms) {
     g_ctrl.slac_start_latched = false;
     g_ctrl.slac_arm_expiry_ms = 0;
 
-    if (!g_module_allowlist.empty()) {
-        (void)apply_new_allowlist({}, g_ctrl.stop_hard ? "CtrlStopHardRelease" : "CtrlStopSoftRelease");
-    }
     clear_last_bms_request();
     request_modules_off(g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
+    if (!g_module_allowlist.empty()) {
+        (void)apply_new_allowlist({}, 0.0f, g_ctrl.stop_hard ? "CtrlStopHardRelease" : "CtrlStopSoftRelease");
+    }
     (void)relay1_set(false, g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
 
     if (g_ctrl.stop_hard) {
@@ -2429,69 +2638,90 @@ void controller_publish_emaid(const uint8_t* data, size_t len) {
     serial_print_identity("EMAID", data, len);
 }
 
-bool apply_new_allowlist(const std::vector<std::string>& next, const char* reason) {
+bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, const char* reason) {
     for (const auto& id : next) {
         if (!module_id_known(id)) {
             return false;
         }
     }
-    if (next == g_module_allowlist) {
+    const float sanitized_limit_kw = std::max(0.0f, limit_kw);
+    const bool limit_changed = std::fabs(sanitized_limit_kw - g_assignment_power_limit_kw) > 0.05f;
+    if (next == g_module_allowlist && !limit_changed) {
+        return true;
+    }
+    if (!g_module_ready) {
+        g_module_allowlist = next;
+        g_assignment_power_limit_kw = sanitized_limit_kw;
+        if (next.empty()) {
+            g_module_output_enabled = false;
+            g_last_module_target_i = 0.0f;
+        }
         return true;
     }
 
-    const char* why = reason ? reason : "AllowlistChange";
-    bool off_prev_ok = true;
-    bool off_next_ok = true;
+    if (next.empty()) {
+        g_module_allowlist.clear();
+        g_assignment_power_limit_kw = 0.0f;
+        g_module_output_enabled = false;
+        g_last_module_target_i = 0.0f;
+        Serial.printf("[CTRL] allowlist cleared silently (%s)\n", reason ? reason : "AllowlistClear");
+        return true;
+    }
 
-    if (g_module_ready) {
-        if (!lock_modules(80)) {
-            return false;
-        }
-        const uint32_t now_ms = millis();
-        g_module_mgr.poll_rx(24);
-        g_module_mgr.tick(now_ms);
+    if (!lock_modules(80)) {
+        return false;
+    }
 
-        cbmodules::GroupTarget off{};
-        off.enable = false;
-        off.voltage_v = 0.0f;
-        off.current_a = 0.0f;
+    const float previous_limit_kw = g_assignment_power_limit_kw;
+    const bool enable = g_module_output_enabled && (g_last_module_target_i > 0.05f);
+    const float target_v = enable ? std::max(0.0f, std::min(MODULE_MAX_VOLTAGE_V, g_last_module_target_v)) : 0.0f;
+    const float target_i = enable ? clamp_current_for_assignment_limit(target_v, g_last_module_target_i) : 0.0f;
+    cbmodules::GroupTarget tgt{};
+    tgt.enable = enable;
+    tgt.voltage_v = target_v;
+    tgt.current_a = enable ? std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, target_i)) : 0.0f;
 
-        if (!g_module_allowlist.empty()) {
-            off_prev_ok = g_module_mgr.apply_group_setpoint_allowlist(
-                runtime_local_group_id(), off, g_module_allowlist, MODULE_ALLOWLIST_LEASE_MS);
-            g_module_mgr.poll_rx(8);
-            g_module_mgr.tick(millis());
-        }
-
-        // Apply destination allowlist with OFF target so removed modules are released now.
-        off_next_ok = g_module_mgr.apply_group_setpoint_allowlist(
-            runtime_local_group_id(), off, next, MODULE_ALLOWLIST_LEASE_MS);
+    g_module_mgr.poll_rx(24);
+    const uint32_t now_ms = millis();
+    g_module_mgr.tick(now_ms);
+    g_assignment_power_limit_kw = sanitized_limit_kw;
+    bool ok =
+        g_module_mgr.apply_group_setpoint_allowlist(runtime_local_group_id(), tgt, next, MODULE_ALLOWLIST_LEASE_MS);
+    g_module_mgr.poll_rx(8);
+    const uint32_t sample_ms = millis();
+    g_module_mgr.tick(sample_ms);
+    if (!ok && try_clear_local_module_isolation_locked(sample_ms, "AllowlistRecover")) {
+        ok = g_module_mgr.apply_group_setpoint_allowlist(runtime_local_group_id(),
+                                                         tgt,
+                                                         next,
+                                                         MODULE_ALLOWLIST_LEASE_MS);
         g_module_mgr.poll_rx(8);
-        const uint32_t sample_ms = millis();
-        g_module_mgr.tick(sample_ms);
-        auto st = g_module_mgr.group_status(runtime_local_group_id());
-        apply_fresh_measurements_from_states(&st, sample_ms);
-        update_real_meter_with_status(st, sample_ms);
-        unlock_modules();
+        g_module_mgr.tick(millis());
+    }
+    auto st = g_module_mgr.group_status(runtime_local_group_id());
+    apply_fresh_measurements_from_states(&st, sample_ms);
+    update_real_meter_with_status(st, sample_ms);
+    unlock_modules();
+
+    if (!ok) {
+        g_assignment_power_limit_kw = previous_limit_kw;
+        Serial.printf("[CTRL] allowlist apply failed (%s)\n", reason ? reason : "AllowlistChange");
+        return false;
     }
 
-    (void)relay1_set(false, why);
     g_module_allowlist = next;
-    g_module_output_enabled = false;
-    g_last_module_target_i = 0.0f;
-
-    if (!off_prev_ok || !off_next_ok) {
-        Serial.printf("[CTRL] allowlist transition warning (%s): off_prev=%d off_next=%d\n",
-                      why,
-                      off_prev_ok ? 1 : 0,
-                      off_next_ok ? 1 : 0);
-    }
-    return off_prev_ok && off_next_ok;
+    return true;
 }
 
 void controller_handle_heartbeat(const CtrlRxFrame& f) {
     const uint8_t seq = f.data[1];
-    const bool resync_needed = !controller_heartbeat_alive(f.rx_ms);
+    const uint32_t session_marker =
+        static_cast<uint32_t>(f.data[4]) |
+        (static_cast<uint32_t>(f.data[5]) << 8u) |
+        (static_cast<uint32_t>(f.data[6]) << 16u);
+    const bool marker_changed =
+        session_marker != 0u && g_ctrl.heartbeat_session_marker != 0u && session_marker != g_ctrl.heartbeat_session_marker;
+    const bool resync_needed = !controller_heartbeat_alive(f.rx_ms) || marker_changed;
     if (resync_needed) {
         controller_reset_command_seq_state(true);
     }
@@ -2506,6 +2736,9 @@ void controller_handle_heartbeat(const CtrlRxFrame& f) {
     }
     g_ctrl.last_heartbeat_ms = f.rx_ms;
     g_ctrl.heartbeat_seen = true;
+    if (session_marker != 0u) {
+        g_ctrl.heartbeat_session_marker = session_marker;
+    }
     send_ctrl_ack(0x10u, seq, ACK_OK, 0, 0);
 }
 
@@ -2621,6 +2854,7 @@ void controller_handle_alloc_begin(const CtrlRxFrame& f) {
     const uint8_t txn_id = f.data[3];
     const uint8_t expected = f.data[4];
     const uint8_t ttl_100ms = f.data[5];
+    const float limit_kw = static_cast<float>(f.data[6]) * 0.5f;
     if (expected == 0u || expected > MAX_STAGED_ALLOC_MODULES) {
         send_ctrl_ack(0x13u, seq, ACK_BAD_VALUE, expected, 0);
         return;
@@ -2629,6 +2863,7 @@ void controller_handle_alloc_begin(const CtrlRxFrame& f) {
     g_ctrl.alloc_txn_id = txn_id;
     g_ctrl.staged_allowlist.clear();
     g_ctrl.staged_allowlist.reserve(expected);
+    g_ctrl.staged_power_limit_kw = limit_kw;
     const uint32_t ttl_ms = (ttl_100ms > 0u) ? (static_cast<uint32_t>(ttl_100ms) * 100u)
                                              : g_runtime_cfg.controller_alloc_ttl_ms;
     g_ctrl.alloc_txn_expiry_ms = f.rx_ms + ttl_ms;
@@ -2682,9 +2917,26 @@ void controller_handle_alloc_commit(const CtrlRxFrame& f) {
         send_ctrl_ack(0x15u, seq, ACK_BAD_VALUE, 0, 0);
         return;
     }
-    const bool ok = apply_new_allowlist(g_ctrl.staged_allowlist, "CtrlAllocCommit");
+    bool ok = apply_new_allowlist(g_ctrl.staged_allowlist, g_ctrl.staged_power_limit_kw, "CtrlAllocCommit");
+    const bool has_remote_modules =
+        std::any_of(g_ctrl.staged_allowlist.begin(), g_ctrl.staged_allowlist.end(), [](const std::string& id) {
+            return id != runtime_local_module_id();
+        });
+    if (!ok && has_remote_modules) {
+        const uint32_t retry_deadline_ms = millis() + 400u;
+        while (!ok && static_cast<int32_t>(millis() - retry_deadline_ms) < 0) {
+            if (lock_modules(20)) {
+                g_module_mgr.poll_rx(24);
+                g_module_mgr.tick(millis());
+                unlock_modules();
+            }
+            delay(20);
+            ok = apply_new_allowlist(g_ctrl.staged_allowlist, g_ctrl.staged_power_limit_kw, "CtrlAllocCommitRetry");
+        }
+    }
     g_ctrl.alloc_txn_active = false;
     g_ctrl.staged_allowlist.clear();
+    g_ctrl.staged_power_limit_kw = 0.0f;
     g_ctrl.alloc_txn_expiry_ms = 0;
     send_ctrl_ack(0x15u, seq, ok ? ACK_OK : ACK_BAD_VALUE, static_cast<uint8_t>(g_module_allowlist.size()), 0);
 }
@@ -2697,7 +2949,11 @@ void controller_handle_alloc_abort(const CtrlRxFrame& f) {
     }
     g_ctrl.alloc_txn_active = false;
     g_ctrl.staged_allowlist.clear();
+    g_ctrl.staged_power_limit_kw = 0.0f;
     g_ctrl.alloc_txn_expiry_ms = 0;
+    if (!g_session_started && !g_hlc_active && !g_relay1_closed && !g_module_allowlist.empty()) {
+        (void)apply_new_allowlist({}, 0.0f, "CtrlAllocAbort");
+    }
     send_ctrl_ack(0x16u, seq, ACK_OK, 0, 0);
 }
 
@@ -3069,11 +3325,12 @@ void serial_ctrl_send_slac(uint8_t cmd, uint32_t arm_ms) {
     serial_inject_controller_frame(CAN_ID_CTRL_SLAC, p);
 }
 
-void serial_ctrl_send_alloc_begin(uint8_t txn_id, uint8_t expected_modules, uint32_t ttl_ms) {
+void serial_ctrl_send_alloc_begin(uint8_t txn_id, uint8_t expected_modules, uint32_t ttl_ms, float limit_kw = 0.0f) {
     uint8_t p[8]{};
     p[3] = txn_id;
     p[4] = expected_modules;
     p[5] = static_cast<uint8_t>(std::max<uint32_t>(1u, std::min<uint32_t>(255u, ttl_ms / 100u)));
+    p[6] = static_cast<uint8_t>(std::clamp(static_cast<int>(std::lround(std::max(0.0f, limit_kw) * 2.0f)), 0, 255));
     serial_inject_controller_frame(CAN_ID_CTRL_ALLOC_BEGIN, p);
 }
 
@@ -3119,7 +3376,7 @@ void serial_ctrl_print_help() {
     Serial.println("  CTRL SLAC <disarm|arm|start|abort> [arm_ms]");
     Serial.println("  CTRL RESET");
     Serial.println("  CTRL ALLOC1");
-    Serial.println("  CTRL ALLOC BEGIN <txn> <expected> [ttl_ms]");
+    Serial.println("  CTRL ALLOC BEGIN <txn> <expected> [ttl_ms] [limit_kw]");
     Serial.println("  CTRL ALLOC DATA <txn> <index> <module_addr>");
     Serial.println("  CTRL ALLOC COMMIT <txn>");
     Serial.println("  CTRL ALLOC ABORT");
@@ -3208,7 +3465,7 @@ void serial_ctrl_handle_line(String line) {
     }
     if (op == "ALLOC1") {
         const uint8_t txn = g_serial_alloc_txn_id++;
-        serial_ctrl_send_alloc_begin(txn, 1u, g_runtime_cfg.controller_alloc_ttl_ms);
+        serial_ctrl_send_alloc_begin(txn, 1u, g_runtime_cfg.controller_alloc_ttl_ms, MODULE_MAX_POWER_KW);
         serial_ctrl_send_alloc_data(txn, 0u, g_runtime_cfg.local_module_address);
         serial_ctrl_send_alloc_commit(txn);
         Serial.printf("[SERCTRL] ALLOC1 txn=%u module=0x%02X\n",
@@ -3225,16 +3482,21 @@ void serial_ctrl_handle_line(String line) {
         sub.toUpperCase();
         if (sub == "BEGIN") {
             if (t.size() < 5) {
-                Serial.println("[SERCTRL] ALLOC BEGIN <txn> <expected> [ttl_ms]");
+                Serial.println("[SERCTRL] ALLOC BEGIN <txn> <expected> [ttl_ms] [limit_kw]");
                 return;
             }
             const uint8_t txn = static_cast<uint8_t>(parse_u32_token(t[3], 1u) & 0xFFu);
             const uint8_t expected = static_cast<uint8_t>(parse_u32_token(t[4], 1u) & 0xFFu);
             const uint32_t ttl_ms = (t.size() >= 6) ? parse_u32_token(t[5], g_runtime_cfg.controller_alloc_ttl_ms)
                                                     : g_runtime_cfg.controller_alloc_ttl_ms;
-            serial_ctrl_send_alloc_begin(txn, expected, ttl_ms);
-            Serial.printf("[SERCTRL] ALLOC BEGIN txn=%u expected=%u ttl_ms=%lu\n",
-                          static_cast<unsigned>(txn), static_cast<unsigned>(expected), static_cast<unsigned long>(ttl_ms));
+            const float limit_kw =
+                (t.size() >= 7) ? static_cast<float>(t[6].toFloat()) : 0.0f;
+            serial_ctrl_send_alloc_begin(txn, expected, ttl_ms, limit_kw);
+            Serial.printf("[SERCTRL] ALLOC BEGIN txn=%u expected=%u ttl_ms=%lu limit_kw=%.1f\n",
+                          static_cast<unsigned>(txn),
+                          static_cast<unsigned>(expected),
+                          static_cast<unsigned long>(ttl_ms),
+                          static_cast<double>(limit_kw));
             return;
         }
         if (sub == "DATA") {
@@ -3553,17 +3815,31 @@ void service_lwip_tx_queue_once() {
         return;
     }
     LwipTxFrame frame{};
-    while (xQueueReceive(g_lwip_tx_queue, &frame, 0) == pdTRUE) {
+    uint8_t drained = 0u;
+    while (drained < LWIP_TX_MAX_FRAMES_PER_LOOP &&
+           xQueueReceive(g_lwip_tx_queue, &frame, 0) == pdTRUE) {
         if (frame.len == 0 || frame.len > ETH_FRAME_LEN) {
+            drained++;
             continue;
         }
-        const auto rc = g_transport->write(frame.data, frame.len, 20);
+        const auto rc = g_transport->write(frame.data, frame.len, LWIP_TX_WRITE_TIMEOUT_MS);
         if (rc != slac::ITransport::IOResult::Ok) {
             const uint32_t now = millis();
             if (g_next_lwip_tx_drop_log_ms == 0 || static_cast<int32_t>(now - g_next_lwip_tx_drop_log_ms) >= 0) {
                 Serial.printf("[NET] lwIP TX write failed rc=%d\n", static_cast<int>(rc));
                 g_next_lwip_tx_drop_log_ms = now + 2000;
             }
+        }
+        drained++;
+    }
+    if (uxQueueMessagesWaiting(g_lwip_tx_queue) > 0u) {
+        const uint32_t now = millis();
+        if (g_next_lwip_tx_drop_log_ms == 0 || static_cast<int32_t>(now - g_next_lwip_tx_drop_log_ms) >= 0) {
+            Serial.printf("[NET] lwIP TX backlog pending=%lu drained=%u perLoop=%u\n",
+                          static_cast<unsigned long>(uxQueueMessagesWaiting(g_lwip_tx_queue)),
+                          static_cast<unsigned>(drained),
+                          static_cast<unsigned>(LWIP_TX_MAX_FRAMES_PER_LOOP));
+            g_next_lwip_tx_drop_log_ms = now + 2000;
         }
     }
 }
@@ -3775,9 +4051,12 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
 
     req_v = sane_non_negative(req_v);
     req_i = sane_non_negative(req_i);
-    const bool allow_energy = controller_allows_energy(millis());
+    const float requested_v = req_v;
+    const float requested_i = req_i;
+    const uint32_t now_ms = millis();
+    const bool allow_energy = controller_allows_energy(now_ms);
     const bool enable = allow_energy && (req_i > 0.05f);
-    update_last_bms_request(req_v, req_i, 2u, enable, true);
+    update_last_bms_request(requested_v, requested_i, 2u, enable, true);
     (void)relay1_set(enable, enable ? "CurrentDemandStart" : "CurrentDemandStop");
     (void)modules_apply_target(enable, req_v, req_i, allow_energy ? "CurrentDemand" : "CurrentDemandBlocked");
 
@@ -3789,12 +4068,13 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     if (present_i <= 0.05f) present_i = sane_non_negative(g_last_measured_i);
     if (!enable) present_i = 0.0f;
 
-    const float req_power_kw = (req_v * req_i) / 1000.0f;
+    const float req_power_kw = (requested_v * requested_i) / 1000.0f;
     const float avail_i = sane_non_negative(st.available_current_a);
     const float avail_p = sane_non_negative(st.available_power_kw);
-    const bool current_limited = st.saturated || (avail_i > 0.0f && req_i > (avail_i + 0.1f));
+    const bool current_limited =
+        st.saturated || (requested_i > (req_i + 0.1f)) || (avail_i > 0.0f && requested_i > (avail_i + 0.1f));
     const bool power_limited = st.saturated || (avail_p > 0.0f && req_power_kw > (avail_p + 0.1f));
-    const bool voltage_limited = req_v > (MODULE_MAX_VOLTAGE_V + 0.5f);
+    const bool voltage_limited = requested_v > (MODULE_MAX_VOLTAGE_V + 0.5f);
 
     const uint8_t* sid = ctx->secc->session_id;
     if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
@@ -4486,10 +4766,10 @@ void loop() {
     // look "from the future" to the watchdog/session gate logic.
     now_ms = millis();
     controller_service_watchdogs(now_ms);
-    process_cp_and_fsm(now_ms);
-    service_lwip_tx_queue_once();
-    service_module_manager_once(now_ms);
     controller_service_periodic_tx(now_ms);
+    process_cp_and_fsm(now_ms);
+    service_module_manager_once(now_ms);
+    service_lwip_tx_queue_once();
     const bool hlc_priority = g_session_started || g_hlc_active || cp_connected(g_cp_state);
     delay(hlc_priority ? 1 : 5);
 }

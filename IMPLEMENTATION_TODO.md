@@ -114,6 +114,8 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - Tasks:
   - [x] Implement controller-owned allocation begin/data/commit/abort transactions.
   - [x] Enforce hard clamp: only assigned modules are ever controlled via allowlist.
+  - [x] Refactor controller mode so the borrower PLC is the sole module-control master for the leased module set.
+  - [x] Keep donor PLCs module-silent while leased out; controller mode donor behavior is now relay-only plus local hard safety.
   - [x] Keep Relay1 + module enable/disable transitions safe on all exits.
   - [x] Ensure current-demand telemetry uses real module aggregate only.
 
@@ -166,3 +168,4 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - [ ] SLAC arm validity window after gun connected.
 - [ ] Identity event retention policy if controller temporarily offline.
 - [ ] Security hardening level beyond targeted controller-id/module-address masking (trusted CAN vs authenticated control frames).
+- [ ] Live shared-load validation under sustained borrow/release with the new borrower-only module-control contract.
