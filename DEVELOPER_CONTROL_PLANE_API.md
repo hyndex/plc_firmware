@@ -1,6 +1,6 @@
 # CB PLC Firmware Control Plane Developer Guide
 
-Updated: 2026-03-06
+Updated: 2026-03-07
 
 This document is the implementation-accurate API and behavior contract for:
 
@@ -34,6 +34,22 @@ Source of truth is firmware implementation in `src/main.cpp`.
 - Energy permission in controller mode: controller-owned via `CTRL_AUTH_*` + heartbeat TTL.
 - Module setpoints and Relay1 toggling: PLC-owned, derived from HLC requests plus control-plane gating.
 - Module allowlist ownership: controller-owned via alloc transaction API.
+
+### 1.3 Persisted PLC Identity
+
+Each PLC persists these runtime identity fields in NVS:
+
+- `plc_id`: unique PLC address on the controller CAN contract
+- `connector_id`: stable controller-side connector binding for this PLC
+- `controller_id`: only frames from this controller ID are accepted
+- `local_module_address`: only this local module address is admitted into the module stack
+
+The PLC also derives:
+
+- logical group ID: `PLC_GROUP_<plc_id>` for controller/session ownership
+- module-manager owner ID: `(controller_id << 8) | plc_id` for `cbmodules` multi-controller fencing
+
+In the current Maxwell single-module profile, the logical PLC group is decoupled from the Maxwell low-level CAN group. The logical group tracks `plc_id`, while the Maxwell module stays on its working local CAN-group profile.
 
 ## 2. CAN Control Plane Spec
 
@@ -93,6 +109,14 @@ Then command-layer validation applies:
 
 - per-command sequence acceptance
 - command-specific state/value checks
+
+All controller-frame CAN families are consumed by the PLC control-plane receive path and are never forwarded into `cbmodules`.
+
+Module CAN ingress is masked separately:
+
+- only the configured `local_module_address` is passed into `cbmodules`
+- ownership-claim traffic is only passed through when it also matches that same local module address
+- foreign module telemetry is dropped before it reaches the module manager
 
 ### 2.4 Sequence Acceptance Rule
 
@@ -256,7 +280,7 @@ Payload:
 
 Supported mapping in current firmware:
 
-- `0x01` -> `MXR_1`
+- `runtime_cfg.local_module_address` -> `PLC<plc_id>_MXR_<module_addr>`
 
 Reaction:
 
@@ -422,6 +446,7 @@ Segmented identity/event transport:
   - `2`: EV MAC
   - `3`: EVCCID
   - `4`: EMAID
+  - `5`: PLC identity tuple (`plc_id`, `connector_id`, `controller_id`, `local_module_address`, logical group, owner_id)
 - `b3`: event id
 - `b4`: high nibble total segment count, low nibble segment index
 - `b5..b6`: payload bytes for this segment (2 bytes per segment)
@@ -429,6 +454,7 @@ Segmented identity/event transport:
 Notes:
 
 - Local MAC is published once on boot.
+- PLC identity tuple is published once on boot.
 - EV MAC is published when changed after SLAC match.
 - EVCCID is published on SessionSetup request.
 
@@ -579,13 +605,15 @@ Commands:
 - `CTRL ALLOC ABORT`
 - `CTRL RELAY <enable_mask> <state_mask> [hold_ms]`
 - `CTRL STOP <soft|hard|clear> [timeout_ms]`
-- `CTRL MODE <standalone0|1> <plc_id 0..15> [controller_id 0..15]`
+- `CTRL MODE <standalone0|1> <plc_id 1..15> [controller_id 1..15]`
+- `CTRL OWNERSHIP <connector_id> <module_addr>`
 - `CTRL SAVE`
 - `CTRL STATUS`
 
 Notes:
 
 - `CTRL MODE` changes runtime config in RAM only; call `CTRL SAVE` + reboot to persist.
+- `CTRL OWNERSHIP` changes the persisted connector/module ownership fields in RAM; call `CTRL SAVE` + reboot to rebind runtime inventory.
 - `CTRL RESET` clears runtime controller state and performs safe-stop.
 
 ## 11. SW4 Setup Portal API
@@ -601,7 +629,9 @@ Fields:
 - standalone mode
 - SLAC requires controller start
 - PLC ID
+- connector ID
 - controller ID
+- local module address
 - heartbeat timeout ms
 - auth TTL ms
 - alloc TTL ms

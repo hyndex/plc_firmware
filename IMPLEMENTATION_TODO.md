@@ -1,6 +1,6 @@
 # PLC Firmware Rework TODO (Standalone + Controller-Orchestrated)
 
-Updated: 2026-03-06  
+Updated: 2026-03-07  
 Owner: Codex  
 Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-authoritative for authorization and SLAC start, while preserving a complete standalone path.
 
@@ -25,6 +25,7 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - [ ] Module output OFF on session end/deallocation/watchdog timeout.
 - [ ] Controller command frames are sequence + CRC checked; stale commands rejected.
 - [ ] In controller mode, command loss fails safe (hold/no new session and safe stop).
+- [x] PLC accepts only targeted controller frames and only its own local module traffic at the transport boundary.
 
 ## External Controller Contract (New V1)
 ### PLC -> Controller (TX)
@@ -67,6 +68,7 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - Dependencies: None
 - Tasks:
   - [x] Add persistent config: `standalone_mode`, controller timeouts, SLAC policy gates, relay2/3 policy.
+  - [x] Add persistent identity config: `plc_id`, `connector_id`, `controller_id`, `local_module_address`.
   - [x] Implement SW4 boot sample window and conditional WiFi manager startup.
   - [x] Ensure non-WiFi boot path has zero portal/task allocation.
 
@@ -76,6 +78,8 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - Tasks:
   - [x] Define CAN IDs, payload schema, seq, CRC, and ack/nack behavior.
   - [x] Implement parser/validator with duplicate and stale frame suppression.
+  - [x] Consume controller CAN families before `cbmodules` so controller traffic never leaks into the module stack.
+  - [x] Mask module CAN ingress to the PLC's own local module address and matching ownership-claim traffic only.
   - [x] Implement deterministic command application order per tick.
 
 ## Stage C: Controller Liveness and Authorization Gate
@@ -98,6 +102,7 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - Status: In Progress
 - Dependencies: Stage B
 - Tasks:
+  - [x] Publish PLC identity tuple (`plc_id`, `connector_id`, `controller_id`, `local_module_address`, logical group, owner_id`) on boot.
   - [x] Publish EVCCID + local MAC as segmented events with session epoch sequencing.
   - [ ] Publish EV MAC/EMAID when available from runtime path (pending explicit extraction points).
   - [ ] Publish RFID events with dedupe and replay protection (RFID HW not yet integrated in this firmware).
@@ -143,7 +148,7 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
   - [ ] Unit tests for control-plane decode/validation/state transitions.
   - [ ] Integration tests for standalone and controller modes.
   - [ ] Two-ESP/multi-controller contention tests for module ownership safety.
-  - [x] Live tests on `/dev/ttyACM0` with captured logs and pass/fail assertions.
+  - [x] Live tests on `/dev/ttyACM0` and `/dev/ttyACM1` with erase, flash, persisted provisioning, and serial verification.
   - [ ] End-to-end test: gun connect -> controller SLAC start -> auth pending->finish -> charging -> graceful stop.
 
 ## Stage K: Documentation and Operational Runbook
@@ -160,4 +165,4 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - [ ] Auth TTL default and refresh cadence.
 - [ ] SLAC arm validity window after gun connected.
 - [ ] Identity event retention policy if controller temporarily offline.
-- [ ] Security hardening level (trusted CAN vs authenticated control frames).
+- [ ] Security hardening level beyond targeted controller-id/module-address masking (trusted CAN vs authenticated control frames).

@@ -9,3 +9,6 @@ __pycache__/
 .DS_Store
 *.swp
 *.swo
+
+# Generated bench logs
+logs/*.log
