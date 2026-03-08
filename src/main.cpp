@@ -2955,8 +2955,7 @@ void controller_tx_session_status(uint32_t now_ms) {
     const uint32_t wh = static_cast<uint32_t>(std::max<int64_t>(0, std::min<int64_t>(real_meter_wh_i64(), 65535)));
     p[4] = static_cast<uint8_t>(wh & 0xFFu);
     p[5] = static_cast<uint8_t>((wh >> 8) & 0xFFu);
-    p[6] = static_cast<uint8_t>((now_ms / 1000u) & 0xFFu);
-    p[7] = encode_last_ev_soc_pct();
+    p[6] = encode_last_ev_soc_pct();
     (void)can_send_ctrl_frame(CAN_ID_PLC_SESSION_STATUS, p);
 }
 
