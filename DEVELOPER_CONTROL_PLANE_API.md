@@ -1,65 +1,79 @@
 # CB PLC Firmware Control Plane Developer Guide
 
-Updated: 2026-03-07
+Updated: 2026-03-09
 
-This document is the implementation-accurate API and behavior contract for:
+This document is the implementation-accurate contract for:
 
-- Controller <-> PLC CAN control plane
-- PLC runtime mode behavior (standalone vs controller mode)
-- HLC authorization gating behavior
-- Module allocation/deallocation behavior
-- Stop/shutdown behavior and safe handover semantics
-- Serial command API (developer/test harness)
-- SW4 boot setup portal behavior
+- controller <-> PLC CAN control plane
+- PLC runtime mode behavior
+- module allocation and deallocation semantics
+- controller-managed power control
+- serial developer API
+- SW4 setup portal behavior
 
-Source of truth is firmware implementation in `src/main.cpp`.
+The source of truth is `src/main.cpp`.
 
 ## 1. Architecture and Authority Model
 
 ### 1.1 Runtime Modes
 
-- `standalone_mode = true`
-  - PLC is autonomous for SLAC start and energy path decisions.
-  - External controller commands are optional from power authorization perspective.
-- `standalone_mode = false` (default)
-  - Controller is required for session control decisions.
-  - SLAC start gating, energy authorization, and module allowlist are controller-driven.
-  - Relay1 (gun contactor) remains PLC-owned and switched by PLC logic only.
-  - Relay2/Relay3 are externally commandable through control-plane API.
+- `mode=0` `Standalone`
+  - PLC is autonomous for SLAC start, auth, module targets, HLC power replies, and Relay1.
+- `mode=1` `ControllerSupported`
+  - controller owns heartbeat, auth, SLAC permission, and allocation
+  - PLC still owns module targets, HLC power replies, and Relay1 timing
+- `mode=2` `ControllerManaged`
+  - controller owns heartbeat, auth, SLAC permission, allocation, live power setpoints, live HLC power-side reply data, and may command Relay1 through `CTRL_AUX_RELAY`
+  - PLC still owns CP, SLAC, HLC transport, and hard-stop safety overrides
 
 ### 1.2 Decision Ownership
 
-- CP state, SLAC FSM, HLC server socket lifecycle: PLC-owned.
-- SLAC permission in controller mode: controller-owned via `CTRL_SLAC_*`.
-- Energy permission in controller mode: controller-owned via `CTRL_AUTH_*` + heartbeat TTL.
-- Module setpoints and Relay1 toggling: PLC-owned, derived from HLC requests plus control-plane gating.
-- Module allowlist ownership: controller-owned via alloc transaction API.
+- CP sampling, SLAC FSM, HLC socket lifecycle: PLC-owned in all modes
+- SLAC permission in `mode=1/2`: controller-owned via `CTRL_SLAC_*`
+- energy permission in `mode=1/2`: controller-owned via heartbeat + auth + non-empty allowlist
+- module allowlist ownership in `mode=1/2`: controller-owned via allocation transaction API
+- module setpoints:
+  - `mode=0/1`: PLC-owned from HLC demand
+  - `mode=2`: controller-owned through `CTRL_POWER_SETPOINT`
+- HLC power-side reply values:
+  - `mode=0/1`: PLC-owned from local module telemetry
+  - `mode=2`: controller-owned through `CTRL_HLC_FEEDBACK`
+- Relay1:
+  - `mode=0/1`: PLC-owned
+  - `mode=2`: controller-commandable through `CTRL_AUX_RELAY` bit 2, but PLC safety logic can still force it open
 
 ### 1.3 Persisted PLC Identity
 
-Each PLC persists these runtime identity fields in NVS:
+Persisted in NVS:
 
-- `plc_id`: unique PLC address on the controller CAN contract
-- `connector_id`: stable controller-side connector binding for this PLC
-- `controller_id`: only frames from this controller ID are accepted
-- `local_module_address`: only this local module address is admitted into the module stack
+- `mode`
+- `plc_id`
+- `connector_id`
+- `controller_id`
+- `local_module_address`
+- `can_node_id`
+- controller timeout fields
 
-The PLC also derives:
+Derived at runtime:
 
-- logical group ID: `PLC_GROUP_<plc_id>` for controller/session ownership
-- module-manager owner ID: `(controller_id << 8) | plc_id` for `cbmodules` multi-controller fencing
+- logical group id: `PLC_GROUP_<plc_id>`
+- local module id: `PLC<plc_id>_MXR_<module_addr>`
+- module-manager owner id: `(controller_id << 8) | plc_id`
 
-In the current Maxwell single-module profile, the logical PLC group is decoupled from the Maxwell low-level CAN group. The logical group tracks `plc_id`, while the Maxwell module stays on its working local CAN-group profile.
+Legacy config migration:
+
+- v3 `standalone_mode=true` -> `mode=0`
+- v3 `standalone_mode=false` -> `mode=1`
 
 ## 2. CAN Control Plane Spec
 
-All control-plane frames are **extended CAN**, **8-byte payload**.
+All control-plane frames are extended CAN with 8-byte payloads.
 
 ### 2.1 CAN ID Layout
 
-- Low nibble (`ID & 0x0F`) is PLC target ID.
-- Controller transmits to base IDs below with target PLC nibble.
-- PLC transmits status using its configured PLC ID nibble.
+- low nibble (`ID & 0x0F`) is PLC target id
+- controller transmits to the base ids below plus the target PLC nibble
+- PLC transmits status using its configured PLC id nibble
 
 Controller -> PLC base IDs:
 
@@ -72,8 +86,10 @@ Controller -> PLC base IDs:
 - `0x18FF5060` `CTRL_ALLOC_ABORT`
 - `0x18FF5070` `CTRL_AUX_RELAY`
 - `0x18FF5080` `CTRL_SESSION`
+- `0x18FF5090` `CTRL_POWER_SETPOINT`
+- `0x18FF50A0` `CTRL_HLC_FEEDBACK`
 
-PLC -> Controller base IDs:
+PLC -> controller base IDs:
 
 - `0x18FF6000` `PLC_HEARTBEAT`
 - `0x18FF6010` `PLC_CP_STATUS`
@@ -83,16 +99,24 @@ PLC -> Controller base IDs:
 - `0x18FF6050` `PLC_SESSION_STATUS`
 - `0x18FF6060` `PLC_IDENTITY_EVT`
 - `0x18FF6070` `PLC_CMD_ACK`
+- `0x18FF6080` `PLC_BMS_STATUS`
 
 ### 2.2 Common Payload Header
 
-For controller->PLC commands (bytes are `data[0..7]`):
+For controller -> PLC commands:
 
 - `b0`: protocol version (`1`)
-- `b1`: command sequence number
-- `b2`: controller ID nibble in low 4 bits
-- `b3..b6`: command-specific data
-- `b7`: `CRC8(poly=0x07, init=0x00)` over bytes `b0..b6`
+- `b1`: command sequence
+- `b2`: controller id nibble in low 4 bits
+- `b3..b6`: command-specific payload
+- `b7`: `CRC8(poly=0x07, init=0x00)` over `b0..b6`
+
+For PLC -> controller frames:
+
+- `b0`: protocol version (`1`)
+- `b1`: per-frame-family sequence
+- `b2..b6`: frame-specific payload
+- `b7`: CRC8 over `b0..b6`
 
 ### 2.3 Ingress Validation Pipeline
 
@@ -100,68 +124,73 @@ Frames are dropped before queueing unless all checks pass:
 
 - extended frame
 - DLC = 8
-- target PLC nibble matches local PLC ID
-- protocol version matches (`1`)
-- controller ID nibble matches local configured controller ID
+- target PLC nibble matches local PLC id
+- protocol version matches
+- controller id nibble matches configured controller id
 - CRC valid
 
 Then command-layer validation applies:
 
-- per-command sequence acceptance
-- command-specific state/value checks
+- per-family sequence acceptance
+- command-specific state and value checks
 
-All controller-frame CAN families are consumed by the PLC control-plane receive path and are never forwarded into `cbmodules`.
+All controller-plane CAN families are consumed by the PLC control-plane receive path and never forwarded into `cbmodules`.
 
-Module CAN ingress is masked separately:
+Module CAN ingress is filtered separately to:
 
-- only the configured `local_module_address` is passed into `cbmodules`
-- ownership-claim traffic is only passed through when it also matches that same local module address
-- foreign module telemetry is dropped before it reaches the module manager
+- local module
+- active allowlist modules
+- staged allocation modules
+- ownership traffic for those same modules
 
 ### 2.4 Sequence Acceptance Rule
 
-Per command family, a sequence is accepted when:
+Each family accepts sequences with:
 
-- first frame for that family always accepted
-- subsequent frame accepted only if `delta = new_seq - prev_seq` is in `1..127`
+- first frame always accepted
+- later frame accepted only when `delta = new_seq - prev_seq` is in `1..127`
 - duplicate (`delta=0`) rejected
 - large backward jump (`delta>127`) rejected as stale
 
-Families with independent sequence tracks:
+Independent sequence tracks exist for:
 
 - heartbeat
 - auth
 - slac
-- alloc (begin/data/commit/abort share one track)
+- allocation (`BEGIN/DATA/COMMIT/ABORT` share one track)
 - aux relay
 - session
+- managed power
+- managed feedback
 
-### 2.5 ACK Frame (`PLC_CMD_ACK`)
+Heartbeat session-marker change or heartbeat re-establishment resets the non-heartbeat sequence tracks.
+
+## 3. ACK Frame
 
 `CAN_ID = 0x18FF6070 | plc_id`
 
 - `b0`: version
 - `b1`: PLC ack sequence
-- `b2`: command type code
+- `b2`: command type
 - `b3`: echoed command sequence
 - `b4`: ack status
 - `b5`: detail0
 - `b6`: detail1
 - `b7`: CRC
 
-Ack status codes:
+Ack status:
 
-- `0`: `ACK_OK`
-- `1`: `ACK_BAD_CRC`
-- `2`: `ACK_BAD_VERSION`
-- `3`: `ACK_BAD_TARGET`
-- `4`: `ACK_BAD_SEQ`
-- `5`: `ACK_BAD_STATE`
-- `6`: `ACK_BAD_VALUE`
+- `0` `ACK_OK`
+- `1` `ACK_BAD_CRC`
+- `2` `ACK_BAD_VERSION`
+- `3` `ACK_BAD_TARGET`
+- `4` `ACK_BAD_SEQ`
+- `5` `ACK_BAD_STATE`
+- `6` `ACK_BAD_VALUE`
 
 Command type codes used by firmware:
 
-- `0x01`: generic parser/validation reject
+- `0x01`: parser / validation reject
 - `0x10`: heartbeat
 - `0x11`: auth
 - `0x12`: slac
@@ -171,29 +200,33 @@ Command type codes used by firmware:
 - `0x16`: alloc abort / alloc timeout event
 - `0x17`: aux relay
 - `0x18`: session
+- `0x19`: managed power setpoint
+- `0x1A`: managed HLC feedback
 
-## 3. Controller -> PLC Command APIs
+## 4. Controller -> PLC Command APIs
 
-## 3.1 `CTRL_HEARTBEAT` (`0x18FF5000`)
+## 4.1 `CTRL_HEARTBEAT` (`0x18FF5000`)
 
 Payload:
 
-- `b3`: heartbeat timeout in 100 ms (`1..255` => `100..25500 ms`)
-- other command bytes reserved
+- `b3`: heartbeat timeout in 100 ms units (`1..255` -> `100..25500 ms`, clamped to `500..10000 ms`)
+- `b4..b6`: optional session marker, used only for command-stream resync
 
 Reaction:
 
 - updates `last_heartbeat_ms`
 - marks heartbeat as seen
-- updates runtime heartbeat timeout with clamp `500..10000 ms`
+- updates runtime heartbeat timeout if `b3 > 0`
+- resets sequence state if heartbeat had expired or the session marker changed
 - returns `ACK_OK`
 
-If missing in controller mode:
+In `mode=1/2`, missing heartbeat:
 
-- SLAC arm/start is disabled while heartbeat not alive
-- after grace windows, safe stop is forced (see watchdog section)
+- immediately clears controller SLAC arm/start permission after real heartbeat loss
+- forces safe stop after `3000 ms` if energy path is active
+- forces safe stop after `15000 ms` if session/HLC is active
 
-## 3.2 `CTRL_AUTH` (`0x18FF5010`)
+## 4.2 `CTRL_AUTH` (`0x18FF5010`)
 
 Payload:
 
@@ -201,23 +234,27 @@ Payload:
   - `0`: denied
   - `1`: pending
   - `2`: granted
-- `b4`: auth TTL in 100 ms (0 => uses configured default)
+- `b4`: auth TTL in 100 ms units (`0` -> use configured default)
 
 Reaction:
 
-- updates `auth_state`
-- updates `auth_expiry_ms`
+- updates auth state and expiry
+- explicit `Denied` immediately:
+  - clears managed power cache
+  - clears managed feedback cache
+  - turns modules off
+  - opens Relay1
 - returns `ACK_OK`
 
-Invalid values (`b3 > 2`) return `ACK_BAD_VALUE`.
+Invalid auth state returns `ACK_BAD_VALUE`.
 
-How HLC uses this in controller mode:
+HLC authorization behavior in `mode=1/2`:
 
-- heartbeat missing or `denied` -> Authorization response `FAILED + Finished`
-- `granted` -> Authorization returns one `Ongoing`, then `Finished`
-- `pending` -> Authorization returns `OK + Ongoing`
+- heartbeat missing or `Denied` -> auth response `FAILED`
+- `Pending` -> auth response `Ongoing`
+- `Granted` -> one `Ongoing`, then `Finished`
 
-## 3.3 `CTRL_SLAC` (`0x18FF5020`)
+## 4.3 `CTRL_SLAC` (`0x18FF5020`)
 
 Payload:
 
@@ -226,74 +263,73 @@ Payload:
   - `1`: arm
   - `2`: start now
   - `3`: abort
-- `b4`: arm validity in 100 ms (0 => configured default)
+- `b4`: arm validity in 100 ms units (`0` -> configured default)
 
-Reaction by command:
+Reaction:
 
 - `DISARM`
-  - clears arm/start latch
-  - triggers `controller_force_safe_stop("CtrlDisarm")`
+  - clears arm/start state
+  - calls safe stop
 - `ARM`
   - sets `slac_armed=true`, `slac_start_latched=false`
-  - sets arm expiry
+  - updates arm expiry
 - `START_NOW`
   - sets `slac_armed=true`, `slac_start_latched=true`
-  - sets arm expiry
+  - updates arm expiry
 - `ABORT`
-  - clears arm/start latch
-  - triggers `controller_force_safe_stop("CtrlAbort")`
+  - clears arm/start state
+  - calls safe stop
 
-All successful commands return `ACK_OK`.
+All valid commands return `ACK_OK`.
 Invalid command returns `ACK_BAD_VALUE`.
 
-SLAC start gate in controller mode:
+SLAC start gate in `mode=1/2`:
 
-- requires heartbeat alive
-- and either `slac_start_latched==true` or `(slac_armed && arm_not_expired)`
+- heartbeat must be alive
+- and either `slac_start_latched==true` or `(slac_armed && !expired)`
 
-## 3.4 Allocation Transaction API
-
-### 3.4.1 `CTRL_ALLOC_BEGIN` (`0x18FF5030`)
+## 4.4 `CTRL_ALLOC_BEGIN` (`0x18FF5030`)
 
 Payload:
 
 - `b3`: transaction id
 - `b4`: expected module count (`1..32`)
-- `b5`: txn TTL in 100 ms (`0` => configured default)
+- `b5`: transaction TTL in 100 ms units (`0` -> configured default)
+- `b6`: assignment power limit in `0.5 kW` units (`0` -> unlimited by assignment contract)
 
 Reaction:
 
 - starts staged transaction
-- clears staged list
-- sets expiry
-- `ACK_OK(detail0=txn_id, detail1=expected)`
+- clears staged allowlist and staged module limits
+- stores expected size, TTL, and assignment limit
+- returns `ACK_OK(detail0=txn_id, detail1=expected)`
 
-Invalid expected count returns `ACK_BAD_VALUE`.
+Invalid expected size returns `ACK_BAD_VALUE`.
 
-### 3.4.2 `CTRL_ALLOC_DATA` (`0x18FF5040`)
+## 4.5 `CTRL_ALLOC_DATA` (`0x18FF5040`)
 
 Payload:
 
 - `b3`: transaction id
-- `b4`: index (currently informational)
-- `b5`: module address
-
-Supported mapping in current firmware:
-
-- `runtime_cfg.local_module_address` -> `PLC<plc_id>_MXR_<module_addr>`
+- `b4`: module CAN group (`1..7`)
+- `b5`: module CAN address
+- `b6`: per-module power limit in `0.5 kW` units (`0` -> module default max)
 
 Reaction:
 
-- requires active txn and matching txn_id
-- appends module id if not already present (dedup)
-- `ACK_OK(detail0=module_addr, detail1=staged_size)`
+- requires active transaction and matching txn id
+- validates module group and module address
+- upserts remote module metadata if needed
+- deduplicates module ids in staged allowlist
+- stores per-module limit for that staged module
+- returns `ACK_OK(detail0=module_addr, detail1=staged_unique_count)`
 
 Error reactions:
 
 - no active txn -> `ACK_BAD_STATE`
-- txn mismatch or unknown module addr -> `ACK_BAD_VALUE`
+- txn mismatch, bad group, or bad module address -> `ACK_BAD_VALUE`
 
-### 3.4.3 `CTRL_ALLOC_COMMIT` (`0x18FF5050`)
+## 4.6 `CTRL_ALLOC_COMMIT` (`0x18FF5050`)
 
 Payload:
 
@@ -301,48 +337,69 @@ Payload:
 
 Reaction:
 
-- requires active txn and matching txn id and non-empty staged list
-- calls `apply_new_allowlist(staged_allowlist, "CtrlAllocCommit")`
-- on success: active allowlist updated
-- always clears txn state after attempt
-- returns
-  - `ACK_OK(detail0=active_allowlist_size)` on success
-  - `ACK_BAD_VALUE` on apply failure
+- requires active txn
+- txn id must match
+- staged unique module count must equal expected count
+- normalizes staged power limits to the staged allowlist
+- applies limits before swapping allowlists
+- pushes the new allowlist through `apply_group_setpoint_allowlist`
+- if remote modules are present and first apply fails, retries discovery/polling for up to `1500 ms`
+- if output is active and the set changed, re-applies the last target to the new allowlist
+- clears staged transaction state after the attempt
 
-### 3.4.4 `CTRL_ALLOC_ABORT` (`0x18FF5060`)
+ACK:
+
+- success -> `ACK_OK(detail0=active_allowlist_size)`
+- failure -> `ACK_BAD_VALUE`
+
+## 4.7 `CTRL_ALLOC_ABORT` (`0x18FF5060`)
+
+Payload:
+
+- none
 
 Reaction:
 
-- clears staged txn state
-- `ACK_OK`
+- clears staged transaction state
+- if idle and no active session/HLC/Relay1 output remains, may release the active allowlist too
+- returns `ACK_OK`
 
-### 3.4.5 Allocation Timeout
+Allocation timeout auto-aborts and emits:
 
-If staged txn TTL expires, firmware auto-aborts txn and sends:
+- `cmd=0x16`
+- `status=ACK_BAD_STATE`
+- `detail0=0xEE`
 
-- `ACK cmd=0x16, status=ACK_BAD_STATE, detail0=0xEE`
-
-## 3.5 `CTRL_AUX_RELAY` (`0x18FF5070`)
+## 4.8 `CTRL_AUX_RELAY` (`0x18FF5070`)
 
 Payload:
 
 - `b3`: enable mask
   - bit0 -> Relay2 command valid
   - bit1 -> Relay3 command valid
+  - bit2 -> Relay1 command valid (`mode=2` only)
 - `b4`: state mask
   - bit0 -> desired Relay2 state
   - bit1 -> desired Relay3 state
-- `b5`: hold timeout in 100 ms (`0` = no auto-off)
+  - bit2 -> desired Relay1 state
+- `b5`: hold timeout in 100 ms units (`0` -> no auto-open timeout)
 
 Reaction:
 
-- applies selected relays only
-- per relay, if hold timeout > 0, auto-off after timeout
-- returns `ACK_OK(detail0=en_mask, detail1=st_mask)`
+- applies only the relays enabled by `b3`
+- Relay1 close is rejected unless:
+  - runtime mode is `2`
+  - energy is currently allowed
+  - CP is connected
+- Relay2 and Relay3 are valid in all modes
+- selected relays use per-relay auto-open deadlines if `hold_ms > 0`
 
-Relay1 is not controlled by this API.
+ACK:
 
-## 3.6 `CTRL_SESSION` (`0x18FF5080`)
+- success -> `ACK_OK(detail0=en_mask, detail1=st_mask)`
+- invalid state -> `ACK_BAD_STATE`
+
+## 4.9 `CTRL_SESSION` (`0x18FF5080`)
 
 Payload:
 
@@ -351,72 +408,137 @@ Payload:
   - `1`: soft stop
   - `2`: hard stop
   - `3`: clear stop state
-- `b4`: timeout in 100 ms (`0` => 3000 ms, then clamped to `500..30000 ms`)
-- `b5`: reason code (stored)
+- `b4`: timeout in 100 ms units (`0` -> `3000 ms`, clamped to `500..30000 ms`)
+- `b5`: reason code
 
 Reaction:
 
-- `SOFT/HARD`: starts stop FSM and applies stop policy immediately
-- `CLEAR/NONE`: clears stop flags only
+- `SOFT/HARD`
+  - starts stop FSM
+  - applies stop policy immediately
+- `CLEAR/NONE`
+  - clears stop flags
+  - clears managed power and feedback caches
 
 ACK:
 
 - `ACK_OK(detail0=action, detail1=stop_complete_flag)`
 - invalid action -> `ACK_BAD_VALUE`
 
-## 4. PLC -> Controller Status APIs
+## 4.10 `CTRL_POWER_SETPOINT` (`0x18FF5090`)
 
-All status frames are periodic and include version + sequence + CRC.
+Only valid in `mode=2`.
 
-## 4.1 `PLC_HEARTBEAT` (`0x18FF6000`, 500 ms)
+Payload:
 
-- `b2`: standalone flag (1=true)
-- `b3`: CP state char (`A/B/C/D/E/F`)
+- `b3..b6`: packed 32-bit little-endian value
+
+Bit layout:
+
+- bit0: `enable`
+- bits1..14: target voltage in `0.1 V` units
+- bits15..26: target current in `0.1 A` units
+
+Reaction:
+
+- rejects with `ACK_BAD_STATE` unless:
+  - current mode is `2`
+  - if `enable=1`, energy is allowed
+  - if `enable=1`, allowlist is non-empty
+  - if `enable=1`, CP is connected
+- `enable=1` applies module target immediately
+- `enable=0` turns modules off
+- stores managed power cache for freshness tracking
+
+Managed power freshness timeout:
+
+- `1200 ms`
+- stale managed power command -> modules off + Relay1 open
+
+## 4.11 `CTRL_HLC_FEEDBACK` (`0x18FF50A0`)
+
+Only valid in `mode=2`.
+
+Payload:
+
+- `b3..b6`: packed 32-bit little-endian value
+
+Bit layout:
+
+- bit0: `ready`
+- bit1: current limit achieved
+- bit2: voltage limit achieved
+- bit3: power limit achieved
+- bits4..17: present voltage in `0.1 V` units
+- bits18..29: present current in `0.1 A` units
+- bit30: `valid`
+
+Reaction:
+
+- rejects with `ACK_BAD_STATE` unless current mode is `2`
+- updates managed feedback cache
+- does not directly energize modules or relays
+
+Managed feedback freshness timeout:
+
+- `1200 ms`
+- stale feedback clears the feedback cache
+- HLC responses then degrade to not-ready / zero-current behavior until fresh feedback returns
+
+## 5. PLC -> Controller Status APIs
+
+All status frames include version, per-family sequence, and CRC.
+
+### 5.1 `PLC_HEARTBEAT` (`0x18FF6000`, every `500 ms`)
+
+- `b2`: current mode (`0`, `1`, or `2`)
+- `b3`: CP state char
 - `b4` bitfield:
   - bit0 HLC ready
   - bit1 HLC active
   - bit2 module output enabled
 - `b5..b6`: uptime seconds low/high bytes
 
-## 4.2 `PLC_CP_STATUS` (`0x18FF6010`, 200 ms)
+### 5.2 `PLC_CP_STATUS` (`0x18FF6010`, every `200 ms`)
 
 - `b2`: CP state char
 - `b3`: CP PWM duty percent
 - `b4..b5`: CP millivolts little-endian
-- `b6`: time since CP connected in 100 ms (8-bit)
+- `b6`: time since CP connected in `100 ms` units
 
-## 4.3 `PLC_SLAC_STATUS` (`0x18FF6020`, 500 ms)
+### 5.3 `PLC_SLAC_STATUS` (`0x18FF6020`, every `500 ms`)
 
 - `b2`: session started flag
 - `b3`: session matched flag
-- `b4`: SLAC FSM state enum value (0xFF if no FSM)
+- `b4`: SLAC FSM state (`0xFF` if no FSM)
 - `b5`: SLAC failure counter for current CP cycle
 - `b6` bitfield:
   - bit0 `slac_armed`
   - bit1 `slac_start_latched`
 
-## 4.4 `PLC_HLC_STATUS` (`0x18FF6030`, 500 ms)
+### 5.4 `PLC_HLC_STATUS` (`0x18FF6030`, every `500 ms`)
 
 - `b2` bitfield:
   - bit0 HLC ready
   - bit1 HLC active
-- `b3`: auth state enum (`Unknown/Denied/Pending/Granted` values)
+- `b3`: auth state enum
 - `b4`: heartbeat alive flag
-- `b5`: auth granted flag (`controller_auth_granted()`)
-- `b6`: precharge_seen flag
+- `b5`: `controller_auth_granted()` flag
+- `b6` bitfield:
+  - bit0 precharge seen
+  - bit1 precharge converged
 
-## 4.5 `PLC_POWER_STATUS` (`0x18FF6040`, 200 ms)
+### 5.5 `PLC_POWER_STATUS` (`0x18FF6040`, every `200 ms`)
 
-- `b2..b3`: combined voltage * 10 (u16 little-endian)
-- `b4..b5`: combined current * 10 (u16 little-endian)
+- `b2..b3`: combined voltage in `0.1 V` units
+- `b4..b5`: combined current in `0.1 A` units
 - `b6` nibble packing:
-  - low nibble: active modules
-  - high nibble: assigned modules
+  - low nibble = active modules
+  - high nibble = assigned modules
 
-This frame is the primary fast telemetry path for live charging electrical values
-(`V`, `I`) from PLC/module aggregation.
+This is the fast local electrical telemetry path from module aggregation.
 
-## 4.6 `PLC_SESSION_STATUS` (`0x18FF6050`, 500 ms)
+### 5.6 `PLC_SESSION_STATUS` (`0x18FF6050`, every `500 ms`)
 
 - `b2` bitfield:
   - bit0 session started
@@ -425,72 +547,100 @@ This frame is the primary fast telemetry path for live charging electrical value
   - bit0 Relay1 closed
   - bit1 Relay2 closed
   - bit2 Relay3 closed
-  - bit3 stop_active
-  - bit4 stop_hard
-  - bit5 stop_complete
-- `b4..b5`: meter Wh (u16 little-endian)
-- `b6`: uptime seconds low byte
-- `b7`: last EV SoC percent (`0..100`, `0xFF` = unknown/not yet available)
+  - bit3 stop active
+  - bit4 stop hard
+  - bit5 stop complete
+- `b4..b5`: meter Wh (`u16`)
+- `b6`: last EV SoC (`0..100`, `0xFF` unknown)
 
-During active charging, controller should combine:
-
-- `PLC_POWER_STATUS` for `Voltage` + `Current`
-- `PLC_SESSION_STATUS` for `Energy(Wh)` + `SoC`
-
-## 4.7 `PLC_IDENTITY_EVT` (`0x18FF6060`, event-driven)
-
-Segmented identity/event transport:
+### 5.7 `PLC_IDENTITY_EVT` (`0x18FF6060`, event-driven with retry`)
 
 - `b2`: event kind
   - `1`: local MAC
   - `2`: EV MAC
   - `3`: EVCCID
   - `4`: EMAID
-  - `5`: PLC identity tuple (`plc_id`, `connector_id`, `controller_id`, `local_module_address`, logical group, owner_id)
+  - `5`: PLC identity tuple
 - `b3`: event id
-- `b4`: high nibble total segment count, low nibble segment index
-- `b5..b6`: payload bytes for this segment (2 bytes per segment)
+- `b4`: high nibble total segments, low nibble segment index
+- `b5..b6`: 2 payload bytes for this segment
 
-Notes:
+Event kind `5` PLC identity tuple payload:
 
-- Local MAC is published once on boot.
-- PLC identity tuple is published once on boot.
-- EV MAC is published when changed after SLAC match.
-- EVCCID is published on SessionSetup request.
+- `plc_id`
+- `connector_id`
+- `controller_id`
+- `local_module_address`
+- logical module group
+- owner id high byte
+- owner id low byte
 
-## 5. Controller Call Order (Recommended)
+### 5.8 `PLC_BMS_STATUS` (`0x18FF6080`, every `250 ms` or on change)
 
-Controller mode (`standalone_mode=false`) recommended session sequence:
+This frame is especially important in `mode=2`.
 
-1. Start heartbeat loop every `<= 400 ms`.
-2. Send `CTRL_AUTH pending` with TTL refresh cadence (for example every 800 ms).
-3. On gun connect and business logic allow:
+- `b2..b3`: latest EV-requested voltage in `0.1 V` units
+- `b4..b5`: latest EV-requested current in `0.1 A` units
+- `b6` bitfield:
+  - bit0 request valid
+  - bit1 delivery ready flag as currently interpreted by PLC
+  - bits2..7 HLC stage code
+
+Current stage codes used by firmware:
+
+- `1`: precharge
+- `2`: current demand
+- `3`: power-delivery update / stop edge
+
+The PLC sets this from decoded HLC demand. In `mode=2`, the external controller should treat it as the latest EV request snapshot and answer with fresh `CTRL_POWER_SETPOINT` and `CTRL_HLC_FEEDBACK`.
+
+## 6. Controller Call Order
+
+## 6.1 `mode=1` Recommended Flow
+
+1. Send `CTRL_HEARTBEAT` every `<= 400 ms`.
+2. Keep `CTRL_AUTH pending` alive until charging is allowed.
+3. Build the module assignment:
    - `CTRL_ALLOC_BEGIN`
    - `CTRL_ALLOC_DATA` for each module
    - `CTRL_ALLOC_COMMIT`
-4. Send `CTRL_SLAC arm` and `CTRL_SLAC start`.
-5. Wait for `PLC_SLAC_STATUS matched=1` and HLC status activity.
-6. Once identity/event policy allows charging, send `CTRL_AUTH grant` refresh loop.
-7. During charging maintain:
-   - heartbeat refresh
-   - auth TTL refresh
-   - allocation refresh when needed
-8. For controlled stop:
-   - `CTRL_SESSION stop_soft` (or hard)
+4. When policy allows, send `CTRL_SLAC arm` and `CTRL_SLAC start`.
+5. Wait for SLAC match and HLC activity.
+6. Once identity/business logic allows charging, refresh `CTRL_AUTH grant`.
+7. Let the PLC own precharge/current-demand targets and Relay1 behavior.
+8. For stop:
+   - `CTRL_SESSION stop_soft` or `stop_hard`
    - `CTRL_AUTH deny`
    - `CTRL_SLAC disarm`
-9. Wait until `PLC_SESSION_STATUS stop_complete=1` and `PLC_POWER_STATUS assigned=0 active=0`.
+9. Wait for:
+   - `PLC_SESSION_STATUS.stop_complete=1`
+   - `PLC_POWER_STATUS assigned=0 active=0`
 
-## 6. Stop, Shutdown, and Module Deallocation Semantics
+## 6.2 `mode=2` Recommended Flow
 
-## 6.1 Stop Guarantees in Current Firmware
+Use the same sequence as `mode=1`, plus a managed power loop:
 
-When stop is triggered (`CTRL_SESSION stop_*`, disarm, abort, reset, or watchdog):
+1. Watch `PLC_BMS_STATUS` for the latest EV target.
+2. Send `CTRL_POWER_SETPOINT` at a stable cadence faster than the `1200 ms` timeout.
+3. Send `CTRL_HLC_FEEDBACK` at a stable cadence faster than the `1200 ms` timeout.
+4. Command Relay1 through `CTRL_AUX_RELAY` bit 2 when the controller wants the contactor closed.
+5. On stop or deny, immediately:
+   - `CTRL_POWER_SETPOINT enable=0`
+   - `CTRL_HLC_FEEDBACK valid=1 ready=0`
+   - open Relay1
 
-- HLC/session power path is disabled.
-- Relay1 is opened.
-- Module OFF target is sent.
-- Allowlist transition to empty is applied (release ownership for handover).
+In `mode=2`, controller mistakes directly affect what the EV sees, so the power/feedback loop should be treated as a real-time control loop, not a best-effort background update.
+
+## 7. Stop, Shutdown, and Release Semantics
+
+### 7.1 Stop Guarantees
+
+When stop is triggered by command, watchdog, disarm, abort, disconnect, or HLC teardown:
+
+- modules are turned off
+- Relay1 is opened
+- managed power and managed feedback caches are cleared
+- active allowlist is released when the stop path reaches the empty-assignment state
 
 `controller_stop_is_complete()` requires:
 
@@ -500,95 +650,81 @@ When stop is triggered (`CTRL_SESSION stop_*`, disarm, abort, reset, or watchdog
 - no HLC active client
 - allowlist empty
 
-## 6.2 Soft vs Hard Stop
+Operationally, a fully released power path is best confirmed with both:
 
-- Soft stop:
+- `PLC_SESSION_STATUS.stop_complete=1`
+- `PLC_POWER_STATUS assigned=0 active=0`
+
+If the EV remains physically plugged in after stop, CP usually settles at `B` or `B2`. That is connected idle, not active charging, and should not be interpreted as a failed stop.
+
+### 7.2 Soft vs Hard Stop
+
+- soft stop:
   - starts graceful stop with deadline
-  - if deadline exceeded, escalates to hard force stop
-- Hard stop:
-  - immediate force safe stop path
+  - escalates to hard behavior if deadline expires
+- hard stop:
+  - immediate force-safe-stop path
 
-## 6.3 Allowlist Transition Behavior
+## 8. Watchdogs and Automatic Reactions
 
-`apply_new_allowlist()` now performs OFF transition on both sides:
+Controller-mode watchdogs:
 
-- OFF applied to previous allowlist
-- OFF applied to next allowlist
-- relay opened
-- then active allowlist state is switched
-
-This prevents stale ownership and supports safe multi-PLC handover.
-
-## 7. Watchdogs and Automatic Reactions
-
-Controller mode watchdog behaviors:
-
-- Heartbeat loss:
-  - immediately clears SLAC arm/start permissions
-  - after `CONTROLLER_HB_SOFT_STOP_GRACE_MS` (3000 ms) if energy path active -> safe stop
-  - after `CONTROLLER_HB_HARD_STOP_GRACE_MS` (15000 ms) if session/HLC active -> safe stop
-- Auth TTL expiry from `Granted`:
-  - transitions to `Denied`
-  - modules OFF + Relay1 open
+- heartbeat loss:
+  - clears SLAC arm/start immediately after real loss
+  - safe stop after `3000 ms` if energy path active
+  - safe stop after `15000 ms` if only session/HLC active
+- auth expiry from `Granted`:
+  - becomes `Denied`
+  - modules off
+  - Relay1 open
 - SLAC arm TTL expiry:
   - clears `slac_armed` and `slac_start_latched`
-- Allocation txn TTL expiry:
-  - staged allocation dropped and timeout ack emitted
-- Relay2/Relay3 hold timeout:
+- allocation txn TTL expiry:
+  - staged transaction dropped
+  - timeout ACK emitted
+- Relay1/Relay2/Relay3 hold timeout:
   - relay auto-opens
-
-## 8. HLC Power Path Reactions
-
-## 8.1 Authorization Requests
-
-In controller mode:
-
-- `Denied` or heartbeat missing -> `FAILED` auth response
-- `Pending` -> `OK + Ongoing`
-- `Granted` -> first poll `Ongoing`, next poll `Finished`
-
-This enforces at least one ongoing cycle before final authorization completion.
-
-## 8.2 PreCharge Requests
-
-- Uses EV requested target V and I, but clamps precharge current to `PRECHARGE_CURRENT_LIMIT_A` (2 A).
-- If `controller_allows_energy()` false:
+- managed power timeout in `mode=2`:
+  - modules off
   - Relay1 open
-  - modules OFF
-  - EVSE status reported NotReady
+- managed feedback timeout in `mode=2`:
+  - feedback cache cleared
+  - HLC responses fall back to not-ready / zero-current behavior
 
-## 8.3 CurrentDemand Requests
+## 9. HLC Power Path Reactions
 
-- Uses EV requested V/I as command target.
-- Enables Relay1 and modules only when:
-  - `controller_allows_energy() == true`
-  - requested current > 0.05 A
-- Response telemetry uses real module aggregate snapshots (with stale filtering).
+### 9.1 PreCharge
 
-## 8.4 PowerDelivery and SessionStop
+- `mode=0/1`
+  - PLC applies requested voltage locally
+  - current is limited to `2 A`
+  - convergence is based on present voltage vs requested voltage
+- `mode=2`
+  - PLC publishes demand in `PLC_BMS_STATUS`
+  - controller feedback drives `EVSEReady` / present voltage in the response
+  - PLC does not compute the managed power response on its own
 
-- PowerDelivery stop/disable or controller energy disallow => Relay1 open and module current hold disabled.
-- SessionStop request => modules OFF + Relay1 open.
+### 9.2 CurrentDemand
 
-## 9. Module Telemetry and Aggregation Contract
+- `mode=0/1`
+  - PLC applies requested voltage/current locally if energy allowed
+  - telemetry and limit flags are derived from module status
+- `mode=2`
+  - PLC publishes demand in `PLC_BMS_STATUS`
+  - controller feedback drives `ready`, present voltage/current, and limit flags
+  - PLC does not synthesize those fields from local power telemetry
 
-Aggregation for group `G_MAIN`:
+### 9.3 PowerDelivery Stop and SessionStop
 
-- Current: sum of fresh module currents
-- Voltage: average of fresh module voltages
-- Power: `V * I`
+All modes:
 
-Freshness controls:
+- clear delivery enable state
+- modules off
+- Relay1 open
 
-- module telemetry stale threshold: `MODULE_TELEMETRY_FRESH_MS = 10000 ms`
-- module manager runtime probe interval set to `200 ms`
-- service loop runs at 10 ms normally, 50 ms during SLAC-critical stage
+`mode=2` also clears managed power cache so the next session cannot inherit stale controller intent.
 
-Fallback behavior:
-
-- if combined V/I are too low/missing, response may fall back to last measured values for continuity.
-
-## 10. Serial Developer API (Local Console)
+## 10. Serial Developer API
 
 Serial commands are a local controller emulator and debug API.
 
@@ -599,136 +735,66 @@ Commands:
 - `CTRL SLAC <disarm|arm|start|abort> [arm_ms]`
 - `CTRL RESET`
 - `CTRL ALLOC1`
-- `CTRL ALLOC BEGIN <txn> <expected> [ttl_ms]`
-- `CTRL ALLOC DATA <txn> <index> <module_addr>`
+- `CTRL ALLOC BEGIN <txn> <expected> [ttl_ms] [limit_kw]`
+- `CTRL ALLOC DATA <txn> <module_group> <module_addr> [limit_kw]`
 - `CTRL ALLOC COMMIT <txn>`
 - `CTRL ALLOC ABORT`
 - `CTRL RELAY <enable_mask> <state_mask> [hold_ms]`
+- `CTRL POWER <enable0|1> <voltage_v> <current_a>`
+- `CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1]`
 - `CTRL STOP <soft|hard|clear> [timeout_ms]`
-- `CTRL MODE <standalone0|1> <plc_id 1..15> [controller_id 1..15]`
+- `CTRL MODE <mode0|1|2> <plc_id 1..15> [controller_id 1..15]`
 - `CTRL OWNERSHIP <connector_id> <module_addr>`
 - `CTRL SAVE`
 - `CTRL STATUS`
 
+Mode tokens accepted:
+
+- `0`, `standalone`, `local`
+- `1`, `controller`, `controller_supported`, `supported`
+- `2`, `managed`, `controller_managed`, `full`
+
 Notes:
 
-- `CTRL MODE` changes runtime config in RAM only; call `CTRL SAVE` + reboot to persist.
-- `CTRL OWNERSHIP` changes the persisted connector/module ownership fields in RAM; call `CTRL SAVE` + reboot to rebind runtime inventory.
-- `CTRL RESET` clears runtime controller state and performs safe-stop.
+- `CTRL ALLOC1` is a convenience helper that allocates the current local module in the current local group with the module max-power limit.
+- `CTRL STOP` is valid in all 3 modes. In `mode=0`, it acts as a direct local operator/debug safe-stop path.
+- `CTRL MODE` changes runtime config in RAM only; `CTRL SAVE` persists it
+- `CTRL RESET` clears controller runtime state and performs safe stop
+- `CTRL STATUS` reports current mode and managed power / feedback freshness flags
 
-## 11. SW4 Setup Portal API
+## 11. SW4 Setup Portal
 
 If SW4 is held at boot:
 
 - firmware starts AP `CBPLC-SETUP-<mac-suffix>`
 - serves setup form on `/` for 120 seconds
-- POST `/save` persists config to NVS and reboots
+- `POST /save` persists config to NVS and reboots
 
 Fields:
 
-- standalone mode
-- SLAC requires controller start
-- PLC ID
-- connector ID
-- controller ID
-- local module address
-- heartbeat timeout ms
-- auth TTL ms
-- alloc TTL ms
-- SLAC arm timeout ms
+- `mode`
+- `slac_requires_controller_start`
+- `plc_id`
+- `connector_id`
+- `controller_id`
+- `local_module_address`
+- heartbeat timeout
+- auth TTL
+- alloc TTL
+- SLAC arm timeout
 
-If SW4 is not pressed, portal is not started.
+For backward compatibility, the form handler still accepts legacy `standalone=<0|1>`, but it normalizes and stores `mode`.
 
-## 12. Edge Cases and Expected Reactions
+## 12. Edge Cases Integrators Should Expect
 
-## 12.1 Duplicate or stale command sequences
-
-- Rejected with `ACK_BAD_SEQ`.
-- No state mutation for that command.
-
-## 12.2 CRC/version/target mismatch
-
-- Rejected at parser layer with generic ack (`cmd_type=0x01`) and corresponding status.
-- Not enqueued into command logic.
-
-## 12.3 Unknown module address in alloc data
-
-- `ACK_BAD_VALUE`.
-- staged transaction remains active for corrected frames.
-
-## 12.4 Commit with empty staged list
-
-- `ACK_BAD_VALUE`.
-- no allowlist change.
-
-## 12.5 Heartbeat alive but auth pending forever
-
-- Session can stay in authorization ongoing state.
-- Energy path remains blocked unless granted.
-
-## 12.6 Controller disarm/abort during active charge
-
-- Safe-stop path runs:
-  - modules OFF
-  - Relay1 open
-  - HLC client/socket stop
-  - session reset
-
-## 12.7 Stop complete but module reports `off=0`
-
-Some module firmwares may not expose explicit off bit consistently.
-Operationally safe completion is based on:
-
-- allowlist released (`assigned=0`)
-- active modules `0`
-- output disabled
-- current ~ `0 A`
-
-## 12.8 Controller ID / PLC ID misconfiguration
-
-- Frames with mismatched target/controller nibble are ignored.
-- System appears idle (`waiting SLAC start auth`) in controller mode.
-
-## 13. Default Timing and Limits Summary
-
-- Startup log hold: 10 s
-- Heartbeat timeout default: 1200 ms (clamp 500..10000)
-- Auth TTL default: 2500 ms (clamp 500..30000)
-- Alloc txn TTL default: 3000 ms (clamp via command / config)
-- SLAC arm timeout default: 10000 ms (clamp 1000..60000)
-- Soft stop grace on HB loss: 3000 ms
-- Hard stop grace on HB loss with session/HLC active: 15000 ms
-- Module allowlist lease in setpoint path: 1200 ms
-
-## 14. Memory and CPU Budget Notes
-
-Current build snapshot (`pio run`, 2026-03-06):
-
-- RAM usage: ~26.3% (`86340 / 327680`)
-- Flash usage: ~31.0% (`1035377 / 3342336`)
-
-Runtime pacing notes:
-
-- Main loop delay: `1 ms` during CP/session/HLC-active phases, else `5 ms`.
-- Module service: `10 ms` nominal, `50 ms` SLAC-critical phase.
-- Status TX rates:
-  - CP/power at `200 ms`
-  - heartbeat/SLAC/HLC/session at `500 ms`
-
-SW4 portal memory behavior:
-
-- WiFi AP + WebServer objects are created only in SW4-held boot path.
-- In normal boot path (SW4 released), portal code path exits early and AP is not started.
-- After successful save, firmware reboots and returns to normal memory profile.
-
-## 15. Validation Checklist for Integrators
-
-Before production integration:
-
-1. Confirm controller sends heartbeat and auth refresh at stable cadence.
-2. Confirm alloc transaction sequence is begin->data->commit every re-assignment.
-3. Confirm SLAC arm/start is sent only after CP connect policy allows.
-4. Confirm stop command path checks `PLC_SESSION_STATUS.stop_complete=1` and `PLC_POWER_STATUS assigned=0 active=0`.
-5. Confirm controller handles `ACK_BAD_SEQ` by advancing/re-syncing sequence.
-6. Confirm controller handles `ACK_BAD_VALUE` with retry/repair logic.
-7. Confirm recovery behavior after controller restart (re-send mode heartbeat/auth/alloc/slac state).
+- wrong PLC id or controller id nibble -> frame ignored
+- bad CRC or wrong protocol version -> rejected with generic ACK
+- duplicate or stale sequence -> `ACK_BAD_SEQ`
+- unknown module address or bad group in alloc data -> `ACK_BAD_VALUE`
+- commit with missing unique modules -> `ACK_BAD_VALUE`
+- heartbeat seen once then lost -> controller permissions collapse and stop logic starts
+- auth pending forever -> HLC may remain in authorization ongoing, but energy stays blocked
+- controller disarm/abort during active charge -> immediate safe stop
+- allowlist change during active charge -> PLC retargets the new module set
+- managed mode with missing power updates -> modules off + Relay1 open
+- managed mode with missing feedback updates -> EV replies fall back to not-ready semantics

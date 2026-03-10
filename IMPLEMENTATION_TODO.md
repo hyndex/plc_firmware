@@ -1,18 +1,22 @@
-# PLC Firmware Rework TODO (Standalone + Controller-Orchestrated)
+# PLC Firmware Rework TODO (Mode-Based Runtime)
 
 Updated: 2026-03-07  
 Owner: Codex  
-Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-authoritative for authorization and SLAC start, while preserving a complete standalone path.
+Scope: Rework firmware architecture around `mode=0/1/2`, with controller authority for authorization and SLAC in controller-backed modes while preserving a complete local standalone path.
 
 ## Confirmed Requirements (Authoritative)
-- `StandaloneMode=enabled`:
+- `mode=0`:
   - PLC is fully independent (SLAC/HLC/modules/Relay1 local).
-- `StandaloneMode=disabled`:
-  - PLC depends on external controller for authorization decision.
+- `mode=1`:
+  - PLC depends on external controller for authorization and SLAC start decisions.
+  - PLC still owns Relay1 timing and local module targeting.
+- `mode=2`:
+  - controller handles live power-side actuation and Relay1 intent
+  - PLC publishes BMS demand and returns controller-provided HLC power-side data to the EV
+- Controller-backed modes:
   - PLC must publish status continuously to controller (CP/SLAC/HLC/session/module/safety).
   - PLC must publish identity/events (RFID, EV MAC, EVCCID, EMAID where available).
   - Controller explicitly decides when SLAC is allowed to start after gun connect.
-  - Relay1 remains PLC-owned; Relay2/Relay3 can be externally commanded.
 - Optional SW4 boot WiFi manager:
   - Start portal only when SW4 held at boot.
   - No portal tasks/allocations in normal boot.
@@ -46,10 +50,10 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - [ ] `CTRL_LIMITS_POLICY`: optional caps/derates/no-energy mode.
 
 ## Mode-Specific Session Flow
-### Standalone Enabled
+### `mode=0`
 - [ ] CP stable -> local SLAC trigger -> HLC -> local auth policy -> module + Relay1 control.
 
-### Standalone Disabled (Controller Authority)
+### `mode=1/2` (Controller Authority)
 - [ ] CP stable only raises `gun_connected` event.
 - [ ] PLC waits for `CTRL_SLAC_CONTROL=ARM/START_NOW`.
 - [ ] SLAC runs only while controller authorization window is valid.
@@ -67,7 +71,7 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - Status: In Progress
 - Dependencies: None
 - Tasks:
-  - [x] Add persistent config: `standalone_mode`, controller timeouts, SLAC policy gates, relay2/3 policy.
+  - [x] Add persistent config: `mode`, controller timeouts, SLAC policy gates, relay2/3 policy.
   - [x] Add persistent identity config: `plc_id`, `connector_id`, `controller_id`, `local_module_address`.
   - [x] Implement SW4 boot sample window and conditional WiFi manager startup.
   - [x] Ensure non-WiFi boot path has zero portal/task allocation.
@@ -123,8 +127,9 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - Status: In Progress
 - Dependencies: Stage B
 - Tasks:
-  - [x] Keep Relay1 local-only ownership.
+  - [x] Keep Relay1 PLC-owned outside controller-managed mode.
   - [x] Add Relay2/Relay3 external command path with safety interlocks and timeout-off.
+  - [x] Allow Relay1 external control only in `mode=2`.
   - [x] Publish applied relay state + reject reason codes.
 
 ## Stage H: Remove Unneeded Legacy Paths
@@ -148,10 +153,15 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - Dependencies: Stage A..I
 - Tasks:
   - [ ] Unit tests for control-plane decode/validation/state transitions.
-  - [ ] Integration tests for standalone and controller modes.
+  - [x] Live `mode=0` validation on `/dev/ttyACM0` for `10` minute and `15` minute charging windows, plus direct hard-stop verification while the vehicle remained connected.
+  - [ ] Complete uninterrupted `30` minute live validation for `mode=0`.
+  - [ ] Integration tests for `mode=1`.
+  - [ ] Integration tests for `mode=2`.
   - [ ] Two-ESP/multi-controller contention tests for module ownership safety.
   - [x] Live tests on `/dev/ttyACM0` and `/dev/ttyACM1` with erase, flash, persisted provisioning, and serial verification.
-  - [ ] End-to-end test: gun connect -> controller SLAC start -> auth pending->finish -> charging -> graceful stop.
+- [ ] End-to-end test: gun connect -> controller SLAC start -> auth pending->finish -> charging -> graceful stop.
+- [x] End-to-end test: home-only live charging on PLC 1 with stable power delivery and graceful stop.
+- [x] End-to-end test: borrowed-module live charging on PLC 1 with PLC 2 donor relay path and stable shared delivery.
 
 ## Stage K: Documentation and Operational Runbook
 - Status: Completed
@@ -168,4 +178,4 @@ Scope: Rework firmware architecture so `StandaloneMode=disabled` is controller-a
 - [ ] SLAC arm validity window after gun connected.
 - [ ] Identity event retention policy if controller temporarily offline.
 - [ ] Security hardening level beyond targeted controller-id/module-address masking (trusted CAN vs authenticated control frames).
-- [ ] Live shared-load validation under sustained borrow/release with the new borrower-only module-control contract.
+- [ ] Live dynamic donor release under sustained current with the borrower-only module-control contract.
