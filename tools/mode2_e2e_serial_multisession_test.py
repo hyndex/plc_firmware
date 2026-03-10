@@ -5,6 +5,9 @@ UART-controlled mode 2 multisession validation.
 This keeps the EV physically connected, runs multiple HLC charging sessions
 back-to-back over the serial controller bridge, and fails if CP ever drops to
 state A after the test begins.
+
+This harness is legacy-only. Current mode 2 is the UART-router split and does
+not allow PLC-owned module allocation/power control.
 """
 
 from __future__ import annotations
@@ -17,6 +20,13 @@ import threading
 import time
 
 from controller_charging_test import ControllerChargingRunner, SessionState
+
+
+LEGACY_MODE2_ERROR = (
+    "tools/mode2_e2e_serial_multisession_test.py is obsolete for the current "
+    "mode-2 UART-router architecture. Use a direct controller->module CAN "
+    "application plus the PLC UART router stream instead."
+)
 
 
 CP_TRANSITION_RE = re.compile(r"\[CP\] state .* -> ([A-F])")
@@ -102,7 +112,7 @@ class MultiSessionSerialRunner(ControllerChargingRunner):
         self._write_cmd("CTRL ALLOC ABORT")
         self._write_cmd("CTRL POWER 0 0 0")
         self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-        self._write_cmd("CTRL RELAY 4 0 1500")
+        self._write_cmd("CTRL RELAY 1 0 1500")
         self._write_cmd(f"CTRL MODE 2 {self.plc_id} {self.controller_id}")
         self._write_cmd(f"CTRL HB {self.heartbeat_timeout_ms}")
         self._write_cmd("CTRL STOP clear 3000")
@@ -142,7 +152,7 @@ class MultiSessionSerialRunner(ControllerChargingRunner):
         self._write_cmd(f"CTRL AUTH pending {self.auth_ttl_ms}")
         self._write_cmd("CTRL POWER 0 0 0")
         self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-        self._write_cmd("CTRL RELAY 4 0 1500")
+        self._write_cmd("CTRL RELAY 1 0 1500")
         print(f"[SESSION {index}] begin: waiting for B1 -> B2 -> HLC", flush=True)
 
     def _recover_pending_session(self, index: int, reason: str) -> None:
@@ -159,7 +169,7 @@ class MultiSessionSerialRunner(ControllerChargingRunner):
         self._write_cmd("CTRL ALLOC ABORT")
         self._write_cmd("CTRL POWER 0 0 0")
         self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-        self._write_cmd("CTRL RELAY 4 0 1500")
+        self._write_cmd("CTRL RELAY 1 0 1500")
         self._stop_verify_deadline = None
         self._remote_start_sent = False
         self._last_hb = 0.0
@@ -190,7 +200,7 @@ class MultiSessionSerialRunner(ControllerChargingRunner):
         if now - self._last_managed_cmd >= 0.4:
             self._write_cmd("CTRL POWER 0 0 0")
             self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-            self._write_cmd("CTRL RELAY 4 0 1500")
+            self._write_cmd("CTRL RELAY 1 0 1500")
             self._last_managed_cmd = now
 
     def _tick_gap(self) -> None:
@@ -211,7 +221,7 @@ class MultiSessionSerialRunner(ControllerChargingRunner):
         if now - self._last_managed_cmd >= 0.5:
             self._write_cmd("CTRL POWER 0 0 0")
             self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-            self._write_cmd("CTRL RELAY 4 0 1500")
+            self._write_cmd("CTRL RELAY 1 0 1500")
             self._last_managed_cmd = now
 
     def _idle_connected_ready(self) -> bool:
@@ -437,6 +447,8 @@ class MultiSessionSerialRunner(ControllerChargingRunner):
 
 
 def main() -> int:
+    print(f"[ERR] {LEGACY_MODE2_ERROR}", file=sys.stderr)
+    return 2
     ap = argparse.ArgumentParser(description="UART mode 2 multisession validation with EV kept connected")
     ap.add_argument("--port", default="/dev/ttyACM0")
     ap.add_argument("--baud", type=int, default=115200)

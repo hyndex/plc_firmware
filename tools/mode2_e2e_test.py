@@ -10,6 +10,11 @@ Goals:
   - use actual module/group voltage for managed feedback
   - tolerate the no-load simulator case where measured current stays at 0 A
   - stop cleanly and verify the managed path releases safely
+
+This harness is now legacy-only. The current mode-2 architecture is the UART
+router split where the PLC no longer owns module CAN or module allocation.
+Use `mode=3` only if you intentionally want the older PLC-owned module-manager
+path for comparison, or drive modules directly from the external controller.
 """
 
 from __future__ import annotations
@@ -37,6 +42,14 @@ try:
 except Exception as exc:
     print(f"[ERR] pyserial import failed: {exc}", file=sys.stderr)
     sys.exit(2)
+
+
+LEGACY_MODE2_ERROR = (
+    "tools/mode2_e2e_test.py is obsolete for the current firmware architecture. "
+    "Mode 2 is now controller_uart_router: PLC over UART for CP/HLC/relays, "
+    "modules controlled directly by the external controller over CAN. "
+    "This harness still pushes ALLOC/POWER through the PLC and must not be used."
+)
 
 
 CTRL_MSG_VERSION = 1
@@ -1029,8 +1042,8 @@ class Mode2Harness:
         msg = self._make_frame(
             CAN_ID_CTRL_AUX_RELAY,
             "_seq_aux",
-            0x04,
-            0x04 if closed else 0x00,
+            0x01,
+            0x01 if closed else 0x00,
             clamp_100ms(self.relay_hold_ms),
         )
         if wait:
@@ -1491,6 +1504,8 @@ class Mode2Harness:
 
 
 def main() -> int:
+    print(f"[ERR] {LEGACY_MODE2_ERROR}", file=sys.stderr)
+    return 2
     ap = argparse.ArgumentParser(description="Live end-to-end controller-managed mode 2 validation over CAN with serial verification")
     ap.add_argument("--port", default="/dev/ttyACM0")
     ap.add_argument("--baud", type=int, default=115200)

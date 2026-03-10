@@ -611,8 +611,8 @@ class TimedBorrowRunner:
                     CAN_ID_CTRL_AUX_RELAY,
                     plc.can_node_id,
                     "seq_aux",
-                    0x01,
-                    0x01 if close_relay2 else 0x00,
+                    0x02,
+                    0x02 if close_relay2 else 0x00,
                     0x00,
                 )
                 steps.append(self._plan_step(aux, f"RELAY2 plc={plc.plc_id} closed={1 if close_relay2 else 0}", ACK_CMD_AUX_RELAY))
@@ -661,8 +661,8 @@ class TimedBorrowRunner:
                 CAN_ID_CTRL_AUX_RELAY,
                 plc.can_node_id,
                 "seq_aux",
-                0x01,
-                0x01 if close_relay2 else 0x00,
+                0x02,
+                0x02 if close_relay2 else 0x00,
                 0x00,
             )
             steps.append(self._plan_step(aux, f"RELAY2 plc={plc.plc_id} closed={1 if close_relay2 else 0}", ACK_CMD_AUX_RELAY))

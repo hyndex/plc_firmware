@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Controller-side charging validation for CB PLC firmware over serial.
+Legacy controller-side charging validation for PLC-owned module modes over serial.
 
-This script drives controller APIs exposed by firmware serial bridge:
+This script drives controller APIs exposed by the firmware serial bridge:
   CTRL HB, CTRL AUTH, CTRL SLAC, CTRL ALLOC1, CTRL MODE, CTRL POWER,
   CTRL FEEDBACK, CTRL RELAY, CTRL STATUS
 
@@ -13,6 +13,13 @@ Goal:
   - print meter/SOC every 5 seconds
   - hold charging for N minutes (default: 10) based on CurrentDemand logs
   - stop session and verify module output is OFF
+
+Important:
+  - mode=2 on current firmware is the UART router path where the PLC does not
+    own module CAN control. This legacy script does not implement the direct
+    controller->module CAN leg and must not be used for mode=2.
+  - Use mode=3 / controller_managed if you intentionally want the old
+    PLC-owned module-manager path for comparison.
 """
 
 from __future__ import annotations
@@ -75,7 +82,11 @@ def _normalize_mode_token(token: str) -> str:
         "controller": "controller",
         "controller_supported": "controller",
         "supported": "controller",
-        "2": "managed",
+        "2": "uart_router",
+        "uart": "uart_router",
+        "router": "uart_router",
+        "controller_uart_router": "uart_router",
+        "3": "managed",
         "managed": "managed",
         "controller_managed": "managed",
         "full": "managed",
@@ -163,9 +174,17 @@ class ControllerChargingRunner:
         self.max_total_s = max_total_s
         self.heartbeat_ms = max(200, heartbeat_ms)
         self.heartbeat_timeout_ms = max(3000, self.heartbeat_ms * 8)
-        self.auth_ttl_ms = max(1000, auth_ttl_ms)
+        # Shared USB/UART links carry both controller commands and verbose PLC
+        # logs. Keep auth TTL safely above the heartbeat timeout so temporary
+        # serial congestion does not expire auth and drop Relay1 mid-session.
+        self.auth_ttl_ms = max(6000, auth_ttl_ms, self.heartbeat_timeout_ms + 2000)
         self.arm_ms = max(2000, arm_ms)
-        self.mode = mode if mode in ("standalone", "controller", "managed") else _normalize_mode_token(mode)
+        self.mode = mode if mode in ("standalone", "controller", "managed", "uart_router") else _normalize_mode_token(mode)
+        if self.mode == "uart_router":
+            raise ValueError(
+                "mode=2/controller_uart_router is not supported by controller_charging_test.py; "
+                "the PLC only exposes HLC/relay control there and module CAN must be driven externally"
+            )
         self.plc_id = max(1, min(15, int(plc_id)))
         self.controller_id = max(1, min(15, int(controller_id)))
         self.log_file = log_file
@@ -552,7 +571,7 @@ class ControllerChargingRunner:
         if self.mode == "managed":
             self._write_cmd("CTRL POWER 0 0 0")
             self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-            self._write_cmd("CTRL RELAY 4 0 1500")
+            self._write_cmd("CTRL RELAY 1 0 1500")
         self._write_cmd("CTRL STATUS")
 
     def _tick_controller_contract(self) -> None:
@@ -686,13 +705,13 @@ class ControllerChargingRunner:
         if (not cp_connected) or (not stage):
             self._write_cmd("CTRL POWER 0 0 0")
             self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-            self._write_cmd("CTRL RELAY 4 0 1500")
+            self._write_cmd("CTRL RELAY 1 0 1500")
             self._last_managed_cmd = now
             return
-        if (not recent_request) and stage not in ("precharge", "power_delivery", "current_demand"):
+        if not recent_request:
             self._write_cmd("CTRL POWER 0 0 0")
             self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-            self._write_cmd("CTRL RELAY 4 0 1500")
+            self._write_cmd("CTRL RELAY 1 0 1500")
             self._last_managed_cmd = now
             return
 
@@ -707,7 +726,7 @@ class ControllerChargingRunner:
             precharge_i = min(2.0, effective_i if effective_i > 0.05 else 2.0)
             self._write_cmd(f"CTRL POWER 1 {effective_v:.1f} {precharge_i:.1f}")
             self._write_cmd(f"CTRL FEEDBACK 1 {1 if voltage_ok else 0} {feedback_v:.1f} 0.0")
-            self._write_cmd("CTRL RELAY 4 0 1500")
+            self._write_cmd("CTRL RELAY 1 0 1500")
         elif stage in ("power_delivery", "current_demand"):
             # Once HLC advances past precharge, hold the validated target voltage in
             # feedback so the no-load simulator does not regress on transient telemetry
@@ -716,7 +735,7 @@ class ControllerChargingRunner:
             voltage_ok = effective_v > 1.0
             self._write_cmd(f"CTRL POWER 1 {effective_v:.1f} {effective_i:.1f}")
             self._write_cmd(f"CTRL FEEDBACK 1 {1 if voltage_ok else 0} {feedback_v:.1f} {measured_i:.1f}")
-            self._write_cmd(f"CTRL RELAY 4 {4 if voltage_ok else 0} 1500")
+            self._write_cmd(f"CTRL RELAY 1 {1 if voltage_ok else 0} 1500")
         self._last_managed_cmd = now
 
     def _tick_standalone(self) -> None:
@@ -734,7 +753,7 @@ class ControllerChargingRunner:
             if self.mode == "managed":
                 self._write_cmd("CTRL POWER 0 0 0")
                 self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-                self._write_cmd("CTRL RELAY 4 0 1500")
+                self._write_cmd("CTRL RELAY 1 0 1500")
         self._write_cmd("CTRL STATUS")
         with self._lock:
             self.state.stop_sent = True
@@ -764,7 +783,7 @@ class ControllerChargingRunner:
         if self.mode == "managed" and now - self._last_managed_cmd >= 0.5:
             self._write_cmd("CTRL POWER 0 0 0")
             self._write_cmd("CTRL FEEDBACK 1 0 0 0")
-            self._write_cmd("CTRL RELAY 4 0 1500")
+            self._write_cmd("CTRL RELAY 1 0 1500")
             self._last_managed_cmd = now
         if now - self._last_start >= 6.0:
             self._write_cmd("CTRL RESET")

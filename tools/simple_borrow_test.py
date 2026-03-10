@@ -510,7 +510,14 @@ class SimpleBorrowRunner:
         if not modules:
             abort = self._make_frame(CAN_ID_CTRL_ALLOC_ABORT, plc.can_node_id, "seq_alloc")
             steps.append(self._plan_step(abort, f"ALLOC_ABORT plc={plc.plc_id}", ACK_CMD_ALLOC_ABORT))
-            aux = self._make_frame(CAN_ID_CTRL_AUX_RELAY, plc.can_node_id, "seq_aux", 0x01, 0x01 if relay2_closed else 0x00, 0x00)
+            aux = self._make_frame(
+                CAN_ID_CTRL_AUX_RELAY,
+                plc.can_node_id,
+                "seq_aux",
+                0x02,
+                0x02 if relay2_closed else 0x00,
+                0x00,
+            )
             steps.append(self._plan_step(aux, f"RELAY2 plc={plc.plc_id} closed={1 if relay2_closed else 0}", ACK_CMD_AUX_RELAY))
             return steps
 
@@ -544,7 +551,14 @@ class SimpleBorrowRunner:
             )
         commit = self._make_frame(CAN_ID_CTRL_ALLOC_COMMIT, plc.can_node_id, "seq_alloc", txn_id)
         steps.append(self._plan_step(commit, f"ALLOC_COMMIT plc={plc.plc_id}", ACK_CMD_ALLOC_COMMIT))
-        aux = self._make_frame(CAN_ID_CTRL_AUX_RELAY, plc.can_node_id, "seq_aux", 0x01, 0x01 if relay2_closed else 0x00, 0x00)
+        aux = self._make_frame(
+            CAN_ID_CTRL_AUX_RELAY,
+            plc.can_node_id,
+            "seq_aux",
+            0x02,
+            0x02 if relay2_closed else 0x00,
+            0x00,
+        )
         steps.append(self._plan_step(aux, f"RELAY2 plc={plc.plc_id} closed={1 if relay2_closed else 0}", ACK_CMD_AUX_RELAY))
         return steps
 

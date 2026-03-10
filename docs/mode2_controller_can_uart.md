@@ -1,6 +1,13 @@
-# Mode 2 Controller Interface: CAN and UART
+# Legacy Managed Controller Interface: CAN and UART
 
-This document describes the implemented controller interface for `mode=2` (`controller_managed`) in the PLC firmware.
+This document describes the legacy `mode=3` (`controller_managed`) PLC-owned-module flow.
+
+If you want the direct split:
+
+- `Controller -> PLC` over UART
+- `Controller -> Modules` over external CAN
+
+use `mode=2` (`controller_uart_router`) instead and see [controller_uart_router_mode.md](/home/jpi/Desktop/EVSE/plc_firmware/docs/controller_uart_router_mode.md).
 
 It covers:
 - identity and addressing
@@ -263,13 +270,13 @@ Payload:
 
 Bit meaning:
 
-- bit `0x01`: relay2
-- bit `0x02`: relay3
-- bit `0x04`: relay1
+- bit `0x01`: relay1
+- bit `0x02`: relay2
+- bit `0x04`: relay3
 
 Effect:
 
-- relay1 control is only accepted in `mode=2`
+- relay1 control is only accepted in legacy `mode=3`
 - relay1 close is rejected unless energy is allowed and CP is connected
 - if a hold time is provided, the relay auto-deadline is armed
 
@@ -312,7 +319,7 @@ Payload bytes `3..6` are a packed little-endian 32-bit value:
 
 Effect:
 
-- only valid in `mode=2`
+- only valid in legacy `mode=3`
 - when `enable=1`, PLC drives modules to target V/I
 - when `enable=0`, PLC turns modules off
 
@@ -335,7 +342,7 @@ Payload bytes `3..6` are a packed little-endian 32-bit value:
 
 Effect:
 
-- only valid in `mode=2`
+- only valid in legacy `mode=3`
 - feeds the HLC state machine with present V/I and readiness
 
 ACK:
@@ -496,7 +503,7 @@ On-demand stable controller status:
 
 - `CTRL STATUS`
 - response:
-  - `[SERCTRL] STATUS mode=... plc_id=... connector_id=... controller_id=... module_addr=... local_group=... module_id=... cp=... duty=... hb=... auth=... allow_slac=... allow_energy=... armed=... start=... alloc_sz=... ctrl_power=... ctrl_fb=... stop_active=... stop_hard=... stop_done=...`
+  - `[SERCTRL] STATUS mode=... plc_id=... connector_id=... controller_id=... module_addr=... local_group=... module_id=... cp=... duty=... hb=... auth=... allow_slac=... allow_energy=... armed=... start=... relay1=... relay2=... relay3=... alloc_sz=... ctrl_power=... ctrl_fb=... stop_active=... stop_hard=... stop_done=...`
 
 ACK line:
 
@@ -517,6 +524,12 @@ Serial equivalent of CAN heartbeat.
 #### `CTRL AUTH <deny|pending|grant|0|1|2> [ttl_ms]`
 
 Serial equivalent of CAN auth command.
+
+UART recommendation:
+
+- keep auth TTL comfortably above the heartbeat timeout on the shared serial/logging path
+- a good floor is `heartbeat_timeout_ms + 2000`
+- `AUTH grant 3000` is too aggressive on a noisy UART path and can let Relay1 drop even though the controller is still alive
 
 #### `CTRL SLAC <disarm|arm|start|start_now|abort|0|1|2|3> [arm_ms]`
 
@@ -561,9 +574,16 @@ Serial equivalent of aux relay command.
 
 Relay bits:
 
-- `0x01` relay2
-- `0x02` relay3
-- `0x04` relay1
+- `0x01` relay1
+- `0x02` relay2
+- `0x04` relay3
+
+Examples:
+
+- `CTRL RELAY 1 1 1500`: close Relay1 with a 1500 ms hold deadline
+- `CTRL RELAY 2 2 0`: close Relay2 with no hold deadline
+- `CTRL RELAY 2 0 0`: open Relay2
+- `CTRL RELAY 4 4 0`: close Relay3
 
 #### `CTRL POWER <enable0|1> <voltage_v> <current_a>`
 
@@ -618,13 +638,13 @@ Host scripts should:
 - avoid writing many commands back-to-back with zero spacing
 - keep a small inter-command gap of about `40 ms` to avoid merged lines on the USB/UART path
 
-## 4. End-to-End Mode 2 Flow
+## 4. End-to-End Legacy Managed Flow
 
 This is the intended controller-owned module and relay flow.
 
 ### 4.1 Bootstrap
 
-1. Put PLC into `mode=2`
+1. Put PLC into `mode=3`
 2. Confirm identity with `CTRL STATUS` or CAN identity
 3. Start controller heartbeat loop
 4. Begin/commit allocation for the module(s) the connector owns
@@ -747,4 +767,3 @@ The firmware now republishes that local identity:
 - at boot
 - on first accepted controller heartbeat
 - when the controller heartbeat session marker changes
-
