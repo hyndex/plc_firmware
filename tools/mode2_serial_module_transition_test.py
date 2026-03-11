@@ -212,9 +212,7 @@ class SerialLink:
         self.last_write_ts = 0.0
         self.pending_status_line = ""
 
-    def open(self) -> None:
-        ensure_parent(self.log_file)
-        self.log_fp = open(self.log_file, "w", encoding="utf-8", buffering=1)
+    def _build_serial(self) -> serial.Serial:
         kwargs = {
             "port": self.port,
             "baudrate": self.baud,
@@ -222,11 +220,49 @@ class SerialLink:
             "write_timeout": 0.5,
         }
         try:
-            self.ser = serial.Serial(exclusive=True, **kwargs)
+            ser = serial.Serial(exclusive=True, **kwargs)
         except TypeError:
-            self.ser = serial.Serial(**kwargs)
-        self.ser.reset_input_buffer()
-        self.ser.reset_output_buffer()
+            ser = serial.Serial(**kwargs)
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
+        return ser
+
+    def _close_serial_locked(self) -> None:
+        if self.ser:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+            self.ser = None
+
+    def _reconnect(self, reason: str, timeout_s: float = 12.0) -> bool:
+        deadline = time.time() + max(1.0, timeout_s)
+        last_exc: Optional[Exception] = None
+        self._log(f"{ts()} [HOST] reconnecting {self.port}: {reason}")
+        while not self.stop_event.is_set() and time.time() < deadline:
+            try:
+                ser = self._build_serial()
+            except Exception as exc:
+                last_exc = exc
+                time.sleep(0.25)
+                continue
+            with self.write_lock:
+                self._close_serial_locked()
+                self.ser = ser
+                self.last_write_ts = 0.0
+            self.reader_error = None
+            self.pending_status_line = ""
+            self._log(f"{ts()} [HOST] reconnected {self.port}")
+            return True
+        detail = f"{reason}: {last_exc}" if last_exc else reason
+        self.reader_error = f"reconnect failed on {self.port}: {detail}"
+        self._log(f"{ts()} [HOST] {self.reader_error}")
+        return False
+
+    def open(self) -> None:
+        ensure_parent(self.log_file)
+        self.log_fp = open(self.log_file, "w", encoding="utf-8", buffering=1)
+        self.ser = self._build_serial()
         self.stop_event.clear()
         self.reader_error = None
         self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
@@ -236,12 +272,8 @@ class SerialLink:
         self.stop_event.set()
         if self.reader_thread and self.reader_thread.is_alive():
             self.reader_thread.join(timeout=2.0)
-        if self.ser:
-            try:
-                self.ser.close()
-            except Exception:
-                pass
-            self.ser = None
+        with self.write_lock:
+            self._close_serial_locked()
         if self.log_fp:
             self.log_fp.close()
             self.log_fp = None
@@ -251,15 +283,25 @@ class SerialLink:
             self.log_fp.write(line + "\n")
 
     def command(self, cmd: str) -> None:
-        if not self.ser:
+        if not self.ser and not self._reconnect("command while port closed", timeout_s=5.0):
             raise RuntimeError("serial port not open")
         with self.write_lock:
+            if not self.ser:
+                raise RuntimeError("serial port not open")
             wait_s = 0.04 - (time.time() - self.last_write_ts)
             if wait_s > 0:
                 time.sleep(wait_s)
             payload = (cmd.strip() + "\n").encode("utf-8", errors="ignore")
-            self.ser.write(payload)
-            self.ser.flush()
+            try:
+                self.ser.write(payload)
+                self.ser.flush()
+            except Exception as exc:
+                self._log(f"{ts()} [HOST] write failed: {exc}")
+                self._close_serial_locked()
+                if not self._reconnect(f"write failed: {exc}", timeout_s=5.0) or not self.ser:
+                    raise
+                self.ser.write(payload)
+                self.ser.flush()
             self.last_write_ts = time.time()
             self._log(f"{ts()} > {cmd}")
 
@@ -268,8 +310,9 @@ class SerialLink:
             try:
                 raw = self.ser.readline() if self.ser else b""
             except Exception as exc:
-                self.reader_error = str(exc)
                 self._log(f"{ts()} [HOST] read failed: {exc}")
+                if self._reconnect(f"read failed: {exc}"):
+                    continue
                 break
             if not raw:
                 continue

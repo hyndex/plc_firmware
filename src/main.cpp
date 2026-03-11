@@ -1249,6 +1249,7 @@ struct ControllerManagedFeedbackState {
     bool seen{false};
     bool valid{false};
     bool ready{false};
+    bool stop_charging{false};
     bool current_limit_achieved{false};
     bool voltage_limit_achieved{false};
     bool power_limit_achieved{false};
@@ -2051,6 +2052,7 @@ uint32_t pack_ctrl_hlc_feedback(bool valid,
                                 bool current_limit,
                                 bool voltage_limit,
                                 bool power_limit,
+                                bool stop_charging,
                                 float present_voltage_v,
                                 float present_current_a) {
     const uint32_t v01 = encode_voltage_d01(present_voltage_v, 0x3FFFu);
@@ -2061,7 +2063,8 @@ uint32_t pack_ctrl_hlc_feedback(bool valid,
            (static_cast<uint32_t>(power_limit ? 1u : 0u) << 3u) |
            ((v01 & 0x3FFFu) << 4u) |
            ((i01 & 0x0FFFu) << 18u) |
-           (static_cast<uint32_t>(valid ? 1u : 0u) << 30u);
+           (static_cast<uint32_t>(valid ? 1u : 0u) << 30u) |
+           (static_cast<uint32_t>(stop_charging ? 1u : 0u) << 31u);
 }
 
 void unpack_ctrl_hlc_feedback(uint32_t packed,
@@ -2070,6 +2073,7 @@ void unpack_ctrl_hlc_feedback(uint32_t packed,
                               bool* current_limit,
                               bool* voltage_limit,
                               bool* power_limit,
+                              bool* stop_charging,
                               float* present_voltage_v,
                               float* present_current_a) {
     if (ready) *ready = (packed & 0x01u) != 0u;
@@ -2079,6 +2083,7 @@ void unpack_ctrl_hlc_feedback(uint32_t packed,
     if (present_voltage_v) *present_voltage_v = static_cast<float>((packed >> 4u) & 0x3FFFu) / 10.0f;
     if (present_current_a) *present_current_a = static_cast<float>((packed >> 18u) & 0x0FFFu) / 10.0f;
     if (valid) *valid = (packed & (1u << 30u)) != 0u;
+    if (stop_charging) *stop_charging = (packed & (1u << 31u)) != 0u;
 }
 
 float iso_pv_to_float(const iso2_PhysicalValueType* pv) {
@@ -2169,39 +2174,63 @@ void set_din_physical(din_PhysicalValueType* pv, din_unitSymbolType unit, float 
     pv->Value = round_to_i16(sane_non_negative(value));
 }
 
-void set_iso_dc_status_ready(iso2_DC_EVSEStatusType* st) {
+void set_iso_dc_status_ready(iso2_DC_EVSEStatusType* st,
+                             iso2_EVSENotificationType notification = iso2_EVSENotificationType_None) {
     if (!st) return;
     init_iso2_DC_EVSEStatusType(st);
     st->NotificationMaxDelay = 1;
-    st->EVSENotification = iso2_EVSENotificationType_None;
+    st->EVSENotification = notification;
     st->EVSEStatusCode = iso2_DC_EVSEStatusCodeType_EVSE_Ready;
     st->EVSEIsolationStatus_isUsed = 0;
 }
 
-void set_iso_dc_status_not_ready(iso2_DC_EVSEStatusType* st) {
+void set_iso_dc_status_not_ready(iso2_DC_EVSEStatusType* st,
+                                 iso2_EVSENotificationType notification = iso2_EVSENotificationType_None) {
     if (!st) return;
     init_iso2_DC_EVSEStatusType(st);
     st->NotificationMaxDelay = 1;
-    st->EVSENotification = iso2_EVSENotificationType_None;
+    st->EVSENotification = notification;
     st->EVSEStatusCode = iso2_DC_EVSEStatusCodeType_EVSE_NotReady;
     st->EVSEIsolationStatus_isUsed = 0;
 }
 
-void set_din_dc_status_ready(din_DC_EVSEStatusType* st) {
+void set_iso_dc_status_shutdown(iso2_DC_EVSEStatusType* st,
+                                iso2_EVSENotificationType notification = iso2_EVSENotificationType_StopCharging) {
+    if (!st) return;
+    init_iso2_DC_EVSEStatusType(st);
+    st->NotificationMaxDelay = 1;
+    st->EVSENotification = notification;
+    st->EVSEStatusCode = iso2_DC_EVSEStatusCodeType_EVSE_Shutdown;
+    st->EVSEIsolationStatus_isUsed = 0;
+}
+
+void set_din_dc_status_ready(din_DC_EVSEStatusType* st,
+                             din_EVSENotificationType notification = din_EVSENotificationType_None) {
     if (!st) return;
     init_din_DC_EVSEStatusType(st);
     st->NotificationMaxDelay = 1;
-    st->EVSENotification = din_EVSENotificationType_None;
+    st->EVSENotification = notification;
     st->EVSEStatusCode = din_DC_EVSEStatusCodeType_EVSE_Ready;
     st->EVSEIsolationStatus_isUsed = 0;
 }
 
-void set_din_dc_status_not_ready(din_DC_EVSEStatusType* st) {
+void set_din_dc_status_not_ready(din_DC_EVSEStatusType* st,
+                                 din_EVSENotificationType notification = din_EVSENotificationType_None) {
     if (!st) return;
     init_din_DC_EVSEStatusType(st);
     st->NotificationMaxDelay = 1;
-    st->EVSENotification = din_EVSENotificationType_None;
+    st->EVSENotification = notification;
     st->EVSEStatusCode = din_DC_EVSEStatusCodeType_EVSE_NotReady;
+    st->EVSEIsolationStatus_isUsed = 0;
+}
+
+void set_din_dc_status_shutdown(din_DC_EVSEStatusType* st,
+                                din_EVSENotificationType notification = din_EVSENotificationType_StopCharging) {
+    if (!st) return;
+    init_din_DC_EVSEStatusType(st);
+    st->NotificationMaxDelay = 1;
+    st->EVSENotification = notification;
+    st->EVSEStatusCode = din_DC_EVSEStatusCodeType_EVSE_Shutdown;
     st->EVSEIsolationStatus_isUsed = 0;
 }
 
@@ -3869,6 +3898,7 @@ void controller_handle_hlc_feedback(const CtrlRxFrame& f) {
     bool current_limit = false;
     bool voltage_limit = false;
     bool power_limit = false;
+    bool stop_charging = false;
     float present_v = 0.0f;
     float present_i = 0.0f;
     unpack_ctrl_hlc_feedback(ctrl_unpack_u32_le(&f.data[3]),
@@ -3877,12 +3907,14 @@ void controller_handle_hlc_feedback(const CtrlRxFrame& f) {
                              &current_limit,
                              &voltage_limit,
                              &power_limit,
+                             &stop_charging,
                              &present_v,
                              &present_i);
     g_ctrl_feedback.seen = true;
     g_ctrl_feedback.last_update_ms = f.rx_ms;
     g_ctrl_feedback.valid = valid;
     g_ctrl_feedback.ready = ready;
+    g_ctrl_feedback.stop_charging = stop_charging;
     g_ctrl_feedback.current_limit_achieved = current_limit;
     g_ctrl_feedback.voltage_limit_achieved = voltage_limit;
     g_ctrl_feedback.power_limit_achieved = power_limit;
@@ -4554,10 +4586,11 @@ void serial_ctrl_send_hlc_feedback(bool valid,
                                    float present_i,
                                    bool current_limit,
                                    bool voltage_limit,
-                                   bool power_limit) {
+                                   bool power_limit,
+                                   bool stop_charging) {
     uint8_t p[8]{};
     const uint32_t packed = pack_ctrl_hlc_feedback(
-        valid, ready, current_limit, voltage_limit, power_limit, present_v, present_i);
+        valid, ready, current_limit, voltage_limit, power_limit, stop_charging, present_v, present_i);
     p[3] = static_cast<uint8_t>(packed & 0xFFu);
     p[4] = static_cast<uint8_t>((packed >> 8u) & 0xFFu);
     p[5] = static_cast<uint8_t>((packed >> 16u) & 0xFFu);
@@ -4586,7 +4619,7 @@ void serial_ctrl_print_help() {
     Serial.println("  CTRL ALLOC ABORT");
     Serial.println("  CTRL RELAY <enable_mask> <state_mask> [hold_ms]");
     Serial.println("  CTRL POWER <enable0|1> <voltage_v> <current_a>  (managed mode only)");
-    Serial.println("  CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1]");
+    Serial.println("  CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]");
     Serial.println("  CTRL STOP <soft|hard|clear> [timeout_ms]");
     Serial.println("  CTRL MODE <mode0|1|2|3> <plc_id 1..15> [controller_id 1..15]");
     Serial.println("  CTRL OWNERSHIP <connector_id> <module_addr>");
@@ -4785,15 +4818,17 @@ void serial_ctrl_handle_line(String line) {
         const bool current_limit = (t.size() >= 7) ? (parse_u32_token(t[6], 0u) != 0u) : false;
         const bool voltage_limit = (t.size() >= 8) ? (parse_u32_token(t[7], 0u) != 0u) : false;
         const bool power_limit = (t.size() >= 9) ? (parse_u32_token(t[8], 0u) != 0u) : false;
-        serial_ctrl_send_hlc_feedback(valid, ready, present_v, present_i, current_limit, voltage_limit, power_limit);
-        Serial.printf("[SERCTRL] FEEDBACK valid=%d ready=%d present_v=%.1f present_i=%.1f curr_lim=%d volt_lim=%d pwr_lim=%d\n",
+        const bool stop_charging = (t.size() >= 10) ? (parse_u32_token(t[9], 0u) != 0u) : false;
+        serial_ctrl_send_hlc_feedback(valid, ready, present_v, present_i, current_limit, voltage_limit, power_limit, stop_charging);
+        Serial.printf("[SERCTRL] FEEDBACK valid=%d ready=%d present_v=%.1f present_i=%.1f curr_lim=%d volt_lim=%d pwr_lim=%d stop_notify=%d\n",
                       valid ? 1 : 0,
                       ready ? 1 : 0,
                       static_cast<double>(present_v),
                       static_cast<double>(present_i),
                       current_limit ? 1 : 0,
                       voltage_limit ? 1 : 0,
-                      power_limit ? 1 : 0);
+                      power_limit ? 1 : 0,
+                      stop_charging ? 1 : 0);
         return;
     }
     if (op == "STOP") {
@@ -5257,6 +5292,7 @@ int hlc_handle_precharge(HlcAppContext* ctx,
         const uint32_t now_ms = millis();
         ControllerManagedFeedbackState fb{};
         const bool fb_ok = controller_get_managed_feedback(now_ms, &fb);
+        const bool stop_charging = fb_ok && fb.stop_charging;
         if (!allow_energy && !mode_controller_has_final_decision()) {
             request_modules_off("PreChargeBlocked");
             (void)relay1_set(false, "PreChargeBlocked");
@@ -5276,7 +5312,9 @@ int hlc_handle_precharge(HlcAppContext* ctx,
             if (precharge_ready) {
                 set_iso_dc_status_ready(&res.DC_EVSEStatus);
             } else {
-                set_iso_dc_status_not_ready(&res.DC_EVSEStatus);
+                set_iso_dc_status_not_ready(
+                    &res.DC_EVSEStatus,
+                    stop_charging ? iso2_EVSENotificationType_StopCharging : iso2_EVSENotificationType_None);
             }
             set_iso_physical(&res.EVSEPresentVoltage, iso2_unitSymbolType_V, present_v);
             return jpv2g_cbv2g_encode_pre_charge_res(
@@ -5294,7 +5332,9 @@ int hlc_handle_precharge(HlcAppContext* ctx,
             if (precharge_ready) {
                 set_din_dc_status_ready(&res.DC_EVSEStatus);
             } else {
-                set_din_dc_status_not_ready(&res.DC_EVSEStatus);
+                set_din_dc_status_not_ready(
+                    &res.DC_EVSEStatus,
+                    stop_charging ? din_EVSENotificationType_StopCharging : din_EVSENotificationType_None);
             }
             set_din_physical(&res.EVSEPresentVoltage, din_unitSymbolType_V, present_v);
             return jpv2g_cbv2g_encode_din_pre_charge_res(
@@ -5389,6 +5429,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     if (mode_controller_uses_external_feedback()) {
         ControllerManagedFeedbackState fb{};
         const bool fb_ok = controller_get_managed_feedback(now_ms, &fb);
+        const bool stop_charging = fb_ok && fb.stop_charging;
         const bool response_ready =
             mode_controller_has_final_decision() ? (fb_ok && fb.ready) : (allow_energy && fb_ok && fb.ready);
         if (!allow_energy && !mode_controller_has_final_decision()) {
@@ -5416,9 +5457,15 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
             iso2_CurrentDemandResType res;
             init_iso2_CurrentDemandResType(&res);
             if (response_ready) {
-                set_iso_dc_status_ready(&res.DC_EVSEStatus);
+                if (stop_charging) {
+                    set_iso_dc_status_shutdown(&res.DC_EVSEStatus, iso2_EVSENotificationType_StopCharging);
+                } else {
+                    set_iso_dc_status_ready(&res.DC_EVSEStatus);
+                }
             } else {
-                set_iso_dc_status_not_ready(&res.DC_EVSEStatus);
+                set_iso_dc_status_not_ready(
+                    &res.DC_EVSEStatus,
+                    stop_charging ? iso2_EVSENotificationType_StopCharging : iso2_EVSENotificationType_None);
             }
             set_iso_physical(&res.EVSEPresentVoltage, iso2_unitSymbolType_V, present_v);
             set_iso_physical(&res.EVSEPresentCurrent, iso2_unitSymbolType_A, present_i);
@@ -5441,9 +5488,15 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
             din_CurrentDemandResType res;
             init_din_CurrentDemandResType(&res);
             if (response_ready) {
-                set_din_dc_status_ready(&res.DC_EVSEStatus);
+                if (stop_charging) {
+                    set_din_dc_status_shutdown(&res.DC_EVSEStatus, din_EVSENotificationType_StopCharging);
+                } else {
+                    set_din_dc_status_ready(&res.DC_EVSEStatus);
+                }
             } else {
-                set_din_dc_status_not_ready(&res.DC_EVSEStatus);
+                set_din_dc_status_not_ready(
+                    &res.DC_EVSEStatus,
+                    stop_charging ? din_EVSENotificationType_StopCharging : din_EVSENotificationType_None);
             }
             set_din_physical(&res.EVSEPresentVoltage, din_unitSymbolType_V, present_v);
             set_din_physical(&res.EVSEPresentCurrent, din_unitSymbolType_A, present_i);
@@ -5573,10 +5626,10 @@ void hlc_apply_power_side_effects(HlcAppContext* ctx,
         if (!enable) {
             ctx->power_delivery_enabled = false;
             update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
+            (void)relay1_set(false, "PowerDeliveryStop");
             if (!mode_controller_has_final_decision()) {
                 controller_clear_managed_power_cache();
                 request_modules_off("PowerDeliveryStop");
-                (void)relay1_set(false, "PowerDeliveryStop");
             }
             return;
         }
@@ -5609,9 +5662,9 @@ void hlc_apply_power_side_effects(HlcAppContext* ctx,
         ctx->precharge_converged = false;
         ctx->power_delivery_enabled = false;
         clear_last_bms_request();
+        (void)relay1_set(false, "SessionStop");
         if (!mode_controller_has_final_decision()) {
             request_modules_off("SessionStop");
-            (void)relay1_set(false, "SessionStop");
         }
         stop_session(millis());
     }

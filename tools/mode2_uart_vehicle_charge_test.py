@@ -109,6 +109,7 @@ BMS_EVT_RE = re.compile(
 IDENTITY_EVT_RE = re.compile(
     r"\[SERCTRL\] IDENTITY kind=([A-Z0-9_]+)\s+plc_id=(\d+)\s+connector_id=(\d+)\s+value=([0-9A-Fa-f]+)"
 )
+HLC_REQ_RE = re.compile(r"RX (PowerDeliveryReq|WeldingDetectionReq|SessionStopReq) \(proto=(\d+)\)")
 
 
 def ts() -> str:
@@ -184,6 +185,12 @@ class PlcLiveState:
     identity_seen: bool = False
     identity_source: str = ""
     identity_value: str = ""
+    power_delivery_req_count: int = 0
+    welding_req_count: int = 0
+    session_stop_req_count: int = 0
+    last_power_delivery_req_ts: Optional[float] = None
+    last_welding_req_ts: Optional[float] = None
+    last_session_stop_req_ts: Optional[float] = None
     errors: list[str] = field(default_factory=list)
 
 
@@ -202,6 +209,10 @@ class SummaryModule:
     status: Optional[str]
     voltage_v: Optional[float]
     current_a: Optional[float]
+
+
+class VehicleInitiatedStop(RuntimeError):
+    pass
 
 
 class VehicleChargeRunner:
@@ -262,11 +273,16 @@ class VehicleChargeRunner:
         self.start_recovery_count = 0
 
         self.current_demand_started_at: Optional[float] = None
+        self.session_protocol_baseline: tuple[int, int, int] = (0, 0, 0)
         self.attach_done = False
         self.release_done = False
         self.stop_requested = False
         self.stop_started_at: Optional[float] = None
         self.stop_hard_sent = False
+        self.protocol_stop_verified = False
+        self.vehicle_stop_requested = False
+        self.vehicle_stop_reason = ""
+        self.vehicle_stop_seen_at: Optional[float] = None
 
     def _state(self, plc_name: str) -> tuple[PlcLiveState, threading.RLock]:
         if plc_name == "donor":
@@ -433,6 +449,26 @@ class VehicleChargeRunner:
                 state.identity_seen = True
                 state.identity_source = identity_evt.group(1)
                 state.identity_value = identity_evt.group(4).upper()
+            return
+
+        hlc_req = HLC_REQ_RE.search(line)
+        if hlc_req:
+            kind = hlc_req.group(1)
+            with lock:
+                if kind == "PowerDeliveryReq":
+                    state.power_delivery_req_count += 1
+                    state.last_power_delivery_req_ts = now
+                elif kind == "WeldingDetectionReq":
+                    state.welding_req_count += 1
+                    state.last_welding_req_ts = now
+                elif kind == "SessionStopReq":
+                    state.session_stop_req_count += 1
+                    state.last_session_stop_req_ts = now
+            if plc_name == "borrower" and self.current_demand_started_at is not None and not self.stop_requested:
+                self.vehicle_stop_requested = True
+                self.vehicle_stop_reason = kind
+                if self.vehicle_stop_seen_at is None:
+                    self.vehicle_stop_seen_at = now
 
     def _parse_borrower_line(self, line: str) -> None:
         self._parse_line_common("borrower", line)
@@ -605,9 +641,12 @@ class VehicleChargeRunner:
             normalized = normalize_stage_name(stage_name)
             if normalized in ("precharge", "power_delivery", "current_demand"):
                 return normalized, target_v, target_i, stage_ts, True
-        if precharge_seen:
+        if precharge_seen and self.current_demand_started_at is None:
             return "precharge", target_v, target_i, stage_ts, False
         return "", target_v, target_i, stage_ts, False
+
+    def _vehicle_stop_pending(self) -> bool:
+        return self.vehicle_stop_requested and not self.stop_requested
 
     def _target_voltage(self) -> float:
         stage, target_v, _target_i, _ts, _fresh = self._borrower_stage_snapshot()
@@ -727,7 +766,7 @@ class VehicleChargeRunner:
             self._send("borrower", f"CTRL HB {self.args.heartbeat_timeout_ms}")
             self.last_borrower_hb = now
 
-        if self.stop_requested:
+        if self.stop_requested or self._vehicle_stop_pending():
             if now - self.last_borrower_status >= self.args.status_interval_s:
                 self._send("borrower", "CTRL STATUS")
                 self.last_borrower_status = now
@@ -835,7 +874,8 @@ class VehicleChargeRunner:
         elif stage in ("power_delivery", "current_demand"):
             present_v = self._present_voltage_estimate()
             present_i = self._present_current_estimate()
-            ready = target_v > 10.0 and abs(present_v - target_v) <= self.args.feedback_voltage_tolerance_v
+            power_path_active = self._relay_is_closed("borrower", self.args.borrower_power_relay)
+            ready = target_v > 10.0 and power_path_active
             if self.attach_done and not self.release_done:
                 _home_i, _donor_i, total_cap = self._shared_currents(requested_i)
             else:
@@ -849,6 +889,19 @@ class VehicleChargeRunner:
             )
         else:
             self._send("borrower", "CTRL FEEDBACK 1 0 0 0 0 0 0")
+        self.last_feedback_cmd = now
+
+    def _tick_protocol_stop_feedback(self, now: float) -> None:
+        if (now - self.last_feedback_cmd) < self.args.feedback_interval_s:
+            return
+        present_v = self._present_voltage_estimate()
+        present_i = self._present_current_estimate()
+        power_path_active = self._relay_is_closed("borrower", self.args.borrower_power_relay) and present_v > 10.0
+        self._send(
+            "borrower",
+            f"CTRL FEEDBACK 1 {1 if power_path_active else 0} {present_v:.1f} "
+            f"{present_i if power_path_active else 0.0:.1f} 0 0 0 1",
+        )
         self.last_feedback_cmd = now
 
     def _tick_telemetry(self, now: float) -> None:
@@ -938,15 +991,26 @@ class VehicleChargeRunner:
         self._check_runtime_mode()
         self._tick_borrower_contract(now)
         self._tick_donor_idle(now)
-        self._tick_relays(now)
-        self._tick_module_outputs(now)
-        self._tick_feedback(now, stage, target_v, requested_i)
+        if self._vehicle_stop_pending():
+            self.current_plan["home"] = ControlPlan(False, 0.0, 0.0)
+            self.current_plan["donor"] = ControlPlan(False, 0.0, 0.0)
+            self.desired_relays[("borrower", self.args.borrower_power_relay)] = False
+            self.desired_relays[("donor", self.args.donor_bridge_relay)] = False
+            self._tick_module_outputs(now)
+            self._tick_protocol_stop_feedback(now)
+            self._tick_relays(now)
+        else:
+            self._tick_relays(now)
+            self._tick_module_outputs(now)
+            self._tick_feedback(now, stage, target_v, requested_i)
         self._tick_telemetry(now)
-        self._tick_progress(now, stage)
+        self._tick_progress(now, "stop_request" if self._vehicle_stop_pending() else stage)
 
     def _wait_until(self, timeout_s: float, predicate, description: str, stage: str, target_v: float, requested_i: float) -> None:
         deadline = time.time() + timeout_s
         while time.time() < deadline:
+            if self._vehicle_stop_pending():
+                raise VehicleInitiatedStop(self.vehicle_stop_reason or "vehicle initiated stop")
             if predicate():
                 return
             self._service_cycle(stage, target_v, requested_i)
@@ -1062,6 +1126,8 @@ class VehicleChargeRunner:
         settle_started = time.time()
         settle_deadline = settle_started + self.args.attach_timeout_s
         while time.time() < settle_deadline:
+            if self._vehicle_stop_pending():
+                raise VehicleInitiatedStop(self.vehicle_stop_reason or "vehicle initiated stop")
             self._service_cycle("current_demand", target_v, requested_i)
             if (time.time() - settle_started) >= self.args.attach_settle_s:
                 if not self._bus_continuity_ok(baseline_bus_v, self.args.attach_max_bus_dip_v):
@@ -1083,6 +1149,8 @@ class VehicleChargeRunner:
         verify_deadline = ramp_deadline + self.args.attach_timeout_s
         while time.time() < verify_deadline:
             now = time.time()
+            if self._vehicle_stop_pending():
+                raise VehicleInitiatedStop(self.vehicle_stop_reason or "vehicle initiated stop")
             progress = 1.0 if now >= ramp_deadline else ((now - ramp_started) / max(0.2, self.args.share_ramp_s))
             home_cmd = start_home + ((shared_home_i - start_home) * progress)
             donor_cmd = start_donor + ((shared_donor_i - start_donor) * progress)
@@ -1124,6 +1192,8 @@ class VehicleChargeRunner:
         donor_quiet_deadline = ramp_deadline + self.args.release_timeout_s
         while time.time() < donor_quiet_deadline:
             now = time.time()
+            if self._vehicle_stop_pending():
+                raise VehicleInitiatedStop(self.vehicle_stop_reason or "vehicle initiated stop")
             progress = 1.0 if now >= ramp_deadline else ((now - ramp_started) / max(0.2, self.args.release_ramp_s))
             home_cmd = shared_home_i + ((single_home_i - shared_home_i) * progress)
             donor_cmd = shared_donor_i + ((self.donor_release_hold_a - shared_donor_i) * progress)
@@ -1162,11 +1232,125 @@ class VehicleChargeRunner:
         with self.borrower_lock:
             borrower_power_open = self.borrower.relay_states.get(self.args.borrower_power_relay) is False
             borrower_stop_done = self.borrower.stop_done
+            borrower_session_inactive = (not self.borrower.session_started) and (not self.borrower.hlc_active)
         with self.donor_lock:
             donor_bridge_open = self.donor.relay_states.get(self.args.donor_bridge_relay) is False
         home_off = True if self.home_module is None else module_is_off(self.home_module)
         donor_off = True if self.donor_module is None else module_is_off(self.donor_module)
-        return borrower_power_open and donor_bridge_open and borrower_stop_done and home_off and donor_off
+        return borrower_power_open and donor_bridge_open and (borrower_stop_done or borrower_session_inactive) and home_off and donor_off
+
+    def _protocol_stop_counters(self) -> tuple[int, int, int]:
+        with self.borrower_lock:
+            return (
+                self.borrower.power_delivery_req_count,
+                self.borrower.welding_req_count,
+                self.borrower.session_stop_req_count,
+            )
+
+    def _wait_for_protocol_stop(
+        self,
+        baseline: Optional[tuple[int, int, int]] = None,
+        vehicle_initiated: bool = False,
+    ) -> bool:
+        baseline_pd, baseline_wd, baseline_ss = baseline if baseline is not None else self._protocol_stop_counters()
+        current_pd, current_wd, current_ss = self._protocol_stop_counters()
+        saw_power_delivery = current_pd > baseline_pd
+        saw_welding = current_wd > baseline_wd
+        saw_session_stop = current_ss > baseline_ss
+        relay_opened = False
+        relay_open_requested = False
+        logged_welding = False
+        logged_session_stop = False
+        logged_power_delivery = False
+        self._set_phase("stop_request")
+        target_v = self._target_voltage()
+        requested_i = self._requested_current()
+        if requested_i <= 0.0:
+            requested_i = max(
+                self.args.single_home_current_a,
+                self.args.shared_home_current_a + self.args.shared_donor_current_a,
+            )
+
+        deadline = time.time() + self.args.protocol_stop_timeout_s
+        last_auth = 0.0
+        last_status = 0.0
+        last_hb = 0.0
+
+        if vehicle_initiated:
+            self.current_plan["home"] = ControlPlan(False, 0.0, 0.0)
+            self.current_plan["donor"] = ControlPlan(False, 0.0, 0.0)
+            self.desired_relays[("borrower", self.args.borrower_power_relay)] = False
+            self.desired_relays[("donor", self.args.donor_bridge_relay)] = False
+        if vehicle_initiated:
+            self.events.append(f"{ts()} protocol_stop=vehicle:{self.vehicle_stop_reason or 'PowerDeliveryReq'}")
+        else:
+            self.events.append(f"{ts()} protocol_stop=notify")
+        if saw_power_delivery and not relay_open_requested:
+            self.current_plan["home"] = ControlPlan(False, 0.0, 0.0)
+            self.current_plan["donor"] = ControlPlan(False, 0.0, 0.0)
+            self.desired_relays[("borrower", self.args.borrower_power_relay)] = False
+            relay_open_requested = True
+            self.events.append(f"{ts()} protocol_stop=power_delivery")
+
+        while time.time() < deadline:
+            now = time.time()
+            if (now - last_hb) * 1000.0 >= self.args.heartbeat_ms:
+                self._send("borrower", f"CTRL HB {self.args.heartbeat_timeout_ms}")
+                last_hb = now
+            if now - last_status >= self.args.status_interval_s:
+                self._send("borrower", "CTRL STATUS")
+                last_status = now
+            if vehicle_initiated and now - last_auth >= 1.0:
+                self._send("borrower", f"CTRL AUTH deny {self.args.auth_ttl_ms}")
+                last_auth = now
+
+            self._tick_runtime_mode_safe(now)
+            if (not relay_open_requested) and saw_power_delivery:
+                self.current_plan["home"] = ControlPlan(False, 0.0, 0.0)
+                self.current_plan["donor"] = ControlPlan(False, 0.0, 0.0)
+                self.desired_relays[("borrower", self.args.borrower_power_relay)] = False
+                self.desired_relays[("donor", self.args.donor_bridge_relay)] = False
+                relay_open_requested = True
+                self.events.append(f"{ts()} protocol_stop=power_delivery")
+            stage = "power_delivery" if saw_power_delivery else "stop_request"
+            self._tick_protocol_stop_feedback(now)
+            self._tick_module_outputs(now)
+            self._tick_relays(now)
+            self._tick_telemetry(now)
+            self._tick_progress(now, stage)
+            if relay_open_requested and self._relay_is_open("borrower", self.args.borrower_power_relay):
+                relay_opened = True
+
+            pd_count, wd_count, ss_count = self._protocol_stop_counters()
+            if pd_count > baseline_pd:
+                saw_power_delivery = True
+            if saw_power_delivery and not logged_power_delivery:
+                logged_power_delivery = True
+            if wd_count > baseline_wd:
+                saw_welding = True
+            if ss_count > baseline_ss:
+                saw_session_stop = True
+
+            if saw_welding and relay_opened and not logged_welding:
+                self.events.append(f"{ts()} protocol_stop=welding")
+                logged_welding = True
+            if saw_session_stop and not logged_session_stop:
+                self.events.append(f"{ts()} protocol_stop=session_stop")
+                logged_session_stop = True
+            if saw_session_stop:
+                self._send("borrower", "CTRL SLAC disarm 3000")
+                return True
+            time.sleep(0.05)
+        return False
+
+    def _tick_runtime_mode_safe(self, now: float) -> None:
+        self._check_runtime_mode()
+        if now - self.last_donor_hb >= (self.args.heartbeat_ms / 1000.0):
+            self._send("donor", f"CTRL HB {self.args.heartbeat_timeout_ms}")
+            self.last_donor_hb = now
+        if now - self.last_donor_status >= max(5.0, self.args.status_interval_s):
+            self._send("donor", "CTRL STATUS")
+            self.last_donor_status = now
 
     def _shutdown_modules(self) -> None:
         if self.home_module:
@@ -1185,13 +1369,19 @@ class VehicleChargeRunner:
     def _execute_stop_sequence(self) -> None:
         if self.stop_requested:
             return
+        vehicle_initiated = self._vehicle_stop_pending()
+        baseline = self.session_protocol_baseline if vehicle_initiated else None
+        protocol_stop_ok = self._wait_for_protocol_stop(baseline=baseline, vehicle_initiated=vehicle_initiated)
+        self.protocol_stop_verified = protocol_stop_ok
         self.stop_requested = True
         self.stop_started_at = time.time()
         self.stop_hard_sent = self.args.stop_mode == "hard"
         self._set_phase("stopping")
 
-        stop_cmd = f"CTRL STOP {self.args.stop_mode} 3000"
-        self._send("borrower", stop_cmd)
+        if not protocol_stop_ok:
+            self.notes.append("protocol stop timeout; falling back to forced stop")
+            stop_cmd = f"CTRL STOP {self.args.stop_mode} 3000"
+            self._send("borrower", stop_cmd)
         self._send("borrower", f"CTRL AUTH deny {self.args.auth_ttl_ms}")
         self._send("borrower", "CTRL SLAC disarm 3000")
         self._send("donor", f"CTRL AUTH deny {self.args.auth_ttl_ms}")
@@ -1202,6 +1392,7 @@ class VehicleChargeRunner:
         self._shutdown_modules()
 
         deadline = time.time() + self.args.stop_timeout_s
+        stop_verified = False
         while time.time() < deadline:
             now = time.time()
             self._tick_borrower_contract(now)
@@ -1215,9 +1406,13 @@ class VehicleChargeRunner:
                 self._send("borrower", "CTRL FEEDBACK 1 0 0 0 0 0 0")
                 self.last_feedback_cmd = now
             if self._stop_verification_ok():
-                return
+                stop_verified = True
+                break
             time.sleep(0.05)
-        raise RuntimeError("stop verification timeout: relays/modules did not reach OFF state")
+        if not stop_verified:
+            raise RuntimeError("stop verification timeout: relays/modules did not reach OFF state")
+        if not protocol_stop_ok:
+            raise RuntimeError("protocol stop timeout; forced stop used")
 
     def _write_summary(self, result: str) -> None:
         payload = {
@@ -1231,6 +1426,10 @@ class VehicleChargeRunner:
             "current_demand_started_at": self.current_demand_started_at,
             "attach_done": self.attach_done,
             "release_done": self.release_done,
+            "protocol_stop_verified": self.protocol_stop_verified,
+            "vehicle_stop_requested": self.vehicle_stop_requested,
+            "vehicle_stop_reason": self.vehicle_stop_reason,
+            "vehicle_stop_seen_at": self.vehicle_stop_seen_at,
             "borrower": asdict(self.borrower),
             "donor": asdict(self.donor),
             "home_module": asdict(
@@ -1306,6 +1505,10 @@ class VehicleChargeRunner:
                 if stage == "current_demand" and self.current_demand_started_at is None:
                     with self.borrower_lock:
                         self.current_demand_started_at = self.borrower.first_current_demand_ts or now
+                    self.session_protocol_baseline = self._protocol_stop_counters()
+                    self.vehicle_stop_requested = False
+                    self.vehicle_stop_reason = ""
+                    self.vehicle_stop_seen_at = None
                     print("[SESSION] first CurrentDemand observed", flush=True)
                     self._set_phase("home_only")
 
@@ -1327,6 +1530,18 @@ class VehicleChargeRunner:
                         self._execute_stop_sequence()
                         result = "pass" if not self.failures else "fail"
                         break
+
+                if self.current_demand_started_at is not None and self._vehicle_stop_pending():
+                    charge_elapsed = now - self.current_demand_started_at
+                    msg = (
+                        f"vehicle initiated protocol stop early at {charge_elapsed:.1f}s "
+                        f"({self.vehicle_stop_reason or 'unknown'})"
+                    )
+                    self.failures.append(msg)
+                    self.notes.append(msg)
+                    self._execute_stop_sequence()
+                    result = "fail"
+                    break
 
                 if self.current_demand_started_at is None and (now - start_wall) >= self.args.session_start_timeout_s:
                     raise RuntimeError("session never reached CurrentDemand")
@@ -1368,6 +1583,18 @@ class VehicleChargeRunner:
             self.failures.append("KeyboardInterrupt")
             print("[FAIL] interrupted", flush=True)
             return 130
+        except VehicleInitiatedStop as exc:
+            if self.current_demand_started_at is not None and not self.stop_requested:
+                charge_elapsed = time.time() - self.current_demand_started_at
+                msg = f"vehicle initiated protocol stop during transition at {charge_elapsed:.1f}s ({exc})"
+                self.failures.append(msg)
+                self.notes.append(msg)
+                try:
+                    self._execute_stop_sequence()
+                except Exception as stop_exc:
+                    self.failures.append(str(stop_exc))
+            print(f"[FAIL] {self.failures[-1]}", flush=True)
+            return 1
         except Exception as exc:
             self.failures.append(str(exc))
             print(f"[FAIL] {exc}", flush=True)
@@ -1454,6 +1681,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--absolute-current-scale", type=float, default=1024.0)
     parser.add_argument("--enforce-rated-current", action="store_true")
     parser.add_argument("--stop-mode", choices=("soft", "hard"), default="hard")
+    parser.add_argument("--protocol-stop-timeout-s", type=float, default=20.0)
     parser.add_argument("--stop-hard-after-s", type=float, default=8.0)
     parser.add_argument("--stop-timeout-s", type=float, default=45.0)
     parser.add_argument(
