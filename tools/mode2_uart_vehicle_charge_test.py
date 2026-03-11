@@ -691,45 +691,100 @@ class VehicleChargeRunner:
             modules.append(self.donor_module)
         return modules
 
-    def _present_voltage_estimate(self) -> float:
-        attached = self._actual_attached_modules()
-        voltages = [module_voltage_value(module) for module in attached if module_voltage_value(module) > 5.0]
-        if voltages:
-            return min(voltages)
-        if self.home_module:
-            home_v = module_voltage_value(self.home_module)
-            if home_v > 5.0:
-                return home_v
-        if self.donor_module:
-            donor_v = module_voltage_value(self.donor_module)
-            if donor_v > 5.0:
-                return donor_v
-        return 0.0
+    def _append_unique(self, bucket: list[str], message: str) -> None:
+        if message not in bucket:
+            bucket.append(message)
+
+    def _module_telemetry_fresh(self, module: Optional[mxr.ModuleInfo]) -> bool:
+        if not module:
+            return False
+        last_seen = safe_float(getattr(module, "last_seen", 0.0), 0.0)
+        if last_seen <= 0.0:
+            return False
+        age_s = time.monotonic() - last_seen
+        if age_s < 0.0 or age_s > self.args.telemetry_stale_s:
+            return False
+        return (
+            module.voltage_v is not None
+            and math.isfinite(module.voltage_v)
+            and module.current_a is not None
+            and math.isfinite(module.current_a)
+        )
+
+    def _module_live_voltage(self, module: Optional[mxr.ModuleInfo]) -> Optional[float]:
+        if not self._module_telemetry_fresh(module):
+            return None
+        return module_voltage_value(module)
+
+    def _module_live_current(self, module: Optional[mxr.ModuleInfo]) -> Optional[float]:
+        if not self._module_telemetry_fresh(module):
+            return None
+        return module_current_value(module)
+
+    def _feedback_modules_for_stage(self, stage: str) -> list[mxr.ModuleInfo]:
+        normalized = normalize_stage_name(stage)
+        if normalized == "precharge":
+            return [self.home_module] if self.home_module else []
+        if normalized in ("power_delivery", "current_demand"):
+            return self._actual_attached_modules()
+        if normalized == "stop_request":
+            attached = self._actual_attached_modules()
+            if attached:
+                return attached
+            return [self.home_module] if self.home_module else []
+        return self._actual_attached_modules()
+
+    def _aggregate_feedback_telemetry(self, stage: str) -> Optional[tuple[float, float]]:
+        modules = self._feedback_modules_for_stage(stage)
+        if not modules:
+            return (0.0, 0.0)
+        voltages: list[float] = []
+        total_current = 0.0
+        stale_modules: list[str] = []
+        for module in modules:
+            voltage_v = self._module_live_voltage(module)
+            current_a = self._module_live_current(module)
+            if voltage_v is None or current_a is None:
+                stale_modules.append(f"{module.address}/{module.group}")
+                continue
+            voltages.append(voltage_v)
+            total_current += current_a
+        if stale_modules:
+            self._append_unique(
+                self.notes,
+                f"stale module telemetry on output path during {normalize_stage_name(stage)}: {', '.join(stale_modules)}",
+            )
+            return None
+        if not voltages:
+            return (0.0, 0.0)
+        return (min(voltages), total_current)
+
+    def _present_voltage_estimate(self, stage: str = "current_demand") -> float:
+        telemetry = self._aggregate_feedback_telemetry(stage)
+        if telemetry is None:
+            return 0.0
+        return telemetry[0]
 
     def _bus_voltage_estimate(self) -> float:
-        attached = self._actual_attached_modules()
-        voltages = [module_voltage_value(module) for module in attached if module_voltage_value(module) > 5.0]
-        if not voltages:
-            return 0.0
-        return min(voltages)
+        return self._present_voltage_estimate("current_demand")
 
-    def _present_current_estimate(self) -> float:
-        if not self._relay_is_closed("borrower", self.args.borrower_power_relay):
+    def _present_current_estimate(self, stage: str = "current_demand") -> float:
+        if normalize_stage_name(stage) == "precharge":
             return 0.0
-        total = 0.0
-        for module in self._actual_attached_modules():
-            total += module_current_value(module)
-        return total
+        telemetry = self._aggregate_feedback_telemetry(stage)
+        if telemetry is None:
+            return 0.0
+        return telemetry[1]
 
     def _record_metrics(self) -> None:
         metrics = self.phase_metrics.setdefault(self.phase, PhaseMetrics(name=self.phase))
-        home_v = module_voltage_value(self.home_module) if self.home_module else 0.0
-        donor_v = module_voltage_value(self.donor_module) if self.donor_module else 0.0
+        home_v = self._module_live_voltage(self.home_module) or 0.0
+        donor_v = self._module_live_voltage(self.donor_module) or 0.0
         metrics.observe(
             bus_v=self._bus_voltage_estimate(),
             home_v=home_v,
             donor_v=donor_v,
-            total_i=self._present_current_estimate(),
+            total_i=self._present_current_estimate("current_demand"),
         )
         if time.time() - self.phase_started_at < self.args.transition_grace_s:
             return
@@ -864,28 +919,28 @@ class VehicleChargeRunner:
     def _tick_feedback(self, now: float, stage: str, target_v: float, requested_i: float) -> None:
         if (now - self.last_feedback_cmd) < self.args.feedback_interval_s:
             return
+        telemetry = self._aggregate_feedback_telemetry(stage)
+        if telemetry is None:
+            self._send("borrower", "CTRL FEEDBACK 0 0 0 0 0 0 0")
+            self.last_feedback_cmd = now
+            return
+        present_v, present_i = telemetry
         if stage == "precharge":
-            present_v = self._present_voltage_estimate()
             ready = target_v > 10.0 and abs(present_v - target_v) <= self.args.feedback_voltage_tolerance_v
             self._send(
                 "borrower",
                 f"CTRL FEEDBACK 1 {1 if ready else 0} {present_v:.1f} 0.0 0 0 0",
             )
         elif stage in ("power_delivery", "current_demand"):
-            present_v = self._present_voltage_estimate()
-            present_i = self._present_current_estimate()
             power_path_active = self._relay_is_closed("borrower", self.args.borrower_power_relay)
             ready = target_v > 10.0 and power_path_active
-            if self.attach_done and not self.release_done:
-                _home_i, _donor_i, total_cap = self._shared_currents(requested_i)
-            else:
-                total_cap = self.home_single_limit_a
-            current_limited = requested_i > (total_cap + 0.1)
-            power_limited = current_limited
+            current_limited = requested_i > (present_i + 0.5)
+            voltage_limited = target_v > 10.0 and present_v > 0.0 and (target_v - present_v) > self.args.feedback_voltage_tolerance_v
+            power_limited = current_limited or voltage_limited
             self._send(
                 "borrower",
                 f"CTRL FEEDBACK 1 {1 if ready else 0} {present_v:.1f} {present_i:.1f} "
-                f"{1 if current_limited else 0} 0 {1 if power_limited else 0}",
+                f"{1 if current_limited else 0} {1 if voltage_limited else 0} {1 if power_limited else 0}",
             )
         else:
             self._send("borrower", "CTRL FEEDBACK 1 0 0 0 0 0 0")
@@ -894,8 +949,12 @@ class VehicleChargeRunner:
     def _tick_protocol_stop_feedback(self, now: float) -> None:
         if (now - self.last_feedback_cmd) < self.args.feedback_interval_s:
             return
-        present_v = self._present_voltage_estimate()
-        present_i = self._present_current_estimate()
+        telemetry = self._aggregate_feedback_telemetry("stop_request")
+        if telemetry is None:
+            self._send("borrower", "CTRL FEEDBACK 0 0 0 0 0 0 0 1")
+            self.last_feedback_cmd = now
+            return
+        present_v, present_i = telemetry
         power_path_active = self._relay_is_closed("borrower", self.args.borrower_power_relay) and present_v > 10.0
         self._send(
             "borrower",
@@ -919,18 +978,18 @@ class VehicleChargeRunner:
             return
         requested_i = self._requested_current()
         charge_elapsed = -1.0 if self.current_demand_started_at is None else (now - self.current_demand_started_at)
-        home_v = module_voltage_value(self.home_module) if self.home_module else -1.0
-        home_i = module_current_value(self.home_module) if self.home_module else -1.0
-        donor_v = module_voltage_value(self.donor_module) if self.donor_module else -1.0
-        donor_i = module_current_value(self.donor_module) if self.donor_module else -1.0
+        home_v = self._module_live_voltage(self.home_module)
+        home_i = self._module_live_current(self.home_module)
+        donor_v = self._module_live_voltage(self.donor_module)
+        donor_i = self._module_live_current(self.donor_module)
         print(
             f"[PROGRESS] phase={self.phase} stage={stage or '-'} charge_s={charge_elapsed:.1f} "
             f"relay1={int(self._relay_is_closed('borrower', self.args.borrower_power_relay))} "
             f"relay2={int(self._relay_is_closed('donor', self.args.donor_bridge_relay))} "
             f"targetV={self._target_voltage():.1f} targetI={requested_i:.1f} "
-            f"busV={self._present_voltage_estimate():.1f} busI={self._present_current_estimate():.1f} "
-            f"homeV={home_v:.1f} homeI={home_i:.1f} "
-            f"donorV={donor_v:.1f} donorI={donor_i:.1f}",
+            f"busV={self._present_voltage_estimate(stage):.1f} busI={self._present_current_estimate(stage):.1f} "
+            f"homeV={(home_v if home_v is not None else -1.0):.1f} homeI={(home_i if home_i is not None else -1.0):.1f} "
+            f"donorV={(donor_v if donor_v is not None else -1.0):.1f} donorI={(donor_i if donor_i is not None else -1.0):.1f}",
             flush=True,
         )
         self.last_progress = now
@@ -1020,7 +1079,7 @@ class VehicleChargeRunner:
     def _donor_voltage_matched(self, target_v: float) -> bool:
         if not self.donor_module or module_is_off(self.donor_module):
             return False
-        donor_v = module_voltage_value(self.donor_module)
+        donor_v = self._module_live_voltage(self.donor_module) or 0.0
         return donor_v > 10.0 and abs(donor_v - target_v) <= self.args.match_tolerance_v
 
     def _bus_continuity_threshold(self, baseline_v: float, max_dip_v: float) -> float:
@@ -1037,9 +1096,9 @@ class VehicleChargeRunner:
     def _shared_path_engaged(self, baseline_bus_v: float, donor_current_floor_a: float) -> bool:
         if not self.home_module or not self.donor_module:
             return False
-        home_v = module_voltage_value(self.home_module)
-        donor_v = module_voltage_value(self.donor_module)
-        donor_i = module_current_value(self.donor_module)
+        home_v = self._module_live_voltage(self.home_module) or 0.0
+        donor_v = self._module_live_voltage(self.donor_module) or 0.0
+        donor_i = self._module_live_current(self.donor_module) or 0.0
         bus_v = self._bus_voltage_estimate()
         if home_v <= 10.0 or donor_v <= 10.0 or bus_v <= 10.0:
             return False
@@ -1157,7 +1216,7 @@ class VehicleChargeRunner:
             self.current_plan["home"] = ControlPlan(True, target_v, max(0.0, home_cmd))
             self.current_plan["donor"] = ControlPlan(True, target_v, max(0.0, donor_cmd))
             self._service_cycle("current_demand", target_v, requested_i)
-            donor_actual = module_current_value(self.donor_module)
+            donor_actual = self._module_live_current(self.donor_module) or 0.0
             if not self._bus_continuity_ok(baseline_bus_v, self.args.attach_max_bus_dip_v):
                 threshold_v = self._bus_continuity_threshold(baseline_bus_v, self.args.attach_max_bus_dip_v)
                 raise RuntimeError(
@@ -1200,7 +1259,7 @@ class VehicleChargeRunner:
             self.current_plan["home"] = ControlPlan(True, target_v, max(0.0, home_cmd))
             self.current_plan["donor"] = ControlPlan(True, target_v, max(0.0, donor_cmd))
             self._service_cycle("current_demand", target_v, requested_i)
-            donor_actual = module_current_value(self.donor_module)
+            donor_actual = self._module_live_current(self.donor_module) or 0.0
             if progress >= 1.0 and donor_actual <= self.args.release_donor_current_a:
                 break
             time.sleep(0.05)
@@ -1655,6 +1714,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--feedback-interval-s", type=float, default=0.25)
     parser.add_argument("--telemetry-interval-s", type=float, default=0.75)
     parser.add_argument("--telemetry-response-s", type=float, default=0.25)
+    parser.add_argument("--telemetry-stale-s", type=float, default=2.0)
     parser.add_argument("--status-interval-s", type=float, default=2.0)
     parser.add_argument("--max-status-misses", type=int, default=5)
     parser.add_argument("--heartbeat-ms", type=int, default=800)
