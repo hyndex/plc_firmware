@@ -109,6 +109,18 @@ def module_voltage_ok(module: mxr.ModuleInfo, min_voltage_v: float) -> bool:
     return module.voltage_v >= min_voltage_v and not module_is_off(module)
 
 
+def module_current_value(module: Optional[mxr.ModuleInfo]) -> float:
+    if not module or module.current_a is None or not math.isfinite(module.current_a):
+        return 0.0
+    return max(0.0, module.current_a)
+
+
+def module_voltage_value(module: Optional[mxr.ModuleInfo]) -> float:
+    if not module or module.voltage_v is None or not math.isfinite(module.voltage_v):
+        return 0.0
+    return max(0.0, module.voltage_v)
+
+
 @dataclass
 class Ack:
     cmd_hex: int
@@ -626,9 +638,9 @@ class ModuleTransitionRunner:
         if time.time() - self.phase_started_at < self.args.transition_grace_s:
             return
         threshold = 0.0
-        if self.phase in ("home_1", "home_2"):
+        if self.phase in ("home_1", "home_2", "release_ramp"):
             threshold = self.args.min_home_bus_voltage_v
-        elif self.phase == "shared":
+        elif self.phase in ("shared_prepare", "shared_ramp", "shared"):
             threshold = self.args.min_shared_bus_voltage_v
         if threshold > 0.0 and self._attached_modules():
             bus_v = self._bus_voltage_estimate()
@@ -708,6 +720,59 @@ class ModuleTransitionRunner:
         if not self.donor_module or self.donor_module.current_a is None or not math.isfinite(self.donor_module.current_a):
             return False
         return abs(self.donor_module.current_a) <= self.args.release_donor_current_a
+
+    def _shared_bus_voltage_stable(self, target_v: float, tolerance_v: float) -> bool:
+        home_v = module_voltage_value(self.home_module)
+        donor_v = module_voltage_value(self.donor_module)
+        if home_v <= 0.0 or donor_v <= 0.0:
+            return False
+        return abs(home_v - target_v) <= tolerance_v and abs(donor_v - target_v) <= tolerance_v
+
+    def _share_ramp_with_feedback(
+        self,
+        duration_s: float,
+        home_start_a: float,
+        home_end_a: float,
+        donor_start_a: float,
+        donor_end_a: float,
+        transition_voltage_v: float,
+    ) -> None:
+        self._set_phase("shared_ramp")
+        steps = max(1, int(max(duration_s, 1.0) / 0.1))
+        home_step = max(0.05, abs(home_start_a - home_end_a) / steps)
+        donor_step = max(0.05, abs(donor_end_a - donor_start_a) / steps)
+        home_cmd = home_start_a
+        donor_cmd = donor_start_a
+        deadline = time.time() + max(duration_s, 0.0) + self.args.attach_timeout_s
+
+        while time.time() < deadline:
+            bus_v = self._bus_voltage_estimate()
+            if bus_v >= self.args.min_shared_bus_voltage_v:
+                home_cmd = max(home_end_a, home_cmd - home_step)
+                donor_cmd = min(donor_end_a, donor_cmd + donor_step)
+            else:
+                home_cmd = min(home_start_a, home_cmd + home_step)
+                donor_cmd = max(donor_start_a, donor_cmd - donor_step)
+
+            self.current_plan["home"] = (True, transition_voltage_v, max(0.0, home_cmd))
+            self.current_plan["donor"] = (True, transition_voltage_v, max(0.0, donor_cmd))
+            self._tick()
+
+            if home_cmd <= (home_end_a + 0.2) and donor_cmd >= (donor_end_a - 0.2):
+                break
+            time.sleep(0.05)
+
+        self.current_plan["home"] = (True, transition_voltage_v, max(0.0, home_end_a))
+        self.current_plan["donor"] = (True, transition_voltage_v, max(0.0, donor_end_a))
+        settle_deadline = time.time() + self.args.attach_timeout_s
+        while time.time() < settle_deadline:
+            self._tick()
+            if self._bus_voltage_estimate() >= self.args.min_shared_bus_voltage_v:
+                donor_actual = module_current_value(self.donor_module)
+                if donor_actual >= max(donor_start_a, donor_end_a * 0.5):
+                    return
+            time.sleep(0.05)
+        raise RuntimeError("shared ramp did not stabilize")
 
     def _hold_phase(self, name: str, duration_s: float) -> None:
         self._set_phase(name)
@@ -851,11 +916,14 @@ class ModuleTransitionRunner:
             self._hold_phase("home_1", self.args.home_duration_s)
 
             self._set_phase("shared_prepare")
-            self.current_plan["donor"] = (True, self.args.voltage_v, donor_bootstrap_current_a)
+            live_home_bus_v = module_voltage_value(self.home_module)
+            attach_voltage_v = live_home_bus_v if live_home_bus_v >= self.args.min_home_bus_voltage_v else self.args.voltage_v
+            donor_attach_current_a = min(donor_release_hold_a, donor_bootstrap_current_a)
+            self.current_plan["donor"] = (True, attach_voltage_v, donor_attach_current_a)
             self._wait_until(
                 self.args.startup_timeout_s,
                 lambda: self.donor_module is not None and self._module_matched(
-                    self.donor_module, self.args.voltage_v, self.args.match_tolerance_v
+                    self.donor_module, attach_voltage_v, self.args.match_tolerance_v
                 ),
                 "donor module failed isolated precharge match",
             )
@@ -867,16 +935,20 @@ class ModuleTransitionRunner:
             )
             self._wait_until(
                 self.args.attach_timeout_s,
-                lambda: self._bus_voltage_estimate() >= self.args.min_shared_bus_voltage_v,
+                lambda: self._bus_voltage_estimate() >= self.args.min_home_bus_voltage_v
+                and self._shared_bus_voltage_stable(
+                    module_voltage_value(self.home_module),
+                    max(self.args.match_tolerance_v, 20.0),
+                ),
                 "shared bus did not reach minimum voltage after attach",
             )
-            self._ramp_plan(
-                "shared_ramp",
+            self._share_ramp_with_feedback(
                 self.args.share_ramp_s,
                 home_start_a=home_current_a,
                 home_end_a=home_shared_current_a,
-                donor_start_a=donor_bootstrap_current_a,
+                donor_start_a=donor_attach_current_a,
                 donor_end_a=donor_shared_current_a,
+                transition_voltage_v=self.args.voltage_v,
             )
             self._hold_phase("shared", self.args.shared_duration_s)
 
