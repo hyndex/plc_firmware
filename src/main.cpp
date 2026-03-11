@@ -153,6 +153,7 @@ constexpr uint32_t CP_STATE_DEBOUNCE_MS = 80;
 constexpr uint32_t CP_DISCONNECT_DEBOUNCE_MS = 1200;
 constexpr uint32_t CP_CONNECTED_HOLD_MS = 1500;
 constexpr uint32_t SLAC_HOLD_MS = 3000;
+constexpr uint32_t SLAC_PROGRESS_TIMEOUT_MS = 12000;
 constexpr uint32_t CP_EF_PULSE_MS = 4000;
 constexpr uint8_t EF_PULSE_AFTER_FAILURES = 2;
 constexpr uint32_t STARTUP_LOG_DELAY_MS = 10000;
@@ -1312,6 +1313,7 @@ uint32_t g_ef_pulse_until_ms = 0;
 bool g_session_started = false;
 bool g_bcd_entered = false;
 bool g_session_matched = false;
+uint32_t g_session_started_ms = 0;
 uint8_t g_slac_failures_this_cp = 0;
 uint32_t g_slac_hold_until_ms = 0;
 slac::evse::State g_last_fsm_state = slac::evse::State::Reset;
@@ -3151,6 +3153,7 @@ void controller_reset_runtime_state() {
     g_active_module_power_limits_kw.clear();
     g_last_requested_target_i = 0.0f;
     g_last_seen_ev_mac_valid = false;
+    g_session_started_ms = 0;
     g_ctrl_tx = ControllerStatusTxSchedule{};
     g_serial_tx = SerialStatusTxSchedule{};
 }
@@ -3548,10 +3551,11 @@ void controller_handle_slac(const CtrlRxFrame& f) {
     const uint32_t arm_ms = (arm_100ms > 0u) ? (static_cast<uint32_t>(arm_100ms) * 100u)
                                              : g_runtime_cfg.controller_slac_arm_timeout_ms;
     if (cmd == CTRL_SLAC_DISARM) {
+        const bool active_session = g_session_started || g_session_matched || g_hlc_ready || g_hlc_active;
         g_ctrl.slac_armed = false;
         g_ctrl.slac_start_latched = false;
         g_ctrl.slac_arm_expiry_ms = 0;
-        if (!mode_controller_has_final_decision()) {
+        if (active_session || !mode_controller_has_final_decision()) {
             controller_force_safe_stop("CtrlDisarm");
         }
         Serial.printf("[CTRLRX] SLAC disarm seq=%u\n", static_cast<unsigned>(seq));
@@ -3601,10 +3605,11 @@ void controller_handle_slac(const CtrlRxFrame& f) {
         return;
     }
     if (cmd == CTRL_SLAC_ABORT) {
+        const bool active_session = g_session_started || g_session_matched || g_hlc_ready || g_hlc_active;
         g_ctrl.slac_start_latched = false;
         g_ctrl.slac_armed = false;
         g_ctrl.slac_arm_expiry_ms = 0;
-        if (!mode_controller_has_final_decision()) {
+        if (active_session || !mode_controller_has_final_decision()) {
             controller_force_safe_stop("CtrlAbort");
         }
         Serial.printf("[CTRLRX] SLAC abort seq=%u\n", static_cast<unsigned>(seq));
@@ -5935,6 +5940,7 @@ void start_session(uint32_t now_ms) {
     }
     g_fsm->start(now_ms);
     g_session_started = true;
+    g_session_started_ms = now_ms;
     g_bcd_entered = false;
     g_session_matched = false;
     g_last_fsm_state = g_fsm->get_state();
@@ -5950,6 +5956,7 @@ void stop_session(uint32_t now_ms) {
         controller_clear_managed_feedback_cache();
     }
     g_session_started = false;
+    g_session_started_ms = 0;
     g_bcd_entered = false;
     g_session_matched = false;
     g_last_fsm_state = slac::evse::State::Reset;
@@ -6131,6 +6138,24 @@ void process_cp_and_fsm(uint32_t now_ms) {
     if (s != g_last_fsm_state) {
         Serial.printf("[FSM] %s -> %s\n", evse_state_name(g_last_fsm_state), evse_state_name(s));
         g_last_fsm_state = s;
+    }
+
+    const bool matching_in_progress =
+        s == slac::evse::State::Idle || s == slac::evse::State::WaitForMatchingStart ||
+        s == slac::evse::State::Matching || s == slac::evse::State::Sounding ||
+        s == slac::evse::State::DoAttenChar || s == slac::evse::State::WaitForSlacMatch;
+    if (!g_session_matched && g_session_started_ms != 0 && matching_in_progress &&
+        static_cast<int32_t>(now_ms - (g_session_started_ms + SLAC_PROGRESS_TIMEOUT_MS)) > 0) {
+        Serial.printf("[SLAC] progress timeout state=%s elapsed_ms=%lu\n",
+                      evse_state_name(s),
+                      static_cast<unsigned long>(now_ms - g_session_started_ms));
+        enter_hold_with_optional_ef_pulse(now_ms, "matching timeout");
+        stop_hlc_stack();
+        if (!mode_controller_has_final_decision()) {
+            request_modules_off("SlacProgressTimeout");
+            (void)relay1_set(false, "SlacProgressTimeout");
+        }
+        return;
     }
 
     if (!g_bcd_entered && s == slac::evse::State::Idle) {
