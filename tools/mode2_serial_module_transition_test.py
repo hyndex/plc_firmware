@@ -122,6 +122,10 @@ def module_voltage_value(module: Optional[mxr.ModuleInfo]) -> float:
     return max(0.0, module.voltage_v)
 
 
+MXR_REG_SET_OUTPUT_VOLTAGE_UPPER_LIMIT = 0x0023
+MXR_POWER_LIMIT_RATIO_MAX = 1.0
+
+
 @dataclass
 class Ack:
     cmd_hex: int
@@ -340,13 +344,27 @@ class SerialLink:
 
 
 class DirectMaxwellCan:
-    def __init__(self, iface: str, log_file: str, abs_current_scale: float) -> None:
+    def __init__(
+        self,
+        iface: str,
+        log_file: str,
+        abs_current_scale: float,
+        module_rated_power_kw: float,
+        module_max_voltage_v: float,
+        module_voltage_headroom_v: float,
+        module_max_current_a: float,
+    ) -> None:
         self.iface = iface
         self.log_file = log_file
         self.abs_current_scale = abs_current_scale
+        self.module_rated_power_kw = max(0.0, module_rated_power_kw)
+        self.module_max_voltage_v = max(0.0, module_max_voltage_v)
+        self.module_voltage_headroom_v = max(0.0, module_voltage_headroom_v)
+        self.module_max_current_a = max(0.0, module_max_current_a)
         self.sock = None
         self.log_fp = None
         self.started: set[tuple[int, int]] = set()
+        self.last_safety_signature: dict[tuple[int, int], tuple[int, int]] = {}
 
     def open(self) -> None:
         ensure_parent(self.log_file)
@@ -496,18 +514,92 @@ class DirectMaxwellCan:
         time.sleep(0.02)
         self._log(f"RESET addr={module.address} grp={module.group} input_mode={desired_mode}")
         mxr.soft_reset_defaults(self.sock, module, input_mode=desired_mode)
+        self.last_safety_signature.pop((module.address, module.group), None)
         self.refresh(module, response_window_s=0.4)
+
+    def safe_output_request(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> tuple[float, float]:
+        safe_voltage_v = max(0.0, voltage_v)
+        # Treat the configured maximum as a hard safety ceiling only. The live
+        # module limits still track the requested BMS-driven command.
+        if self.module_max_voltage_v > 0.0:
+            safe_voltage_v = min(safe_voltage_v, self.module_max_voltage_v)
+
+        safe_current_a = max(0.0, current_a)
+        # Convert rated power into a live current ceiling at the active voltage
+        # so a 30 kW module is not treated like a fixed-current 15 kW module at 500 V.
+        if self.module_rated_power_kw > 0.0 and safe_voltage_v > 10.0:
+            safe_current_a = min(safe_current_a, (self.module_rated_power_kw * 1000.0) / safe_voltage_v)
+        # Treat the configured maximum as a hard safety ceiling only. The live
+        # module limits still track the requested BMS-driven command.
+        if self.module_max_current_a > 0.0:
+            safe_current_a = min(safe_current_a, self.module_max_current_a)
+
+        return safe_voltage_v, safe_current_a
+
+    def _apply_safety_limits(self, module: mxr.ModuleInfo, requested_voltage_v: float, requested_current_a: float) -> tuple[float, float]:
+        if not self.sock:
+            raise RuntimeError("CAN socket not open")
+
+        safe_voltage_v, safe_current_a = self.safe_output_request(module, requested_voltage_v, requested_current_a)
+        # Follow the live command from the BMS-driven plan, but leave a small
+        # headroom above the commanded voltage so the module does not trip
+        # against its own ceiling while ramping.
+        voltage_upper_limit_v = safe_voltage_v + self.module_voltage_headroom_v
+        if self.module_max_voltage_v > 0.0:
+            voltage_upper_limit_v = min(voltage_upper_limit_v, self.module_max_voltage_v)
+        voltage_upper_limit_v = max(safe_voltage_v, voltage_upper_limit_v)
+
+        current_limit_ratio_sig = -1
+        rated_current_a = module.rated_current_a if module.rated_current_a and module.rated_current_a > 0.0 else None
+        if rated_current_a is not None:
+            current_limit_ratio = max(0.0, min(MXR_POWER_LIMIT_RATIO_MAX, safe_current_a / rated_current_a))
+            current_limit_ratio_sig = int(round(current_limit_ratio * 1000.0))
+        else:
+            current_limit_ratio = None
+
+        key = (module.address, module.group)
+        safety_signature = (
+            int(round(voltage_upper_limit_v * 10.0)),
+            current_limit_ratio_sig,
+        )
+        if self.last_safety_signature.get(key) != safety_signature:
+            if safe_voltage_v + 0.05 < requested_voltage_v or safe_current_a + 0.05 < requested_current_a:
+                self._log(
+                    f"CLAMP addr={module.address} grp={module.group} "
+                    f"voltage_v={requested_voltage_v:.1f}->{safe_voltage_v:.1f} "
+                    f"current_a={requested_current_a:.2f}->{safe_current_a:.2f}"
+                )
+            self._log(
+                f"SAFE addr={module.address} grp={module.group} v_cmd={safe_voltage_v:.1f} v_upper={voltage_upper_limit_v:.1f} "
+                f"i_cmd={safe_current_a:.2f} "
+                f"i_limit_ratio={(f'{current_limit_ratio:.3f}' if current_limit_ratio is not None else 'n/a')}"
+            )
+            mxr.send_set_float(
+                self.sock,
+                module.address,
+                module.group,
+                MXR_REG_SET_OUTPUT_VOLTAGE_UPPER_LIMIT,
+                voltage_upper_limit_v,
+            )
+            time.sleep(0.005)
+            if current_limit_ratio is not None:
+                mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_LIMIT_RATIO, current_limit_ratio)
+                time.sleep(0.005)
+            self.last_safety_signature[key] = safety_signature
+
+        return safe_voltage_v, safe_current_a
 
     def set_output(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> None:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
-        current_raw = int(round(max(0.0, current_a) * self.abs_current_scale))
+        safe_voltage_v, safe_current_a = self._apply_safety_limits(module, voltage_v, current_a)
+        current_raw = int(round(max(0.0, safe_current_a) * self.abs_current_scale))
         key = (module.address, module.group)
         if key not in self.started:
             self._log(
-                f"START addr={module.address} grp={module.group} voltage_v={voltage_v:.1f} current_a={current_a:.2f} raw=0x{current_raw:08X}"
+                f"START addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
             )
-            mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, voltage_v)
+            mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, safe_voltage_v)
             time.sleep(0.01)
             mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, current_raw)
             time.sleep(0.01)
@@ -515,9 +607,9 @@ class DirectMaxwellCan:
             self.started.add(key)
             return
         self._log(
-            f"SET addr={module.address} grp={module.group} voltage_v={voltage_v:.1f} current_a={current_a:.2f} raw=0x{current_raw:08X}"
+            f"SET addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
         )
-        mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, voltage_v)
+        mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, safe_voltage_v)
         time.sleep(0.005)
         mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, current_raw)
 
@@ -529,6 +621,7 @@ class DirectMaxwellCan:
         time.sleep(0.01)
         mxr.module_off(self.sock, module)
         self.started.discard((module.address, module.group))
+        self.last_safety_signature.pop((module.address, module.group), None)
 
 
 class ModuleTransitionRunner:
@@ -543,7 +636,15 @@ class ModuleTransitionRunner:
 
         self.plc1_link = SerialLink(args.plc1_port, args.baud, args.plc1_log, self._parse_plc1)
         self.plc2_link = SerialLink(args.plc2_port, args.baud, args.plc2_log, self._parse_plc2)
-        self.can = DirectMaxwellCan(args.can_iface, args.can_log, args.absolute_current_scale)
+        self.can = DirectMaxwellCan(
+            args.can_iface,
+            args.can_log,
+            args.absolute_current_scale,
+            args.module_rated_power_kw,
+            args.module_max_voltage_v,
+            args.module_voltage_headroom_v,
+            args.module_max_current_a,
+        )
 
         self.home_module: Optional[mxr.ModuleInfo] = None
         self.donor_module: Optional[mxr.ModuleInfo] = None
@@ -1204,6 +1305,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-home-bus-voltage-v", type=float, default=450.0)
     parser.add_argument("--min-shared-bus-voltage-v", type=float, default=450.0)
     parser.add_argument("--release-donor-current-a", type=float, default=1.0)
+    parser.add_argument(
+        "--module-rated-power-kw",
+        type=float,
+        default=30.0,
+        help="Per-module rated power used to derive a live current ceiling from the active voltage (default: 30 kW)",
+    )
+    parser.add_argument(
+        "--module-max-voltage-v",
+        type=float,
+        default=1000.0,
+        help="Absolute hard voltage ceiling. Live 0x0023 follows the requested command plus headroom (default: 1000 V).",
+    )
+    parser.add_argument(
+        "--module-voltage-headroom-v",
+        type=float,
+        default=15.0,
+        help="Headroom above the live requested voltage when programming 0x0023 (default: 15 V)",
+    )
+    parser.add_argument(
+        "--module-max-current-a",
+        type=float,
+        default=100.0,
+        help="Absolute hard current ceiling. Live module current is capped by min(this, rated-power/current demand).",
+    )
     parser.add_argument("--plc1-log", default="")
     parser.add_argument("--plc2-log", default="")
     parser.add_argument("--can-log", default="")

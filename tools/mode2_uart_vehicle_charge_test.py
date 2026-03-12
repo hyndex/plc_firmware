@@ -463,7 +463,15 @@ class VehicleChargeRunner:
 
         self.borrower_link = SerialLink(args.borrower_port, args.baud, args.borrower_log, self._parse_borrower_line)
         self.donor_link = SerialLink(args.donor_port, args.baud, args.donor_log, self._parse_donor_line)
-        self.can = DirectMaxwellCan(args.can_iface, args.can_log, args.absolute_current_scale)
+        self.can = DirectMaxwellCan(
+            args.can_iface,
+            args.can_log,
+            args.absolute_current_scale,
+            args.module_rated_power_kw,
+            args.module_max_voltage_v,
+            args.module_voltage_headroom_v,
+            args.module_max_current_a,
+        )
 
         self.home_module: Optional[mxr.ModuleInfo] = None
         self.donor_module: Optional[mxr.ModuleInfo] = None
@@ -483,6 +491,9 @@ class VehicleChargeRunner:
         self.donor_shared_limit_a = 0.0
         self.donor_bootstrap_limit_a = 0.0
         self.donor_release_hold_a = 0.0
+        self.home_single_request_limit_a = 0.0
+        self.home_shared_request_limit_a = 0.0
+        self.donor_shared_request_limit_a = 0.0
 
         self.current_plan = {"home": ControlPlan(), "donor": ControlPlan()}
         self.plan_active = {"home": False, "donor": False}
@@ -841,32 +852,56 @@ class VehicleChargeRunner:
             print(f"[WARN] {note}", flush=True)
         return effective
 
+    def _module_current_cap_a(
+        self,
+        module: Optional[mxr.ModuleInfo],
+        target_v: float,
+        configured_limit_a: float,
+    ) -> float:
+        cap_a = configured_limit_a if configured_limit_a > 0.0 else float("inf")
+        if self.args.module_rated_power_kw > 0.0 and target_v > 10.0:
+            cap_a = min(cap_a, (self.args.module_rated_power_kw * 1000.0) / target_v)
+        if self.args.module_max_current_a > 0.0:
+            cap_a = min(cap_a, self.args.module_max_current_a)
+        if self.args.enforce_rated_current and module is not None:
+            rated_a = module.rated_current_a if module.rated_current_a and module.rated_current_a > 0.0 else self.args.default_rated_current_a
+            if rated_a > 0.0:
+                cap_a = min(cap_a, rated_a)
+        return max(0.0, cap_a) if math.isfinite(cap_a) else float("inf")
+
     def _compute_limits(self) -> None:
         if not self.home_module or not self.donor_module:
             raise RuntimeError("modules not loaded")
-        single_home_request = (
-            self.args.single_home_current_a
+        self.home_single_request_limit_a = (
+            self._effective_current(self.args.single_home_current_a, self.home_module.rated_current_a, "home_single")
             if self.args.single_home_current_a > 0.0
-            else (self.home_module.rated_current_a or self.args.default_rated_current_a)
+            else 0.0
         )
-        shared_home_request = (
-            self.args.shared_home_current_a
+        self.home_shared_request_limit_a = (
+            self._effective_current(self.args.shared_home_current_a, self.home_module.rated_current_a, "home_shared")
             if self.args.shared_home_current_a > 0.0
-            else (self.home_module.rated_current_a or self.args.default_rated_current_a)
+            else 0.0
         )
-        shared_donor_request = (
-            self.args.shared_donor_current_a
+        self.donor_shared_request_limit_a = (
+            self._effective_current(self.args.shared_donor_current_a, self.donor_module.rated_current_a, "donor_shared")
             if self.args.shared_donor_current_a > 0.0
-            else (self.donor_module.rated_current_a or self.args.default_rated_current_a)
+            else 0.0
         )
-        self.home_single_limit_a = self._effective_current(
-            single_home_request, self.home_module.rated_current_a, "home_single"
+        nominal_target_v = max(10.0, self.args.target_voltage_v)
+        self.home_single_limit_a = self._module_current_cap_a(
+            self.home_module,
+            nominal_target_v,
+            self.home_single_request_limit_a,
         )
-        self.home_shared_limit_a = self._effective_current(
-            shared_home_request, self.home_module.rated_current_a, "home_shared"
+        self.home_shared_limit_a = self._module_current_cap_a(
+            self.home_module,
+            nominal_target_v,
+            self.home_shared_request_limit_a,
         )
-        self.donor_shared_limit_a = self._effective_current(
-            shared_donor_request, self.donor_module.rated_current_a, "donor_shared"
+        self.donor_shared_limit_a = self._module_current_cap_a(
+            self.donor_module,
+            nominal_target_v,
+            self.donor_shared_request_limit_a,
         )
         self.donor_bootstrap_limit_a = min(
             self.args.donor_bootstrap_current_a,
@@ -975,25 +1010,28 @@ class VehicleChargeRunner:
             return max(0.0, target_i)
         return 0.0
 
-    def _single_home_current(self, requested_i: float) -> float:
+    def _single_home_current(self, requested_i: float, target_v: float) -> float:
         if requested_i <= 0.0:
             return 0.0
-        return min(requested_i, self.home_single_limit_a)
+        home_limit_a = self._module_current_cap_a(self.home_module, target_v, self.home_single_request_limit_a)
+        return min(requested_i, home_limit_a)
 
-    def _shared_currents(self, requested_i: float) -> tuple[float, float, float]:
-        total_limit = max(0.0, self.home_shared_limit_a) + max(0.0, self.donor_shared_limit_a)
+    def _shared_currents(self, requested_i: float, target_v: float) -> tuple[float, float, float]:
+        home_limit_a = self._module_current_cap_a(self.home_module, target_v, self.home_shared_request_limit_a)
+        donor_limit_a = self._module_current_cap_a(self.donor_module, target_v, self.donor_shared_request_limit_a)
+        total_limit = max(0.0, home_limit_a) + max(0.0, donor_limit_a)
         if requested_i <= 0.0 or total_limit <= 0.0:
             return 0.0, 0.0, total_limit
         capped_total = min(requested_i, total_limit)
-        ratio = self.home_shared_limit_a / total_limit if total_limit > 0.0 else 0.5
-        home = min(self.home_shared_limit_a, capped_total * ratio)
-        donor = min(self.donor_shared_limit_a, capped_total - home)
+        ratio = home_limit_a / total_limit if total_limit > 0.0 else 0.5
+        home = min(home_limit_a, capped_total * ratio)
+        donor = min(donor_limit_a, capped_total - home)
         leftover = capped_total - (home + donor)
         if leftover > 0.01:
-            home_extra = min(leftover, max(0.0, self.home_shared_limit_a - home))
+            home_extra = min(leftover, max(0.0, home_limit_a - home))
             home += home_extra
             leftover -= home_extra
-            donor += min(leftover, max(0.0, self.donor_shared_limit_a - donor))
+            donor += min(leftover, max(0.0, donor_limit_a - donor))
         return max(0.0, home), max(0.0, donor), total_limit
 
     def _actual_attached_modules(self) -> list[mxr.ModuleInfo]:
@@ -1090,13 +1128,21 @@ class VehicleChargeRunner:
 
     def _attached_command_current_limit(self) -> float:
         total = 0.0
-        if self.current_plan["home"].enabled:
-            total += max(0.0, self.current_plan["home"].current_a)
+        if self.current_plan["home"].enabled and self.home_module:
+            total += self.can.safe_output_request(
+                self.home_module,
+                self.current_plan["home"].voltage_v,
+                self.current_plan["home"].current_a,
+            )[1]
         donor_attached = (
             self.current_plan["donor"].enabled and self._relay_is_closed("donor", self.args.donor_bridge_relay)
         )
-        if donor_attached:
-            total += max(0.0, self.current_plan["donor"].current_a)
+        if donor_attached and self.donor_module:
+            total += self.can.safe_output_request(
+                self.donor_module,
+                self.current_plan["donor"].voltage_v,
+                self.current_plan["donor"].current_a,
+            )[1]
         return total
 
     def _present_voltage_estimate(self, stage: str = "current_demand") -> float:
@@ -1266,12 +1312,13 @@ class VehicleChargeRunner:
     def _tick_module_outputs(self, now: float) -> None:
         if self.home_module:
             plan = self.current_plan["home"]
-            signature = (plan.enabled, int(round(plan.voltage_v * 10.0)), int(round(plan.current_a * 100.0)))
+            safe_voltage_v, safe_current_a = self.can.safe_output_request(self.home_module, plan.voltage_v, plan.current_a)
+            signature = (plan.enabled, int(round(safe_voltage_v * 10.0)), int(round(safe_current_a * 100.0)))
             if plan.enabled and (
                 self.last_output_command["home"] != signature
                 or (now - self.last_set_refresh["home"]) >= self.args.control_interval_s
             ):
-                self.can.set_output(self.home_module, plan.voltage_v, plan.current_a)
+                self.can.set_output(self.home_module, safe_voltage_v, safe_current_a)
                 self.last_set_refresh["home"] = now
                 self.plan_active["home"] = True
                 self.last_output_command["home"] = signature
@@ -1282,12 +1329,13 @@ class VehicleChargeRunner:
 
         if self.donor_module:
             plan = self.current_plan["donor"]
-            signature = (plan.enabled, int(round(plan.voltage_v * 10.0)), int(round(plan.current_a * 100.0)))
+            safe_voltage_v, safe_current_a = self.can.safe_output_request(self.donor_module, plan.voltage_v, plan.current_a)
+            signature = (plan.enabled, int(round(safe_voltage_v * 10.0)), int(round(safe_current_a * 100.0)))
             if plan.enabled and (
                 self.last_output_command["donor"] != signature
                 or (now - self.last_set_refresh["donor"]) >= self.args.control_interval_s
             ):
-                self.can.set_output(self.donor_module, plan.voltage_v, plan.current_a)
+                self.can.set_output(self.donor_module, safe_voltage_v, safe_current_a)
                 self.last_set_refresh["donor"] = now
                 self.plan_active["donor"] = True
                 self.last_output_command["donor"] = signature
@@ -1636,7 +1684,7 @@ class VehicleChargeRunner:
         self.desired_relays[("donor", self.args.donor_bridge_relay)] = False
 
     def _apply_home_only_plan(self, target_v: float, requested_i: float, post_release: bool = False) -> None:
-        current_a = self._single_home_current(requested_i)
+        current_a = self._single_home_current(requested_i, target_v)
         self.current_plan["home"] = ControlPlan(True, target_v, current_a)
         self.current_plan["donor"] = ControlPlan(False, 0.0, 0.0)
         self.desired_relays[("borrower", self.args.borrower_power_relay)] = True
@@ -1644,7 +1692,7 @@ class VehicleChargeRunner:
         self._set_phase("post_release" if post_release else "home_only")
 
     def _apply_shared_plan(self, target_v: float, requested_i: float) -> None:
-        home_i, donor_i, _total_cap = self._shared_currents(requested_i)
+        home_i, donor_i, _total_cap = self._shared_currents(requested_i, target_v)
         self.current_plan["home"] = ControlPlan(True, target_v, home_i)
         self.current_plan["donor"] = ControlPlan(True, target_v, donor_i)
         self.desired_relays[("borrower", self.args.borrower_power_relay)] = True
@@ -1656,8 +1704,8 @@ class VehicleChargeRunner:
             return
         target_v = self._target_voltage()
         requested_i = self._requested_current()
-        single_home_i = self._single_home_current(requested_i)
-        shared_home_i, shared_donor_i, _total_cap = self._shared_currents(requested_i)
+        single_home_i = self._single_home_current(requested_i, target_v)
+        shared_home_i, shared_donor_i, _total_cap = self._shared_currents(requested_i, target_v)
         baseline_bus_v = self._bus_voltage_estimate()
         donor_bootstrap_i = min(
             self.donor_bootstrap_limit_a if self.donor_bootstrap_limit_a > 0.0 else self.args.donor_bootstrap_current_a,
@@ -1756,7 +1804,8 @@ class VehicleChargeRunner:
             return False
         if charge_elapsed >= self.args.home_duration_s:
             return True
-        if requested_i > (self.home_single_limit_a + 0.5):
+        home_single_limit_a = self._module_current_cap_a(self.home_module, target_v, self.home_single_request_limit_a)
+        if requested_i > (home_single_limit_a + 0.5):
             return True
         present_v = self._present_voltage_estimate("current_demand")
         present_i = self._present_current_estimate("current_demand")
@@ -1769,8 +1818,8 @@ class VehicleChargeRunner:
             return
         target_v = self._target_voltage()
         requested_i = self._requested_current()
-        shared_home_i, shared_donor_i, _total_cap = self._shared_currents(requested_i)
-        single_home_i = self._single_home_current(requested_i)
+        shared_home_i, shared_donor_i, _total_cap = self._shared_currents(requested_i, target_v)
+        single_home_i = self._single_home_current(requested_i, target_v)
 
         self._set_phase("release_ramp")
         ramp_started = time.time()
@@ -1814,20 +1863,22 @@ class VehicleChargeRunner:
         self.release_done = True
         self._set_phase("post_release")
 
-    def _can_release_to_home_only(self, requested_i: float) -> bool:
+    def _can_release_to_home_only(self, requested_i: float, target_v: float) -> bool:
         if self.args.force_release_under_limit:
             return True
         if requested_i <= 0.0:
             return True
-        return requested_i <= (self.home_single_limit_a + 0.5)
+        home_single_limit_a = self._module_current_cap_a(self.home_module, target_v, self.home_single_request_limit_a)
+        return requested_i <= (home_single_limit_a + 0.5)
 
-    def _note_skipped_release(self, requested_i: float) -> None:
+    def _note_skipped_release(self, requested_i: float, target_v: float) -> None:
         if self.release_skip_noted:
             return
         self.release_skip_noted = True
+        home_single_limit_a = self._module_current_cap_a(self.home_module, target_v, self.home_single_request_limit_a)
         note = (
             "skipping final home-only window: "
-            f"EV requests {requested_i:.1f} A but single-home limit is {self.home_single_limit_a:.1f} A"
+            f"EV requests {requested_i:.1f} A but single-home limit is {home_single_limit_a:.1f} A"
         )
         self.notes.append(note)
         print(f"[NOTE] {note}", flush=True)
@@ -2188,11 +2239,11 @@ class VehicleChargeRunner:
                 if self.current_demand_started_at is not None and self.attach_done and not self.release_done:
                     charge_elapsed = now - self.current_demand_started_at
                     if charge_elapsed >= (self.args.home_duration_s + self.args.shared_duration_s):
-                        if self._can_release_to_home_only(requested_i):
+                        if self._can_release_to_home_only(requested_i, target_v):
                             self._execute_release_transition()
                             continue
                         else:
-                            self._note_skipped_release(requested_i)
+                            self._note_skipped_release(requested_i, target_v)
 
                 if self.current_demand_started_at is not None:
                     charge_elapsed = now - self.current_demand_started_at
@@ -2401,6 +2452,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--absolute-current-scale", type=float, default=1024.0)
     parser.add_argument("--enforce-rated-current", action="store_true")
     parser.add_argument("--force-release-under-limit", action="store_true")
+    parser.add_argument(
+        "--module-rated-power-kw",
+        type=float,
+        default=30.0,
+        help="Per-module rated power used to derive a live current ceiling from the active voltage (default: 30 kW)",
+    )
+    parser.add_argument(
+        "--module-max-voltage-v",
+        type=float,
+        default=1000.0,
+        help="Absolute hard voltage ceiling. Live 0x0023 follows the requested command plus headroom (default: 1000 V).",
+    )
+    parser.add_argument(
+        "--module-voltage-headroom-v",
+        type=float,
+        default=15.0,
+        help="Headroom above the live requested voltage when programming 0x0023 (default: 15 V)",
+    )
+    parser.add_argument(
+        "--module-max-current-a",
+        type=float,
+        default=100.0,
+        help="Absolute hard current ceiling. Live module current is capped by min(this, rated-power/current demand).",
+    )
     parser.add_argument("--stop-mode", choices=("soft", "hard"), default="hard")
     parser.add_argument("--protocol-stop-timeout-s", type=float, default=20.0)
     parser.add_argument("--stop-hard-after-s", type=float, default=8.0)
