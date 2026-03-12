@@ -2,8 +2,8 @@
 """
 UART-router PLC monitor and keepalive helper.
 
-This is the controller-side serial companion for `mode=2`
-(`controller_uart_router`):
+This is the controller-side serial companion for `mode=1`
+(`external_controller`):
 - puts the PLC into UART-router mode
 - keeps the PLC controller contract alive with `CTRL HB`
 - maintains auth state with `CTRL AUTH`
@@ -117,7 +117,7 @@ class UartRouterMonitor:
     def bootstrap(self) -> None:
         self.send("CTRL STATUS")
         time.sleep(0.1)
-        self.send(f"CTRL MODE 2 {self.plc_id} {self.controller_id}")
+        self.send(f"CTRL MODE 1 {self.plc_id} {self.controller_id}")
         time.sleep(0.2)
         self.send("CTRL STOP clear 3000")
         time.sleep(0.1)

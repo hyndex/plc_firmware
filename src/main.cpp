@@ -188,8 +188,11 @@ constexpr size_t RX_CHUNK_CAPACITY = 4096;
 constexpr size_t RX_QUEUE_CAPACITY = 8;
 
 constexpr uint16_t PLC_PEER_MAC_DEFAULT[3] = {0x00B0, 0x5200, 0x0001};
+constexpr char ISO_EVSE_ID[] = "IN*JPE*E000100010001";
 constexpr float PRECHARGE_CURRENT_LIMIT_A = 2.0f;
 constexpr float PRECHARGE_VOLTAGE_TOLERANCE_V = 20.0f;
+constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_TIMEOUT_MS = 120u;
+constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_POLL_MS = 5u;
 constexpr float MODULE_MAX_VOLTAGE_V = 1000.0f;
 constexpr float MODULE_MAX_CURRENT_A = 100.0f;
 constexpr float MODULE_MAX_POWER_KW = 30.0f;
@@ -216,8 +219,6 @@ constexpr int CAN_SPI_MISO = 21;
 constexpr int CAN_SPI_MOSI = 47;
 constexpr uint32_t CAN_SPI_HZ = 8000000UL;
 constexpr uint32_t CAN_BITRATE_KBPS = 125;
-constexpr int RFID_SS_PIN = 18;
-constexpr int RFID_RST_PIN = 17;
 constexpr uint32_t RFID_SPI_HZ = 1000000UL;
 constexpr uint32_t RFID_POLL_MS = 30u;
 constexpr uint32_t RFID_CARD_RELEASE_MS = 350u;
@@ -226,6 +227,17 @@ constexpr uint32_t RFID_KEEPALIVE_MS = 1000u;
 constexpr uint32_t RFID_MISSING_LOG_MS = 30000u;
 constexpr size_t RFID_MAX_UID_BYTES = 10u;
 constexpr uint8_t PLC_IDENTITY_EVENT_RFID = 6u;
+
+struct RfidPinMap {
+    const char* name;
+    int ss_pin;
+    int rst_pin;
+};
+
+constexpr std::array<RfidPinMap, 2> RFID_PIN_MAPS{{
+    {"spare_36_39", 36, 39},
+    {"legacy_18_17", 18, 17},
+}};
 
 constexpr uint32_t CFG_MAGIC = 0x4342504Cu; // "CBPL"
 constexpr uint16_t CFG_VERSION = 4u;
@@ -264,20 +276,14 @@ constexpr uint16_t CFG_VERSION = 4u;
 
 enum class OperatingMode : uint8_t {
     Standalone = 0u,
-    ControllerSupported = 1u,
-    ControllerUartRouter = 2u,
-    ControllerManaged = 3u,
+    ExternalController = 1u,
 };
 
 constexpr uint8_t DEFAULT_MODE_RAW = static_cast<uint8_t>(CBPLC_DEFAULT_MODE);
 constexpr OperatingMode DEFAULT_MODE =
-    (DEFAULT_MODE_RAW == static_cast<uint8_t>(OperatingMode::ControllerManaged))
-        ? OperatingMode::ControllerManaged
-        : (DEFAULT_MODE_RAW == static_cast<uint8_t>(OperatingMode::ControllerUartRouter))
-              ? OperatingMode::ControllerUartRouter
-        : (DEFAULT_MODE_RAW == static_cast<uint8_t>(OperatingMode::ControllerSupported))
-              ? OperatingMode::ControllerSupported
-              : OperatingMode::Standalone;
+    (DEFAULT_MODE_RAW == static_cast<uint8_t>(OperatingMode::Standalone))
+        ? OperatingMode::Standalone
+        : OperatingMode::ExternalController;
 constexpr bool DEFAULT_SLAC_REQUIRES_CONTROLLER_START = (CBPLC_DEFAULT_SLAC_REQUIRES_CONTROLLER_START != 0);
 constexpr uint8_t DEFAULT_PLC_ID = static_cast<uint8_t>(CBPLC_DEFAULT_PLC_ID);
 constexpr uint8_t DEFAULT_CONNECTOR_ID = static_cast<uint8_t>(CBPLC_DEFAULT_CONNECTOR_ID);
@@ -291,8 +297,8 @@ constexpr uint32_t DEFAULT_SLAC_ARM_TIMEOUT_MS = 10000u;
 constexpr uint32_t CONTROLLER_HB_SOFT_STOP_GRACE_MS = 3000u;
 constexpr uint32_t CONTROLLER_HB_HARD_STOP_GRACE_MS = 15000u;
 constexpr uint32_t CONTROLLER_ENERGY_HOLD_GRACE_MS = 1200u;
-constexpr uint32_t CONTROLLER_MANAGED_POWER_TIMEOUT_MS = 1200u;
-constexpr uint32_t CONTROLLER_MANAGED_FEEDBACK_TIMEOUT_MS = 1200u;
+constexpr uint32_t CONTROLLER_POWER_TIMEOUT_MS = 1200u;
+constexpr uint32_t CONTROLLER_FEEDBACK_TIMEOUT_MS = 1200u;
 constexpr uint8_t MAX_RUNTIME_PLC_ID = 15u;
 constexpr uint8_t MAX_RUNTIME_CONTROLLER_ID = 15u;
 constexpr uint8_t MAX_MODULE_GROUP_ID = 7u;
@@ -471,14 +477,6 @@ public:
             candidate.dlc = static_cast<uint8_t>(std::min<uint8_t>(8, in.dlc));
             for (uint8_t i = 0; i < candidate.dlc; ++i) candidate.data[i] = in.data[i];
 
-            if (in.extended) {
-                const uint32_t base = in.id & 0x1FFFFFF0u;
-                if (is_controller_rx_base(base)) {
-                    tap_controller_rx_frame(in.id, true, candidate.dlc, candidate.data, millis());
-                    continue;
-                }
-            }
-
             if (!is_allowed_module_can_frame(in.id, in.extended, candidate.dlc, candidate.data)) {
                 continue;
             }
@@ -490,41 +488,7 @@ public:
     }
 
     void poll_controller_frames(uint8_t budget = 16u) {
-        if (!inited_ || !g_can_mutex) return;
-        while (budget-- > 0u) {
-            if (xSemaphoreTake(g_can_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {
-                return;
-            }
-            if (!mcp2515_receive_available(&dev_)) {
-                xSemaphoreGive(g_can_mutex);
-                return;
-            }
-            enr_can_frame_t in{};
-            if (mcp2515_receive(&dev_, &in) != ENR_OK) {
-                xSemaphoreGive(g_can_mutex);
-                return;
-            }
-            xSemaphoreGive(g_can_mutex);
-
-            cbmodules::CanFrame candidate{};
-            candidate.id = in.id & 0x1FFFFFFFu;
-            candidate.extended = in.extended;
-            candidate.dlc = static_cast<uint8_t>(std::min<uint8_t>(8, in.dlc));
-            for (uint8_t i = 0; i < candidate.dlc; ++i) candidate.data[i] = in.data[i];
-
-            if (in.extended) {
-                const uint32_t base = in.id & 0x1FFFFFF0u;
-                if (is_controller_rx_base(base)) {
-                    tap_controller_rx_frame(in.id, true, candidate.dlc, candidate.data, millis());
-                    continue;
-                }
-            }
-
-            if (!is_allowed_module_can_frame(in.id, in.extended, candidate.dlc, candidate.data)) {
-                continue;
-            }
-            push_buffered_module_frame(candidate);
-        }
+        (void)budget;
     }
 
     uint32_t now_ms() const override {
@@ -579,11 +543,9 @@ private:
             return false;
         }
         // Leave the MCP2515 in accept-all extended-frame mode because this bus
-        // carries both controller traffic and shared module telemetry/ownership
-        // frames. Per-target acceptance is enforced in software:
-        // - tap_controller_rx_frame() drops controller frames not addressed to
-        //   this PLC node/controller ID
-        // - is_allowed_module_can_frame() drops unrelated module traffic
+        // carries shared module telemetry and ownership frames in standalone
+        // mode. Per-target acceptance is enforced in software by
+        // is_allowed_module_can_frame().
         const uint32_t accept_all_mask = 0u;
         const uint32_t accept_all_filter = 0u;
         if (mcp2515_set_filters_ext(&dev_, accept_all_mask, &accept_all_filter, 1) != ENR_OK) {
@@ -1302,6 +1264,7 @@ struct RfidRuntimeState {
     bool reader_present{false};
     bool card_latched{false};
     uint8_t event_id{0u};
+    uint8_t map_index{0xFFu};
     size_t uid_len{0u};
     std::array<uint8_t, RFID_MAX_UID_BYTES> uid{};
     uint32_t next_poll_ms{0u};
@@ -1318,7 +1281,7 @@ ControllerManagedPowerState g_ctrl_power{};
 ControllerManagedFeedbackState g_ctrl_feedback{};
 ControllerStatusTxSchedule g_ctrl_tx{};
 SerialStatusTxSchedule g_serial_tx{};
-MFRC522 g_rfid(RFID_SS_PIN, RFID_RST_PIN);
+MFRC522 g_rfid;
 RfidRuntimeState g_rfid_state{};
 Preferences g_cfg_prefs{};
 std::string g_local_group_id = "PLC_GROUP_1";
@@ -1356,6 +1319,7 @@ typedef struct {
     bool precharge_converged;
     bool power_delivery_enabled;
     uint32_t precharge_count;
+    uint8_t sa_schedule_tuple_id;
 } HlcAppContext;
 
 jpv2g_codec_ctx* g_codec = nullptr;
@@ -1472,13 +1436,11 @@ OperatingMode normalize_mode(uint8_t mode_raw) {
     switch (mode_raw) {
         case static_cast<uint8_t>(OperatingMode::Standalone):
             return OperatingMode::Standalone;
-        case static_cast<uint8_t>(OperatingMode::ControllerManaged):
-            return OperatingMode::ControllerManaged;
-        case static_cast<uint8_t>(OperatingMode::ControllerUartRouter):
-            return OperatingMode::ControllerUartRouter;
-        case static_cast<uint8_t>(OperatingMode::ControllerSupported):
+        case static_cast<uint8_t>(OperatingMode::ExternalController):
+        case 2u:
+        case 3u:
         default:
-            return OperatingMode::ControllerSupported;
+            return OperatingMode::ExternalController;
     }
 }
 
@@ -1491,19 +1453,15 @@ bool mode_is_local_autonomous() {
 }
 
 bool mode_requires_controller_contract() {
-    return runtime_mode() != OperatingMode::Standalone;
-}
-
-bool mode_controller_manages_power_path() {
-    return runtime_mode() == OperatingMode::ControllerManaged;
+    return runtime_mode() == OperatingMode::ExternalController;
 }
 
 bool mode_controller_routes_power_externally_over_uart() {
-    return runtime_mode() == OperatingMode::ControllerUartRouter;
+    return mode_requires_controller_contract();
 }
 
 bool mode_controller_owns_power_path() {
-    return mode_controller_manages_power_path() || mode_controller_routes_power_externally_over_uart();
+    return mode_requires_controller_contract();
 }
 
 bool mode_controller_uses_external_feedback() {
@@ -1530,12 +1488,8 @@ const char* runtime_mode_name(OperatingMode mode) {
     switch (mode) {
         case OperatingMode::Standalone:
             return "standalone";
-        case OperatingMode::ControllerSupported:
-            return "controller_supported";
-        case OperatingMode::ControllerManaged:
-            return "controller_managed";
-        case OperatingMode::ControllerUartRouter:
-            return "controller_uart_router";
+        case OperatingMode::ExternalController:
+            return "external_controller";
         default:
             return "unknown";
     }
@@ -1858,9 +1812,9 @@ bool can_send_frame_raw(uint32_t id, const uint8_t payload[8]) {
 }
 
 bool can_send_ctrl_frame(uint32_t base_id, uint8_t payload[8]) {
-    if (!payload) return false;
-    payload[7] = crc8_07(payload, 7);
-    return can_send_frame_raw(can_with_plc_id(base_id), payload);
+    (void)base_id;
+    (void)payload;
+    return false;
 }
 
 bool ctrl_seq_accept(uint8_t seq, uint8_t* last_seq, bool* seq_seen) {
@@ -1923,7 +1877,7 @@ bool controller_power_command_fresh(uint32_t now_ms) {
     // congestion does not collapse the DC bus mid-session.
     const uint32_t timeout_ms =
         std::min<uint32_t>(5000u,
-                           std::max<uint32_t>(CONTROLLER_MANAGED_POWER_TIMEOUT_MS,
+                           std::max<uint32_t>(CONTROLLER_POWER_TIMEOUT_MS,
                                               g_runtime_cfg.controller_heartbeat_timeout_ms + 500u));
     return (now_ms - g_ctrl_power.last_update_ms) <= timeout_ms;
 }
@@ -1935,7 +1889,7 @@ bool controller_feedback_fresh(uint32_t now_ms) {
     if (mode_controller_routes_power_externally_over_uart()) {
         const uint32_t timeout_ms =
             std::min<uint32_t>(5000u,
-                               std::max<uint32_t>(CONTROLLER_MANAGED_FEEDBACK_TIMEOUT_MS,
+                               std::max<uint32_t>(CONTROLLER_FEEDBACK_TIMEOUT_MS,
                                                   g_runtime_cfg.controller_heartbeat_timeout_ms + 500u));
         return (now_ms - g_ctrl_feedback.last_update_ms) <= timeout_ms;
     }
@@ -1944,7 +1898,7 @@ bool controller_feedback_fresh(uint32_t now_ms) {
     }
     const uint32_t timeout_ms =
         std::min<uint32_t>(5000u,
-                           std::max<uint32_t>(CONTROLLER_MANAGED_FEEDBACK_TIMEOUT_MS,
+                           std::max<uint32_t>(CONTROLLER_FEEDBACK_TIMEOUT_MS,
                                               g_runtime_cfg.controller_heartbeat_timeout_ms + 500u));
     return (now_ms - g_ctrl_feedback.last_update_ms) <= timeout_ms;
 }
@@ -2032,7 +1986,6 @@ void send_ctrl_ack(uint8_t cmd_type, uint8_t seq, uint8_t status, uint8_t detail
     p[4] = status;
     p[5] = detail0;
     p[6] = detail1;
-    (void)can_send_ctrl_frame(CAN_ID_PLC_CMD_ACK, p);
     Serial.printf("[SERCTRL] ACK cmd=0x%02X seq=%u status=%u detail0=%u detail1=%u\n",
                   static_cast<unsigned>(cmd_type),
                   static_cast<unsigned>(seq),
@@ -2479,6 +2432,70 @@ bool refresh_precharge_convergence(HlcAppContext* ctx, float requested_v) {
     return converged;
 }
 
+bool snapshot_live_present_values(cbmodules::GroupStatus* out_st,
+                                  float* out_present_v,
+                                  float* out_present_i) {
+    cbmodules::GroupStatus st{};
+    const bool ok = snapshot_group_status(&st, nullptr);
+    float present_v = sane_non_negative(st.combined_voltage_v);
+    float present_i = sane_non_negative(st.combined_current_a);
+    if (present_v <= 0.1f) {
+        present_v = sane_non_negative(g_last_measured_v);
+    }
+    if (present_i <= 0.05f) {
+        present_i = sane_non_negative(g_last_measured_i);
+    }
+    if (out_st) *out_st = st;
+    if (out_present_v) *out_present_v = present_v;
+    if (out_present_i) *out_present_i = present_i;
+    return ok && st.valid;
+}
+
+uint32_t latest_local_group_telemetry_ms() {
+    const auto states = g_module_mgr.module_states();
+    uint32_t latest_ms = 0;
+    for (const auto& s : states) {
+        if (s.group_id != runtime_local_group_id()) continue;
+        latest_ms = std::max(latest_ms, s.telemetry.last_update_ms);
+        latest_ms = std::max(latest_ms, s.telemetry.last_voltage_update_ms);
+        latest_ms = std::max(latest_ms, s.telemetry.last_current_update_ms);
+    }
+    return latest_ms;
+}
+
+bool snapshot_post_target_present_values(uint32_t baseline_telemetry_ms,
+                                         cbmodules::GroupStatus* out_st,
+                                         float* out_present_v,
+                                         float* out_present_i,
+                                         bool* out_fresh_after_target) {
+    const uint32_t started_ms = millis();
+    bool fresh_after_target = false;
+    bool telemetry_valid = false;
+    for (;;) {
+        telemetry_valid = snapshot_live_present_values(out_st, out_present_v, out_present_i);
+        const uint32_t latest_ms = latest_local_group_telemetry_ms();
+        fresh_after_target = latest_ms != 0u && latest_ms > baseline_telemetry_ms;
+        const uint32_t now_ms = millis();
+        const bool expired = (now_ms - started_ms) >= CURRENT_DEMAND_FRESH_SAMPLE_TIMEOUT_MS;
+        if (fresh_after_target || expired) {
+            if (out_fresh_after_target) {
+                *out_fresh_after_target = fresh_after_target;
+            }
+            return telemetry_valid;
+        }
+        delay(CURRENT_DEMAND_FRESH_SAMPLE_POLL_MS);
+    }
+}
+
+uint16_t copy_iso_evse_id(char* out_chars) {
+    if (!out_chars) {
+        return 0u;
+    }
+    const size_t evse_len = strnlen(ISO_EVSE_ID, iso2_EVSEID_CHARACTER_SIZE - 1);
+    memcpy(out_chars, ISO_EVSE_ID, evse_len);
+    return static_cast<uint16_t>(evse_len);
+}
+
 int64_t real_meter_wh_i64() {
     const double v = std::isfinite(g_meter_wh_real) ? g_meter_wh_real : 0.0;
     if (v <= 0.0) return 0;
@@ -2715,7 +2732,7 @@ bool migrate_runtime_config_v3(const RuntimeConfigV3& legacy, RuntimeConfig* out
     RuntimeConfig migrated{};
     migrated.mode = static_cast<uint8_t>(legacy.standalone_mode
                                              ? OperatingMode::Standalone
-                                             : OperatingMode::ControllerSupported);
+                                             : OperatingMode::ExternalController);
     migrated.slac_requires_controller_start = legacy.slac_requires_controller_start;
     migrated.plc_id = legacy.plc_id;
     migrated.connector_id = legacy.connector_id;
@@ -2854,7 +2871,7 @@ void launch_sw4_setup_portal_if_requested() {
         html.reserve(1800);
         html += "<html><body><h2>CB PLC Setup</h2>";
         html += "<form method='POST' action='/save'>";
-        html += "Mode (0=standalone,1=controller-supported,2=controller-uart-router,3=controller-managed) <input name='mode' value='";
+        html += "Mode (0=standalone,1=external_controller) <input name='mode' value='";
         html += String(g_runtime_cfg.mode);
         html += "'/><br/>";
         html += "SLAC requires controller start <input name='slac_ctrl' value='";
@@ -2878,7 +2895,7 @@ void launch_sw4_setup_portal_if_requested() {
         else if (server.hasArg("standalone")) {
             next.mode = static_cast<uint8_t>(parse_bool_from_arg(server.arg("standalone"))
                                                  ? OperatingMode::Standalone
-                                                 : OperatingMode::ControllerSupported);
+                                                 : OperatingMode::ExternalController);
         }
         if (server.hasArg("slac_ctrl")) next.slac_requires_controller_start = parse_bool_from_arg(server.arg("slac_ctrl"));
         if (server.hasArg("plc_id")) next.plc_id = static_cast<uint8_t>(std::max<long>(0, server.arg("plc_id").toInt()));
@@ -2928,7 +2945,10 @@ bool init_module_manager() {
     cfg.telemetry_stale_ms = 12000;
     cfg.startup_scan_default_timeout_ms = 3000;
     cfg.startup_probe_retry_ms = 200;
-    cfg.runtime_probe_interval_ms = 300;
+    // Standalone HLC needs fast post-PreCharge telemetry so the first
+    // CurrentDemand response reflects the real module output, not stale
+    // precharge samples from the prior probe cycle.
+    cfg.runtime_probe_interval_ms = 80;
     cfg.module_quarantine_ms = 2000;
     cfg.drain_timeout_ms = 2500;
     cfg.can_bandwidth_cap_kbps = 0.0f;
@@ -2942,6 +2962,10 @@ bool init_module_manager() {
     cfg.command_settle_window_ms = 2000;
     cfg.preventive_current_margin_pct = 0.025f;
     cfg.preventive_power_margin_pct = 0.025f;
+    // In standalone mode the PLC owns the full charging path. After precharge,
+    // move directly to the EV-requested target and let the real module
+    // capability clamps enforce the hardware limits.
+    cfg.safety.enable_ramp_sequencing = false;
     cfg.safety.enable_telemetry_stale_trip = false;
     cfg.safety.enable_can_rate_limit = false;
     cfg.safety.enable_multi_controller_guard = false;
@@ -3143,10 +3167,6 @@ void service_module_manager_once(uint32_t now_ms) {
     unlock_modules();
 }
 
-void controller_poll_can_raw_once() {
-    g_can.poll_controller_frames(16u);
-}
-
 bool module_id_known(const std::string& module_id) {
     if (module_id.empty()) return false;
     for (const auto& [addr, known_id] : g_known_module_ids) {
@@ -3239,13 +3259,9 @@ void controller_apply_mode_transition(OperatingMode next_mode) {
 
     const char* reason = (next_mode == OperatingMode::Standalone)
                              ? "ModeStandalone"
-                             : (next_mode == OperatingMode::ControllerUartRouter)
-                                   ? "ModeControllerUartRouter"
-                             : (next_mode == OperatingMode::ControllerManaged)
-                                   ? "ModeControllerManaged"
-                                   : "ModeControllerSupported";
-    const bool next_uses_plc_module_manager = (next_mode != OperatingMode::ControllerUartRouter);
-    const bool prev_used_plc_module_manager = (prev_mode != OperatingMode::ControllerUartRouter);
+                             : "ModeExternalController";
+    const bool next_uses_plc_module_manager = (next_mode != OperatingMode::ExternalController);
+    const bool prev_used_plc_module_manager = (prev_mode != OperatingMode::ExternalController);
     controller_force_safe_stop(reason);
     if (!next_uses_plc_module_manager) {
         g_module_allowlist.clear();
@@ -3346,23 +3362,10 @@ void controller_apply_stop_policy(uint32_t now_ms) {
 }
 
 void controller_publish_identity_segment(uint8_t event_kind, const uint8_t* data, size_t len, uint8_t event_id) {
-    if (!mode_uses_plc_can_stack()) return;
-    if (!data || len == 0) return;
-    const size_t seg_count = (len + 1u) / 2u;
-    for (size_t seg = 0; seg < seg_count; ++seg) {
-        uint8_t p[8]{};
-        p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-        p[1] = g_ctrl_tx.seq_event++;
-        p[2] = event_kind;
-        p[3] = event_id;
-        p[4] = static_cast<uint8_t>((static_cast<uint8_t>(seg_count) << 4) | static_cast<uint8_t>(seg & 0x0Fu));
-        const size_t off = seg * 2u;
-        const size_t n = std::min<size_t>(2u, len - off);
-        for (size_t i = 0; i < n; ++i) {
-            p[5 + i] = data[off + i];
-        }
-        (void)can_send_ctrl_frame(CAN_ID_PLC_IDENTITY_EVT, p);
-    }
+    (void)event_kind;
+    (void)data;
+    (void)len;
+    (void)event_id;
 }
 
 void controller_publish_local_identity_once() {
@@ -3465,15 +3468,30 @@ private:
     bool taken_{false};
 };
 
-void rfid_log_missing(const char* reason, uint32_t now_ms) {
+const RfidPinMap* active_rfid_pin_map() {
+    if (g_rfid_state.map_index >= RFID_PIN_MAPS.size()) {
+        return nullptr;
+    }
+    return &RFID_PIN_MAPS[g_rfid_state.map_index];
+}
+
+void rfid_deselect_all_chip_selects() {
+    for (const auto& map : RFID_PIN_MAPS) {
+        pinMode(map.ss_pin, OUTPUT);
+        digitalWrite(map.ss_pin, HIGH);
+    }
+}
+
+void rfid_log_missing(const char* reason, uint32_t now_ms, const RfidPinMap& map) {
     if (static_cast<int32_t>(now_ms - g_rfid_state.next_missing_log_ms) < 0) {
         return;
     }
     g_rfid_state.next_missing_log_ms = now_ms + RFID_MISSING_LOG_MS;
-    Serial.printf("[RFID] reader unavailable (%s) ss=%d rst=%d sck=%d miso=%d mosi=%d\n",
+    Serial.printf("[RFID] reader unavailable (%s) map=%s ss=%d rst=%d sck=%d miso=%d mosi=%d\n",
                   reason ? reason : "unknown",
-                  RFID_SS_PIN,
-                  RFID_RST_PIN,
+                  map.name,
+                  map.ss_pin,
+                  map.rst_pin,
                   CAN_SPI_SCK,
                   CAN_SPI_MISO,
                   CAN_SPI_MOSI);
@@ -3487,17 +3505,19 @@ uint8_t rfid_next_event_id() {
     return g_rfid_state.event_id;
 }
 
-bool rfid_probe_locked(uint32_t now_ms, const char* reason) {
+bool rfid_probe_locked(uint32_t now_ms, const char* reason, size_t map_index) {
     const uint8_t version = g_rfid.PCD_ReadRegister(MFRC522::VersionReg);
+    const auto& map = RFID_PIN_MAPS[map_index];
     if (version == 0x00u || version == 0xFFu) {
         g_rfid_state.reader_present = false;
-        rfid_log_missing(reason, now_ms);
+        rfid_log_missing(reason, now_ms, map);
         return false;
     }
     g_rfid.PCD_SetAntennaGain(MFRC522::RxGain_max);
     g_rfid.PCD_AntennaOn();
     g_rfid_state.reader_present = true;
     g_rfid_state.last_good_ms = now_ms;
+    g_rfid_state.map_index = static_cast<uint8_t>(map_index);
     return true;
 }
 
@@ -3535,6 +3555,9 @@ void rfid_mark_card_released() {
 }
 
 void rfid_init_device(uint32_t now_ms, const char* reason) {
+    if (!mode_requires_controller_contract()) {
+        return;
+    }
     ScopedCanBusLock guard(20u);
     if (!guard.locked()) {
         return;
@@ -3542,27 +3565,34 @@ void rfid_init_device(uint32_t now_ms, const char* reason) {
 
     pinMode(CAN_CS_PIN, OUTPUT);
     digitalWrite(CAN_CS_PIN, HIGH);
-    pinMode(RFID_SS_PIN, OUTPUT);
-    digitalWrite(RFID_SS_PIN, HIGH);
-    pinMode(RFID_RST_PIN, OUTPUT);
-    digitalWrite(RFID_RST_PIN, LOW);
-    delay(2);
-    digitalWrite(RFID_RST_PIN, HIGH);
-
-    SPI.begin(CAN_SPI_SCK, CAN_SPI_MISO, CAN_SPI_MOSI, RFID_SS_PIN);
-    SPI.setFrequency(RFID_SPI_HZ);
-    SPI.setDataMode(SPI_MODE0);
-
-    g_rfid.PCD_Init(RFID_SS_PIN, RFID_RST_PIN);
-    delay(10);
     g_rfid_state.initialized = true;
+    g_rfid_state.reader_present = false;
+    g_rfid_state.map_index = 0xFFu;
     g_rfid_state.next_reinit_ms = now_ms + RFID_REINIT_BACKOFF_MS;
     g_rfid_state.next_keepalive_ms = now_ms + RFID_KEEPALIVE_MS;
-    if (rfid_probe_locked(now_ms, reason)) {
-        Serial.printf("[RFID] ready ss=%d rst=%d event_mode=%s\n",
-                      RFID_SS_PIN,
-                      RFID_RST_PIN,
-                      mode_uart_status_stream_active() ? "uart" : "can");
+
+    for (size_t map_index = 0; map_index < RFID_PIN_MAPS.size(); ++map_index) {
+        const auto& map = RFID_PIN_MAPS[map_index];
+        rfid_deselect_all_chip_selects();
+        pinMode(map.rst_pin, OUTPUT);
+        digitalWrite(map.rst_pin, LOW);
+        delay(2);
+        digitalWrite(map.rst_pin, HIGH);
+
+        SPI.begin(CAN_SPI_SCK, CAN_SPI_MISO, CAN_SPI_MOSI, map.ss_pin);
+        SPI.setFrequency(RFID_SPI_HZ);
+        SPI.setDataMode(SPI_MODE0);
+
+        g_rfid.PCD_Init(map.ss_pin, map.rst_pin);
+        delay(10);
+        if (rfid_probe_locked(now_ms, reason, map_index)) {
+            Serial.printf("[RFID] ready map=%s ss=%d rst=%d event_mode=%s\n",
+                          map.name,
+                          map.ss_pin,
+                          map.rst_pin,
+                          mode_uart_status_stream_active() ? "uart" : "can");
+            return;
+        }
     }
 }
 
@@ -3580,8 +3610,11 @@ void rfid_keepalive(uint32_t now_ms) {
     const uint8_t version = g_rfid.PCD_ReadRegister(MFRC522::VersionReg);
     if (version == 0x00u || version == 0xFFu) {
         g_rfid_state.reader_present = false;
+        g_rfid_state.map_index = 0xFFu;
         g_rfid_state.next_reinit_ms = now_ms + RFID_REINIT_BACKOFF_MS;
-        rfid_log_missing("comm_lost", now_ms);
+        if (const auto* map = active_rfid_pin_map()) {
+            rfid_log_missing("comm_lost", now_ms, *map);
+        }
         rfid_mark_card_released();
         return;
     }
@@ -3589,6 +3622,9 @@ void rfid_keepalive(uint32_t now_ms) {
 }
 
 void rfid_poll(uint32_t now_ms) {
+    if (!mode_requires_controller_contract()) {
+        return;
+    }
     if (static_cast<int32_t>(now_ms - g_rfid_state.next_poll_ms) < 0) {
         return;
     }
@@ -4382,7 +4418,7 @@ void controller_service_watchdogs(uint32_t now_ms) {
             g_ctrl.slac_start_latched = false;
             g_ctrl.slac_arm_expiry_ms = 0;
         }
-        if (mode_controller_manages_power_path()) {
+        if (mode_controller_owns_power_path()) {
             if (g_ctrl_power.seen && !controller_power_command_fresh(now_ms)) {
                 controller_clear_managed_power_cache();
                 request_modules_off("CtrlPowerTimeout");
@@ -4653,36 +4689,7 @@ void controller_service_uart_router_tx(uint32_t now_ms) {
 }
 
 void controller_service_periodic_tx(uint32_t now_ms) {
-    if (mode_uses_plc_can_stack()) {
-        if (static_cast<int32_t>(now_ms - g_ctrl_tx.next_heartbeat_ms) >= 0) {
-            controller_tx_heartbeat(now_ms);
-            g_ctrl_tx.next_heartbeat_ms = now_ms + PLC_TX_HEARTBEAT_MS;
-        }
-        if (static_cast<int32_t>(now_ms - g_ctrl_tx.next_cp_status_ms) >= 0) {
-            controller_tx_cp_status(now_ms);
-            g_ctrl_tx.next_cp_status_ms = now_ms + PLC_TX_CP_STATUS_MS;
-        }
-        if (static_cast<int32_t>(now_ms - g_ctrl_tx.next_slac_status_ms) >= 0) {
-            controller_tx_slac_status();
-            g_ctrl_tx.next_slac_status_ms = now_ms + PLC_TX_SLAC_STATUS_MS;
-        }
-        if (static_cast<int32_t>(now_ms - g_ctrl_tx.next_hlc_status_ms) >= 0) {
-            controller_tx_hlc_status();
-            g_ctrl_tx.next_hlc_status_ms = now_ms + PLC_TX_HLC_STATUS_MS;
-        }
-        if (static_cast<int32_t>(now_ms - g_ctrl_tx.next_power_status_ms) >= 0) {
-            controller_tx_power_status();
-            g_ctrl_tx.next_power_status_ms = now_ms + PLC_TX_POWER_STATUS_MS;
-        }
-        if (static_cast<int32_t>(now_ms - g_ctrl_tx.next_session_status_ms) >= 0) {
-            controller_tx_session_status(now_ms);
-            g_ctrl_tx.next_session_status_ms = now_ms + PLC_TX_SESSION_STATUS_MS;
-        }
-        if (g_last_bms_dirty || static_cast<int32_t>(now_ms - g_ctrl_tx.next_bms_status_ms) >= 0) {
-            controller_tx_bms_status();
-            g_ctrl_tx.next_bms_status_ms = now_ms + PLC_TX_BMS_STATUS_MS;
-        }
-        controller_publish_ev_mac_refresh_if_needed(now_ms);
+    if (!mode_uart_status_stream_active()) {
         return;
     }
     controller_service_uart_router_tx(now_ms);
@@ -4703,17 +4710,12 @@ bool parse_mode_token(String token, OperatingMode* out) {
         if (out) *out = OperatingMode::Standalone;
         return true;
     }
-    if (token == "1" || token == "controller" || token == "controller_supported" || token == "supported") {
-        if (out) *out = OperatingMode::ControllerSupported;
-        return true;
-    }
-    if (token == "2" || token == "uart" || token == "router" || token == "controller_uart_router" ||
-        token == "uart_router" || token == "uart_only") {
-        if (out) *out = OperatingMode::ControllerUartRouter;
-        return true;
-    }
-    if (token == "3" || token == "managed" || token == "controller_managed" || token == "full") {
-        if (out) *out = OperatingMode::ControllerManaged;
+    if (token == "1" || token == "external" || token == "external_controller" ||
+        token == "uart" || token == "router" || token == "controller_uart_router" ||
+        token == "uart_router" || token == "uart_only" ||
+        token == "2" || token == "controller" || token == "controller_supported" || token == "supported" ||
+        token == "3" || token == "managed" || token == "controller_managed" || token == "full") {
+        if (out) *out = OperatingMode::ExternalController;
         return true;
     }
     return false;
@@ -4864,14 +4866,14 @@ void serial_ctrl_print_help() {
     Serial.println("  CTRL ALLOC COMMIT <txn>");
     Serial.println("  CTRL ALLOC ABORT");
     Serial.println("  CTRL RELAY <enable_mask> <state_mask> [hold_ms]");
-    Serial.println("  CTRL POWER <enable0|1> <voltage_v> <current_a>  (managed mode only)");
+    Serial.println("  CTRL POWER <enable0|1> <voltage_v> <current_a>  (mode 1 only)");
     Serial.println("  CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]");
     Serial.println("  CTRL STOP <soft|hard|clear> [timeout_ms]");
-    Serial.println("  CTRL MODE <mode0|1|2|3> <plc_id 1..15> [controller_id 1..15]");
+    Serial.println("  CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]");
     Serial.println("  CTRL OWNERSHIP <connector_id> <module_addr>");
     Serial.println("  CTRL SAVE");
     Serial.println("  CTRL STATUS");
-    Serial.println("  mode2/controller_uart_router: PLC relays + HLC over UART, external controller owns module CAN");
+    Serial.println("  mode1/external_controller: PLC relays + HLC over UART, external controller owns module CAN");
 }
 
 void serial_ctrl_handle_line(String line) {
@@ -5100,7 +5102,7 @@ void serial_ctrl_handle_line(String line) {
     }
     if (op == "MODE") {
         if (t.size() < 4) {
-            Serial.println("[SERCTRL] MODE <mode0|1|2|3> <plc_id> [controller_id]");
+            Serial.println("[SERCTRL] MODE <mode0|1> <plc_id> [controller_id]");
             return;
         }
         OperatingMode next_mode = runtime_mode();
@@ -5401,6 +5403,7 @@ void hlc_reset_session_state(HlcAppContext* ctx) {
     ctx->precharge_converged = false;
     ctx->power_delivery_enabled = false;
     ctx->precharge_count = 0;
+    ctx->sa_schedule_tuple_id = 1u;
     clear_last_bms_request();
 }
 
@@ -5604,8 +5607,20 @@ int hlc_handle_precharge(HlcAppContext* ctx,
         ctx->power_delivery_enabled = false;
     }
 
+    if (allow_energy && !g_relay1_closed) {
+        (void)relay1_set(true, "PreCharge");
+    }
     const bool precharge_ready = refresh_precharge_convergence(ctx, req_v);
     const float present_v = snapshot_present_group_voltage_v();
+    Serial.printf("[HLC] {\"msg\":\"PreChargeRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"allow\":%d,\"ready\":%d,"
+                  "\"presentV\":%.1f,\"relay1\":%d,\"prechargeDone\":%d}\n",
+                  req_v,
+                  req_i,
+                  allow_energy ? 1 : 0,
+                  precharge_ready ? 1 : 0,
+                  present_v,
+                  g_relay1_closed ? 1 : 0,
+                  ctx->precharge_converged ? 1 : 0);
 
     const uint8_t* sid = ctx->secc->session_id;
     if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
@@ -5720,7 +5735,8 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
             res.EVSEPowerLimitAchieved = power_limited ? 1 : 0;
             fill_iso_meter_info_real(&res.MeterInfo);
             res.MeterInfo_isUsed = 1;
-            res.EVSEID.charactersLen = 0;
+            res.EVSEID.charactersLen = copy_iso_evse_id(res.EVSEID.characters);
+            res.SAScheduleTupleID = ctx->sa_schedule_tuple_id;
             return jpv2g_cbv2g_encode_current_demand_res(
                 sid,
                 iso2_responseCodeType_OK,
@@ -5767,28 +5783,38 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         (void)ensure_power_delivery_started(ctx, requested_v, "CurrentDemandStart");
     }
     const bool delivery_active = allow_energy && ctx->power_delivery_enabled && g_relay1_closed;
-    const bool enable = delivery_active && (req_i > 0.05f);
-    update_last_bms_request(requested_v, requested_i, 2u, enable, true);
+    const bool current_requested = (req_i > 0.05f);
+    const uint32_t baseline_telemetry_ms = latest_local_group_telemetry_ms();
+    bool target_applied = false;
     if (delivery_active) {
-        (void)modules_apply_target(enable, req_v, req_i, "CurrentDemand");
+        target_applied = modules_apply_target(true,
+                                              req_v,
+                                              current_requested ? req_i : 0.0f,
+                                              current_requested ? "CurrentDemand" : "CurrentDemandHoldZero");
     } else if (allow_energy && ctx->precharge_seen) {
-        (void)modules_apply_target(true,
-                                   requested_v,
-                                   std::min(PRECHARGE_CURRENT_LIMIT_A, requested_i),
-                                   "CurrentDemandHold");
+        target_applied = modules_apply_target(true,
+                                              requested_v,
+                                              std::min(PRECHARGE_CURRENT_LIMIT_A, requested_i),
+                                              "CurrentDemandHold");
     } else {
         request_modules_off("CurrentDemandBlocked");
     }
-    const float effective_req_i = enable ? sane_non_negative(g_last_module_target_i) : 0.0f;
+    const float effective_req_i = delivery_active ? sane_non_negative(g_last_module_target_i) : 0.0f;
     const float effective_req_power_kw = (requested_v * effective_req_i) / 1000.0f;
 
     cbmodules::GroupStatus st{};
-    (void)snapshot_group_status(&st);
-    float present_v = sane_non_negative(st.combined_voltage_v);
-    float present_i = sane_non_negative(st.combined_current_a);
-    if (present_v <= 0.1f) present_v = sane_non_negative(g_last_measured_v);
-    if (present_i <= 0.05f) present_i = sane_non_negative(g_last_measured_i);
-    if (!enable) present_i = 0.0f;
+    float present_v = 0.0f;
+    float present_i = 0.0f;
+    bool fresh_after_target = false;
+    const bool telemetry_valid = snapshot_post_target_present_values(
+        baseline_telemetry_ms, &st, &present_v, &present_i, &fresh_after_target);
+    if (!current_requested) {
+        present_i = 0.0f;
+    }
+    const bool response_ready = delivery_active && target_applied && g_relay1_closed &&
+                                (fresh_after_target || !current_requested) &&
+                                (telemetry_valid || present_v > 0.1f || present_i > 0.05f);
+    update_last_bms_request(requested_v, requested_i, 2u, response_ready, true);
 
     const float req_power_kw = (requested_v * requested_i) / 1000.0f;
     const float avail_i = sane_non_negative(st.available_current_a);
@@ -5800,12 +5826,32 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         (!delivery_active && req_power_kw > 0.1f) ||
         st.saturated || (req_power_kw > (effective_req_power_kw + 0.1f)) || (avail_p > 0.0f && req_power_kw > (avail_p + 0.1f));
     const bool voltage_limited = requested_v > (MODULE_MAX_VOLTAGE_V + 0.5f);
+    Serial.printf("[HLC] {\"msg\":\"CurrentDemandRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"appliedV\":%.1f,"
+                  "\"appliedI\":%.2f,\"allow\":%d,\"delivery\":%d,\"targetApplied\":%d,\"ready\":%d,\"hold\":%d,"
+                  "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d,\"telemetryValid\":%d,"
+                  "\"sampleFresh\":%d,\"saturated\":%d}\n",
+                  requested_v,
+                  requested_i,
+                  g_last_module_target_v,
+                  g_last_module_target_i,
+                  allow_energy ? 1 : 0,
+                  delivery_active ? 1 : 0,
+                  target_applied ? 1 : 0,
+                  response_ready ? 1 : 0,
+                  current_requested ? 0 : 1,
+                  present_v,
+                  present_i,
+                  g_relay1_closed ? 1 : 0,
+                  ctx->precharge_converged ? 1 : 0,
+                  telemetry_valid ? 1 : 0,
+                  fresh_after_target ? 1 : 0,
+                  st.saturated ? 1 : 0);
 
     const uint8_t* sid = ctx->secc->session_id;
     if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
         iso2_CurrentDemandResType res;
         init_iso2_CurrentDemandResType(&res);
-        if (allow_energy) {
+        if (response_ready) {
             set_iso_dc_status_ready(&res.DC_EVSEStatus);
         } else {
             set_iso_dc_status_not_ready(&res.DC_EVSEStatus);
@@ -5817,7 +5863,8 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         res.EVSEPowerLimitAchieved = power_limited ? 1 : 0;
         fill_iso_meter_info_real(&res.MeterInfo);
         res.MeterInfo_isUsed = 1;
-        res.EVSEID.charactersLen = 0;
+        res.EVSEID.charactersLen = copy_iso_evse_id(res.EVSEID.characters);
+        res.SAScheduleTupleID = ctx->sa_schedule_tuple_id;
         return jpv2g_cbv2g_encode_current_demand_res(
             sid,
             iso2_responseCodeType_OK,
@@ -5830,7 +5877,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
         din_CurrentDemandResType res;
         init_din_CurrentDemandResType(&res);
-        if (allow_energy) {
+        if (response_ready) {
             set_din_dc_status_ready(&res.DC_EVSEStatus);
         } else {
             set_din_dc_status_not_ready(&res.DC_EVSEStatus);
@@ -5852,57 +5899,131 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     return -ENOTSUP;
 }
 
+int hlc_handle_power_delivery(HlcAppContext* ctx,
+                              const jpv2g_secc_request_t* req,
+                              uint8_t* out,
+                              size_t out_len,
+                              size_t* written) {
+    if (!ctx || !ctx->secc || !req) return -EINVAL;
+
+    const bool allow_energy = controller_allows_energy(millis());
+    bool start = false;
+    bool stop = false;
+    bool renegotiate = false;
+    if (req->protocol == JPV2G_PROTOCOL_ISO15118_2 && req->body) {
+        const auto* rq = static_cast<const iso2_PowerDeliveryReqType*>(req->body);
+        start = (rq->ChargeProgress == iso2_chargeProgressType_Start);
+        stop = (rq->ChargeProgress == iso2_chargeProgressType_Stop);
+        renegotiate = (rq->ChargeProgress == iso2_chargeProgressType_Renegotiate);
+        ctx->sa_schedule_tuple_id = (rq->SAScheduleTupleID == 0u) ? 1u : rq->SAScheduleTupleID;
+    } else if (req->protocol == JPV2G_PROTOCOL_DIN70121 && req->body) {
+        const auto* rq = static_cast<const din_PowerDeliveryReqType*>(req->body);
+        start = (rq->ReadyToChargeState != 0);
+        stop = !start;
+        renegotiate = false;
+    }
+
+    bool applied = false;
+    bool ready = false;
+    bool stop_charging = false;
+    if (stop) {
+        ctx->power_delivery_enabled = false;
+        update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
+        (void)relay1_set(false, "PowerDeliveryStop");
+        if (!mode_controller_has_final_decision()) {
+            controller_clear_managed_power_cache();
+            request_modules_off("PowerDeliveryStop");
+        }
+        ctx->precharge_converged = false;
+        clear_last_bms_request();
+        applied = true;
+        ready = false;
+        stop_charging = true;
+    } else if (renegotiate) {
+        ctx->power_delivery_enabled = false;
+        update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
+        (void)relay1_set(false, "PowerDeliveryRenegotiate");
+        if (!mode_controller_has_final_decision()) {
+            request_modules_off("PowerDeliveryRenegotiate");
+        }
+        ctx->precharge_converged = false;
+        applied = true;
+        ready = false;
+    } else if (start) {
+        if (!mode_controller_has_final_decision() && !allow_energy) {
+            applied = false;
+        } else if (mode_controller_uses_external_feedback()) {
+            ControllerManagedFeedbackState fb{};
+            const bool fb_ok = controller_get_managed_feedback(millis(), &fb);
+            ready = fb_ok && fb.ready && g_relay1_closed;
+            ctx->precharge_converged = ctx->precharge_converged || ready;
+            ctx->power_delivery_enabled = ready;
+            applied = ready;
+        } else {
+            if (!ctx->precharge_converged) {
+                (void)refresh_precharge_convergence(ctx, g_last_requested_target_v);
+            }
+            if (ctx->precharge_converged) {
+                applied = ensure_power_delivery_started(ctx, g_last_requested_target_v, "PowerDeliveryStart");
+                ready = applied && g_relay1_closed;
+            }
+        }
+    }
+
+    Serial.printf("[HLC] {\"msg\":\"PowerDeliveryRuntime\",\"start\":%d,\"stop\":%d,\"renegotiate\":%d,"
+                  "\"allow\":%d,\"applied\":%d,\"ready\":%d,\"relay1\":%d,\"prechargeDone\":%d,"
+                  "\"targetV\":%.1f,\"appliedV\":%.1f,\"appliedI\":%.2f}\n",
+                  start ? 1 : 0,
+                  stop ? 1 : 0,
+                  renegotiate ? 1 : 0,
+                  allow_energy ? 1 : 0,
+                  applied ? 1 : 0,
+                  ready ? 1 : 0,
+                  g_relay1_closed ? 1 : 0,
+                  ctx->precharge_converged ? 1 : 0,
+                  g_last_requested_target_v,
+                  g_last_module_target_v,
+                  g_last_module_target_i);
+
+    const uint8_t* sid = ctx->secc->session_id;
+    if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
+        iso2_PowerDeliveryResType res;
+        init_iso2_PowerDeliveryResType(&res);
+        res.DC_EVSEStatus_isUsed = 1;
+        if (stop_charging) {
+            set_iso_dc_status_shutdown(&res.DC_EVSEStatus);
+        } else if (ready) {
+            set_iso_dc_status_ready(&res.DC_EVSEStatus);
+        } else {
+            set_iso_dc_status_not_ready(&res.DC_EVSEStatus);
+        }
+        const iso2_responseCodeType code =
+            (stop || renegotiate || ready) ? iso2_responseCodeType_OK : iso2_responseCodeType_FAILED_PowerDeliveryNotApplied;
+        return jpv2g_cbv2g_encode_power_delivery_res(sid, code, &res, out, out_len, written);
+    }
+
+    if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
+        din_PowerDeliveryResType res;
+        init_din_PowerDeliveryResType(&res);
+        if (stop_charging) {
+            set_din_dc_status_shutdown(&res.DC_EVSEStatus);
+        } else if (ready) {
+            set_din_dc_status_ready(&res.DC_EVSEStatus);
+        } else {
+            set_din_dc_status_not_ready(&res.DC_EVSEStatus);
+        }
+        const din_responseCodeType code =
+            (stop || renegotiate || ready) ? din_responseCodeType_OK : din_responseCodeType_FAILED_PowerDeliveryNotApplied;
+        return jpv2g_cbv2g_encode_din_power_delivery_res(sid, code, &res, out, out_len, written);
+    }
+
+    return -ENOTSUP;
+}
+
 void hlc_apply_power_side_effects(HlcAppContext* ctx,
                                   jpv2g_message_type_t type,
                                   const jpv2g_secc_request_t* req) {
     if (!ctx || !req) return;
-
-    if (type == JPV2G_POWER_DELIVERY_REQ) {
-        bool enable = true;
-        if (req->protocol == JPV2G_PROTOCOL_ISO15118_2 && req->body) {
-            const auto* rq = static_cast<const iso2_PowerDeliveryReqType*>(req->body);
-            enable = (rq->ChargeProgress != iso2_chargeProgressType_Stop);
-        } else if (req->protocol == JPV2G_PROTOCOL_DIN70121 && req->body) {
-            const auto* rq = static_cast<const din_PowerDeliveryReqType*>(req->body);
-            enable = (rq->ReadyToChargeState != 0);
-        }
-        if (!mode_controller_has_final_decision() && !controller_allows_energy(millis())) {
-            enable = false;
-        }
-        if (!enable) {
-            ctx->power_delivery_enabled = false;
-            update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
-            (void)relay1_set(false, "PowerDeliveryStop");
-            if (!mode_controller_has_final_decision()) {
-                controller_clear_managed_power_cache();
-                request_modules_off("PowerDeliveryStop");
-            }
-            return;
-        }
-        if (mode_controller_uses_external_feedback()) {
-            ControllerManagedFeedbackState fb{};
-            const bool fb_ok = controller_get_managed_feedback(millis(), &fb);
-            ctx->precharge_converged = ctx->precharge_converged || (fb_ok && fb.ready);
-            ctx->power_delivery_enabled =
-                (mode_controller_manages_power_path() ? (g_ctrl_power.seen && g_ctrl_power.enable) : (fb_ok && fb.ready)) &&
-                g_relay1_closed;
-            return;
-        }
-        if (!ctx->precharge_converged) {
-            (void)refresh_precharge_convergence(ctx, g_last_requested_target_v);
-        }
-        if (!ctx->precharge_converged) {
-            ctx->power_delivery_enabled = false;
-            (void)relay1_set(false, "PowerDeliveryWaitPrecharge");
-            (void)modules_apply_target(true,
-                                       g_last_requested_target_v,
-                                       PRECHARGE_CURRENT_LIMIT_A,
-                                       "PowerDeliveryWaitPrecharge");
-            return;
-        }
-        (void)ensure_power_delivery_started(ctx, g_last_requested_target_v, "PowerDeliveryStart");
-        return;
-    }
 
     if (type == JPV2G_SESSION_STOP_REQ) {
         ctx->precharge_converged = false;
@@ -5940,6 +6061,9 @@ int hlc_handle_request(jpv2g_message_type_t type,
     }
     if (type == JPV2G_PRE_CHARGE_REQ) {
         return hlc_handle_precharge(ctx, req, out, out_len, written);
+    }
+    if (type == JPV2G_POWER_DELIVERY_REQ) {
+        return hlc_handle_power_delivery(ctx, req, out, out_len, written);
     }
     if (type == JPV2G_CURRENT_DEMAND_REQ) {
         return hlc_handle_current_demand(ctx, req, out, out_len, written);
@@ -6562,7 +6686,9 @@ void setup() {
     }
     request_modules_off("Boot");
     controller_publish_local_identity_once();
-    rfid_init_device(millis(), "boot");
+    if (mode_requires_controller_contract()) {
+        rfid_init_device(millis(), "boot");
+    }
 
     (void)try_init_qca_and_fsm(millis());
 }
@@ -6576,9 +6702,6 @@ void loop() {
     if (g_transport && g_transport->is_ready()) {
         g_transport->service_ingress_once();
     }
-    if (mode_uses_plc_can_stack()) {
-        controller_poll_can_raw_once();
-    }
     controller_service_rx();
     // Re-sample time after controller RX so same-iteration heartbeats do not
     // look "from the future" to the watchdog/session gate logic.
@@ -6589,7 +6712,9 @@ void loop() {
     if (mode_uses_plc_module_manager()) {
         service_module_manager_once(now_ms);
     }
-    rfid_poll(now_ms);
+    if (mode_requires_controller_contract()) {
+        rfid_poll(now_ms);
+    }
     service_lwip_tx_queue_once();
     const bool hlc_priority = g_session_started || g_hlc_active || cp_connected(g_cp_state);
     delay(hlc_priority ? 1 : 5);

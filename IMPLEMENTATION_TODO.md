@@ -2,14 +2,11 @@
 
 Updated: 2026-03-07  
 Owner: Codex  
-Scope: Rework firmware architecture around `mode=0/1/2`, with controller authority for authorization and SLAC in controller-backed modes while preserving a complete local standalone path.
+Scope: Rework firmware architecture around `mode=0/2`, with controller authority for authorization and SLAC in controller-backed mode while preserving a complete local standalone path.
 
 ## Confirmed Requirements (Authoritative)
 - `mode=0`:
   - PLC is fully independent (SLAC/HLC/modules/Relay1 local).
-- `mode=1`:
-  - PLC depends on external controller for authorization and SLAC start decisions.
-  - PLC still owns Relay1 timing and local module targeting.
 - `mode=2`:
   - controller handles live power-side actuation and Relay1 intent
   - PLC publishes BMS demand and returns controller-provided HLC power-side data to the EV
@@ -53,7 +50,7 @@ Scope: Rework firmware architecture around `mode=0/1/2`, with controller authori
 ### `mode=0`
 - [ ] CP stable -> local SLAC trigger -> HLC -> local auth policy -> module + Relay1 control.
 
-### `mode=1/2` (Controller Authority)
+### `mode=2` (Controller Authority)
 - [ ] CP stable only raises `gun_connected` event.
 - [ ] PLC waits for `CTRL_SLAC_CONTROL=ARM/START_NOW`.
 - [ ] SLAC runs only while controller authorization window is valid.
@@ -127,7 +124,7 @@ Scope: Rework firmware architecture around `mode=0/1/2`, with controller authori
 - Status: In Progress
 - Dependencies: Stage B
 - Tasks:
-  - [x] Keep Relay1 PLC-owned outside controller-managed mode.
+  - [x] Keep Relay1 PLC-owned outside controller-backed mode.
   - [x] Add Relay2/Relay3 external command path with safety interlocks and timeout-off.
   - [x] Allow Relay1 external control only in `mode=2`.
   - [x] Publish applied relay state + reject reason codes.
@@ -155,7 +152,6 @@ Scope: Rework firmware architecture around `mode=0/1/2`, with controller authori
   - [ ] Unit tests for control-plane decode/validation/state transitions.
   - [x] Live `mode=0` validation on `/dev/ttyACM0` for `10` minute and `15` minute charging windows, plus direct hard-stop verification while the vehicle remained connected.
   - [ ] Complete uninterrupted `30` minute live validation for `mode=0`.
-  - [ ] Integration tests for `mode=1`.
   - [ ] Integration tests for `mode=2`.
   - [ ] Two-ESP/multi-controller contention tests for module ownership safety.
   - [x] Live tests on `/dev/ttyACM0` and `/dev/ttyACM1` with erase, flash, persisted provisioning, and serial verification.

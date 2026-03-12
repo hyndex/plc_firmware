@@ -3,9 +3,9 @@
 Live vehicle end-to-end UART-router charging test with direct Maxwell CAN.
 
 Important mode note:
-  - The requested "controller-controlled / UART-only" architecture is the
-    current firmware `mode=2` (`controller_uart_router`), not legacy `mode=3`.
-  - This harness intentionally boots both PLCs into `mode=2` and fails if the
+  - The requested "controller-controlled / UART-only" architecture is firmware
+    `mode=1` (`external_controller`).
+  - This harness intentionally boots both PLCs into `mode=1` and fails if the
     PLC reports `can_stack=1` or `module_mgr=1`.
 
 Architecture under test:
@@ -14,7 +14,7 @@ Architecture under test:
   - Controller -> Maxwell modules over CAN directly
 
 Sequence:
-  1. Put borrower and donor PLCs into `mode=2/controller_uart_router`.
+  1. Put borrower and donor PLCs into `mode=1/external_controller`.
   2. Verify both PLCs report `can_stack=0` and `module_mgr=0`.
   3. Discover module `1/group1` and donor module `3/group2` on external CAN.
   4. Soft-reset both modules to known-good defaults.
@@ -267,6 +267,8 @@ def probe_serial_status(port: str, baud: int, timeout_s: float) -> Optional[Seri
 
 def resolve_uart_ports(args: argparse.Namespace) -> None:
     manual_ports = [args.borrower_port, args.donor_port]
+    manual_borrower = bool(args.borrower_port and args.borrower_port.lower() != "auto")
+    manual_donor = bool(args.donor_port and args.donor_port.lower() != "auto")
     candidates: list[str] = []
     seen: set[str] = set()
     for port in manual_ports:
@@ -284,6 +286,17 @@ def resolve_uart_ports(args: argparse.Namespace) -> None:
             results.append(result)
     if not results:
         raise RuntimeError("unable to read [SERCTRL] STATUS from any candidate PLC serial port")
+
+    if manual_borrower and manual_donor:
+        borrower_real = os.path.realpath(args.borrower_port)
+        donor_real = os.path.realpath(args.donor_port)
+        borrower_probe = next((item for item in results if item.real_path == borrower_real), None)
+        donor_probe = next((item for item in results if item.real_path == donor_real), None)
+        if args.borrower_plc_id is None and borrower_probe is not None:
+            args.borrower_plc_id = borrower_probe.status.plc_id
+        if args.donor_plc_id is None and donor_probe is not None:
+            args.donor_plc_id = donor_probe.status.plc_id
+        return
 
     borrower: Optional[SerialProbeResult] = None
     donor: Optional[SerialProbeResult] = None
@@ -479,6 +492,7 @@ class VehicleChargeRunner:
         self.last_start_recovery_at = time.time()
         self.start_recovery_count = 0
 
+        self.current_demand_live_since: Optional[float] = None
         self.current_demand_started_at: Optional[float] = None
         self.session_protocol_baseline: tuple[int, int, int] = (0, 0, 0)
         self.attach_done = False
@@ -576,7 +590,8 @@ class VehicleChargeRunner:
         if slac_evt:
             with lock:
                 state.slac_session = slac_evt.group(1) == "1"
-                state.slac_matched = slac_evt.group(2) == "1"
+                # Treat "session=0 matched=1" as stale status, not a live SLAC match.
+                state.slac_matched = state.slac_session and (slac_evt.group(2) == "1")
                 state.slac_failures = int(slac_evt.group(4))
             return
 
@@ -729,17 +744,24 @@ class VehicleChargeRunner:
         with lock:
             return state.relay_states.get(relay_idx) is False
 
+    @staticmethod
+    def _idle_stop_reject_ok(status: PlcStatus, ack: Ack) -> bool:
+        # Some idle firmware builds reject redundant hard-stop requests instead of ACKing them.
+        return ack.status == 4 and status.relay1 == 0 and status.relay2 == 0 and status.relay3 == 0
+
     def _bootstrap_plc(self, plc_name: str, plc_id: int) -> PlcStatus:
         self._send(plc_name, "CTRL STATUS")
         status = self._wait_for_status(plc_name)
         self._send(plc_name, "CTRL STOP hard 3000")
         ack = self._wait_for_ack(plc_name, ACK_CMD_STOP)
-        if ack.status != ACK_OK:
+        if ack.status != ACK_OK and not self._idle_stop_reject_ok(status, ack):
             raise RuntimeError(f"{plc_name} STOP hard rejected status={ack.status}")
+        if ack.status != ACK_OK:
+            self.notes.append(f"{plc_name} redundant hard stop rejected while idle; continuing bootstrap")
         self._send(plc_name, "CTRL RESET")
         time.sleep(0.2)
-        if status.mode_id != 2 or status.controller_id != self.args.controller_id:
-            self._send(plc_name, f"CTRL MODE 2 {plc_id} {self.args.controller_id}")
+        if status.mode_id != 1 or status.controller_id != self.args.controller_id:
+            self._send(plc_name, f"CTRL MODE 1 {plc_id} {self.args.controller_id}")
             time.sleep(0.3)
         self._send(plc_name, f"CTRL HB {self.args.heartbeat_timeout_ms}")
         ack = self._wait_for_ack(plc_name, ACK_CMD_HEARTBEAT)
@@ -764,8 +786,8 @@ class VehicleChargeRunner:
         for relay_idx in (1, 2, 3):
             self._set_relay(plc_name, relay_idx, False, 0)
         status = self._query_status(plc_name)
-        if status.mode_id != 2:
-            raise RuntimeError(f"{plc_name} did not enter mode=2 controller_uart_router")
+        if status.mode_id != 1:
+            raise RuntimeError(f"{plc_name} did not enter mode=1 external_controller")
         if status.can_stack != 0 or status.module_mgr != 0:
             raise RuntimeError(
                 f"{plc_name} mode2 routing mismatch: can_stack={status.can_stack} module_mgr={status.module_mgr}"
@@ -835,6 +857,36 @@ class VehicleChargeRunner:
     def _vehicle_stop_pending(self) -> bool:
         return self.vehicle_stop_requested and not self.stop_requested
 
+    def _current_demand_live(self) -> bool:
+        stage, _target_v, _target_i, _ts, fresh = self._borrower_stage_snapshot()
+        if stage != "current_demand" or not fresh:
+            return False
+        with self.borrower_lock:
+            relay_closed = self.borrower.relay_states.get(self.args.borrower_power_relay) is True
+            return self.borrower.hlc_active and self.borrower.delivery_ready and relay_closed and not self.borrower.stop_done
+
+    def _reset_session_progress(self) -> None:
+        self.current_demand_live_since = None
+        self.current_demand_started_at = None
+        self.session_protocol_baseline = (0, 0, 0)
+        self.attach_done = False
+        self.release_done = False
+        self.stop_requested = False
+        self.stop_started_at = None
+        self.stop_hard_sent = False
+        self.protocol_stop_verified = False
+        self.vehicle_stop_requested = False
+        self.vehicle_stop_reason = ""
+        self.vehicle_stop_seen_at = None
+        with self.borrower_lock:
+            self.borrower.first_current_demand_ts = None
+            self.borrower.power_delivery_req_count = 0
+            self.borrower.welding_req_count = 0
+            self.borrower.session_stop_req_count = 0
+            self.borrower.last_power_delivery_req_ts = None
+            self.borrower.last_welding_req_ts = None
+            self.borrower.last_session_stop_req_ts = None
+
     def _target_voltage(self) -> float:
         stage, target_v, _target_i, _ts, _fresh = self._borrower_stage_snapshot()
         if stage and target_v > 10.0:
@@ -878,6 +930,20 @@ class VehicleChargeRunner:
             modules.append(self.donor_module)
         return modules
 
+    def _feedback_path_modules(self) -> list[mxr.ModuleInfo]:
+        modules: list[mxr.ModuleInfo] = []
+        borrower_closed = self._relay_is_closed("borrower", self.args.borrower_power_relay) or self.desired_relays[
+            ("borrower", self.args.borrower_power_relay)
+        ]
+        donor_closed = self._relay_is_closed("donor", self.args.donor_bridge_relay) or self.desired_relays[
+            ("donor", self.args.donor_bridge_relay)
+        ]
+        if borrower_closed and self.home_module:
+            modules.append(self.home_module)
+        if borrower_closed and donor_closed and self.donor_module:
+            modules.append(self.donor_module)
+        return modules
+
     def _append_unique(self, bucket: list[str], message: str) -> None:
         if message not in bucket:
             bucket.append(message)
@@ -913,7 +979,7 @@ class VehicleChargeRunner:
         if normalized == "precharge":
             return [self.home_module] if self.home_module else []
         if normalized in ("power_delivery", "current_demand"):
-            return self._actual_attached_modules()
+            return self._feedback_path_modules()
         if normalized == "stop_request":
             attached = self._actual_attached_modules()
             if attached:
@@ -996,8 +1062,8 @@ class VehicleChargeRunner:
                 mode_id = state.mode_id
                 can_stack = state.can_stack
                 module_mgr = state.module_mgr
-            if mode_id not in (-1, 2):
-                raise RuntimeError(f"{plc_name} left mode=2 and entered mode={mode_id}")
+            if mode_id not in (-1, 1):
+                raise RuntimeError(f"{plc_name} left mode=1 and entered mode={mode_id}")
             if can_stack not in (-1, 0):
                 raise RuntimeError(f"{plc_name} reported can_stack={can_stack}; PLC CAN must stay OFF in UART mode")
             if module_mgr not in (-1, 0):
@@ -1187,6 +1253,12 @@ class VehicleChargeRunner:
         self.remote_start_sent = False
         self.last_arm = 0.0
         self.last_start = 0.0
+        self._reset_session_progress()
+        self._enter_idle_output()
+        if self.home_module:
+            self.can.stop_output(self.home_module)
+        if self.donor_module:
+            self.can.stop_output(self.donor_module)
         print(
             f"[RECOVERY] no HLC progress yet; rearming borrower SLAC (count={self.start_recovery_count})",
             flush=True,
@@ -1748,15 +1820,36 @@ class VehicleChargeRunner:
                 target_v = self._target_voltage()
                 requested_i = self._requested_current()
 
-                if stage == "current_demand" and self.current_demand_started_at is None:
-                    with self.borrower_lock:
-                        self.current_demand_started_at = self.borrower.first_current_demand_ts or now
-                    self.session_protocol_baseline = self._protocol_stop_counters()
-                    self.vehicle_stop_requested = False
-                    self.vehicle_stop_reason = ""
-                    self.vehicle_stop_seen_at = None
-                    print("[SESSION] first CurrentDemand observed", flush=True)
-                    self._set_phase("home_only")
+                if self._current_demand_live():
+                    if self.current_demand_live_since is None:
+                        self.current_demand_live_since = now
+                else:
+                    self.current_demand_live_since = None
+
+                if self.current_demand_started_at is None and self.current_demand_live_since is not None:
+                    if (now - self.current_demand_live_since) >= 1.0:
+                        self.current_demand_started_at = self.current_demand_live_since
+                        self.session_protocol_baseline = self._protocol_stop_counters()
+                        self.vehicle_stop_requested = False
+                        self.vehicle_stop_reason = ""
+                        self.vehicle_stop_seen_at = None
+                        print("[SESSION] stable CurrentDemand observed", flush=True)
+                        self._set_phase("home_only")
+
+                if (
+                    self.current_demand_started_at is not None
+                    and not self.stop_requested
+                    and not self._vehicle_stop_pending()
+                    and not self._current_demand_live()
+                ):
+                    charge_elapsed = now - self.current_demand_started_at
+                    if charge_elapsed < 8.0 and (now - self.last_start_recovery_at) >= self.args.start_recovery_s:
+                        self.notes.append(
+                            f"current_demand collapsed after {charge_elapsed:.1f}s; restarting same-plug session"
+                        )
+                        self._recover_start_path(now)
+                        continue
+                    raise RuntimeError(f"session lost during CurrentDemand after {charge_elapsed:.1f}s")
 
                 if self.current_demand_started_at is not None and not self.attach_done:
                     charge_elapsed = now - self.current_demand_started_at
@@ -1795,10 +1888,14 @@ class VehicleChargeRunner:
                 with self.borrower_lock:
                     borrower_cp_connected = self.borrower.cp_connected
                     borrower_hlc_active = self.borrower.hlc_active
+                    borrower_precharge_seen = self.borrower.precharge_seen
                 if (
                     self.current_demand_started_at is None
+                    and self.phase == "wait_for_session"
+                    and not stage
                     and borrower_cp_connected
                     and (not borrower_hlc_active)
+                    and (not borrower_precharge_seen)
                     and (now - self.last_start_recovery_at) >= self.args.start_recovery_s
                 ):
                     self._recover_start_path(now)

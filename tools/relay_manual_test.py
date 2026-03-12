@@ -3,7 +3,7 @@
 UART-router relay tester.
 
 This script is intentionally narrow:
-- switch the target PLC into runtime `mode=2` (`controller_uart_router`)
+- switch the target PLC into runtime `mode=1` (`external_controller`)
 - close one relay at a time through `CTRL RELAY`
 - keep it closed by refreshing the relay hold deadline
 - verify state from `CTRL STATUS`
@@ -226,8 +226,8 @@ class RelayManualTester:
 
     def ensure_router_mode(self) -> PlcStatus:
         status = self.query_status()
-        if status.mode_id != 2 or status.controller_id != self.controller_id:
-            self.send(f"CTRL MODE 2 {status.plc_id} {self.controller_id}")
+        if status.mode_id != 1 or status.controller_id != self.controller_id:
+            self.send(f"CTRL MODE 1 {status.plc_id} {self.controller_id}")
             time.sleep(0.3)
             status = self.query_status()
         self.send("CTRL STOP clear 3000")
@@ -235,8 +235,8 @@ class RelayManualTester:
         if ack.status != ACK_OK:
             raise RuntimeError(f"STOP clear rejected status={ack.status}")
         status = self.query_status()
-        if status.mode_id != 2:
-            raise RuntimeError("PLC did not enter controller_uart_router mode")
+        if status.mode_id != 1:
+            raise RuntimeError("PLC did not enter external_controller mode")
         return status
 
     def set_relay(self, relay_idx: int, closed: bool, hold_ms: int) -> PlcStatus:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Mode 2 / controller_uart_router serial stub for the PLC control plane.
+Mode 1 / external_controller serial stub for the PLC control plane.
 
 This script only speaks to the PLC over UART:
   - heartbeat
@@ -10,7 +10,7 @@ This script only speaks to the PLC over UART:
   - HLC feedback
   - status polling
 
-It does not send ALLOC or module power ownership to the PLC. In mode 2 the
+It does not send ALLOC or module power ownership to the PLC. In mode 1 the
 controller is expected to drive modules directly over CAN outside this process.
 """
 
@@ -124,7 +124,7 @@ class Runner:
         self._reader.start()
 
         try:
-            self._write(f"CTRL MODE 2 {self.args.plc_id} {self.args.controller_id}")
+            self._write(f"CTRL MODE 1 {self.args.plc_id} {self.args.controller_id}")
             self._write("CTRL STATUS")
 
             start = time.time()
@@ -193,7 +193,7 @@ class Runner:
 
 
 def parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Mode 2 PLC UART-router control stub")
+    ap = argparse.ArgumentParser(description="Mode 1 PLC external-controller UART control stub")
     ap.add_argument("--port", default="/dev/ttyACM0")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--plc-id", type=int, default=1)

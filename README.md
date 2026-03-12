@@ -71,21 +71,7 @@ The PLC is locally autonomous:
 
 This is the self-contained path: CP -> SLAC -> HLC -> modules -> Relay1.
 
-### `mode=1` Controller-Supported
-
-The controller owns session permission, while the PLC still owns the power path:
-
-- boot starts with an empty allowlist
-- heartbeat must be alive before controller permissions matter
-- controller grants auth and SLAC start permission
-- controller assigns the module allowlist at runtime
-- PLC still computes module targets from `PreChargeReq` and `CurrentDemandReq`
-- PLC still closes and opens Relay1 based on precharge and power-delivery logic
-- Relay2 and Relay3 remain controller-commandable
-
-This is the existing controller-gated charging model.
-
-### `mode=2` Controller-Managed
+### `mode=1` External Controller
 
 The controller owns the entire power side. The PLC keeps CP, SLAC, and HLC transport:
 
@@ -96,7 +82,7 @@ The controller owns the entire power side. The PLC keeps CP, SLAC, and HLC trans
 - controller may directly command Relay1 through `CTRL_AUX_RELAY` bit 2
 - if managed power commands or managed feedback go stale, the PLC fails safe
 
-In `mode=2`, the PLC is the protocol endpoint and safety executor, but not the charging policy or power-control brain.
+In `mode=1`, the PLC is the protocol endpoint and safety executor, but not the charging policy or power-control brain.
 
 ## Relay Ownership
 
@@ -106,10 +92,9 @@ In `mode=2`, the PLC is the protocol endpoint and safety executor, but not the c
 By mode:
 
 - `mode=0`: Relay1 is PLC-owned, Relay2/3 may still be controller-commanded.
-- `mode=1`: Relay1 is PLC-owned, Relay2/3 may still be controller-commanded.
-- `mode=2`: Relay1, Relay2, and Relay3 may all be commanded through `CTRL RELAY`.
+- `mode=1`: Relay1, Relay2, and Relay3 may all be commanded through `CTRL RELAY`.
 
-Even in `mode=2`, local hard-stop conditions override controller intent. CP disconnect, heartbeat-loss safe stop, auth denial/expiry, SLAC abort/disarm, HLC session stop, and explicit stop paths all open Relay1 locally.
+Even in `mode=1`, local hard-stop conditions override controller intent. CP disconnect, heartbeat-loss safe stop, auth denial/expiry, SLAC abort/disarm, HLC session stop, and explicit stop paths all open Relay1 locally.
 
 ## Boot Sequence
 
@@ -158,7 +143,7 @@ PWM behavior:
 Mode effect:
 
 - `mode=0`: advertise immediately after stable plug-in
-- `mode=1` / `mode=2`: advertise only when controller gating permits SLAC start, unless a session is already active
+- `mode=1`: advertise only when controller gating permits SLAC start, unless a session is already active
 
 ### `mode=0` Session Path
 
@@ -173,18 +158,7 @@ Mode effect:
 
 ### `mode=1` Session Path
 
-1. Controller keeps `CTRL_HEARTBEAT` fresh.
-2. Controller stages and commits a module allowlist through `CTRL_ALLOC_*`.
-3. Controller arms or starts SLAC through `CTRL_SLAC`.
-4. PLC detects plug-in, opens PWM only when controller SLAC policy allows it, and starts SLAC.
-5. Controller keeps auth `pending` until policy allows charging, then refreshes `grant`.
-6. PLC still translates `PreChargeReq` and `CurrentDemandReq` into module targets.
-7. PLC closes Relay1 only after precharge convergence and allowed energy.
-8. Stop, deny, disarm, heartbeat loss, auth expiry, or disconnect drives modules off and opens Relay1.
-
-### `mode=2` Session Path
-
-1. Controller keeps heartbeat, auth, and allocation fresh exactly as in `mode=1`.
+1. Controller keeps heartbeat, auth, and allocation fresh.
 2. PLC handles CP, SLAC, and HLC transport exactly as before.
 3. On every `PreChargeReq`, `CurrentDemandReq`, and `PowerDelivery` update, the PLC publishes the EV/BMS demand through `PLC_BMS_STATUS`.
 4. Controller responds with:
@@ -197,7 +171,7 @@ Mode effect:
    - stale power command -> modules off + Relay1 open
    - stale feedback -> EV replies degrade to not-ready / zero-current behavior
 
-Important `mode=2` detail:
+Important `mode=1` detail:
 
 - `CTRL_POWER_SETPOINT` does not close Relay1 by itself
 - `CTRL_HLC_FEEDBACK` does not energize modules by itself
@@ -371,7 +345,7 @@ Handled explicitly in current code:
 - live allowlist shrink or expansion during a running session re-targets the new module set using the last requested target
 - local module isolation is only auto-cleared when it is safe to do so
 - Relay2 and Relay3 hold timers auto-open on timeout
-- Relay1 hold timer is only available in `mode=2`
+- Relay1 hold timer is only available in `mode=1`
 - mode changes always safe-stop first, then reseed or clear the allowlist according to the new mode
 - managed power and managed feedback are cleared on stop, auth deny, session start, and session stop so stale controller state cannot leak into the next session
 - if a stop happens while the EV remains plugged in, CP normally falls back to connected idle (`B` / `B2`) rather than disconnected `A`; that is still a successful stop with charging disabled
@@ -393,7 +367,7 @@ Useful commands:
 - `CTRL POWER <enable0|1> <voltage_v> <current_a>`
 - `CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1]`
 - `CTRL STOP <soft|hard|clear> [timeout_ms]`
-- `CTRL MODE <mode0|1|2> <plc_id> [controller_id]`
+- `CTRL MODE <mode0|1> <plc_id> [controller_id]`
 - `CTRL OWNERSHIP <connector_id> <module_addr>`
 - `CTRL SAVE`
 - `CTRL STATUS`
@@ -401,13 +375,13 @@ Useful commands:
 Mode tokens accepted by `CTRL MODE`:
 
 - `0`, `standalone`, `local`
-- `1`, `controller`, `controller_supported`, `supported`
-- `2`, `managed`, `controller_managed`, `full`
+- `1`, `external`, `external_controller`, `uart`, `router`, `controller_uart_router`, `uart_router`
+- legacy aliases `2`, `3`, `controller`, `controller_supported`, `managed`, `controller_managed`, `full` are accepted and normalized to `mode=1`
 
 Notes:
 
 - `CTRL ALLOC1` is a convenience helper that allocates the current local module in the current local group with the module max-power limit.
-- `CTRL STOP` is valid in all 3 modes. In `mode=0`, it acts as a direct local operator/debug safe-stop even though no external controller is required.
+- `CTRL STOP` is valid in both modes. In `mode=0`, it acts as a direct local operator/debug safe-stop even though no external controller is required.
 - `CTRL MODE` changes runtime config immediately in RAM; `CTRL SAVE` persists it
 - `CTRL OWNERSHIP` updates connector/module identity in RAM; `CTRL SAVE` persists it
 - `CTRL MODE` does not change `can_node_id`; use the build environment or SW4 setup portal for that
@@ -430,32 +404,19 @@ The portal still accepts the legacy `standalone` argument for backward compatibi
 
 ## Example Harnesses
 
-### `tools/controller_charging_test.py`
+### `tools/mode2_uart_vehicle_charge_test.py`
 
-Single-PLC serial harness with 3 modes:
+Primary end-to-end UART-router harness:
 
-- `--mode standalone`
-  sets `CTRL MODE 0` and mostly observes the local autonomous path
-- `--mode controller`
-  sets `CTRL MODE 1`, keeps heartbeat/auth/allocation alive, and lets the PLC own module targets and Relay1
-- `--mode managed`
-  sets `CTRL MODE 2`, keeps heartbeat/auth/allocation alive, and also sends live `CTRL POWER`, `CTRL FEEDBACK`, and Relay1 commands based on observed HLC demand
-- accepts both numeric and named mode tokens:
-  - `0`, `local`, `standalone`
-  - `1`, `controller`, `supported`
-  - `2`, `managed`, `full`
-- accepts `--plc-id` and `--controller-id` so the serial bootstrap no longer hardcodes `1/1`
+- boots both PLCs into `mode=1`
+- resolves borrower/donor PLC ids dynamically from live `CTRL STATUS`
+- drives controller heartbeat/auth/SLAC/feedback over UART
+- drives module CAN directly, matching the production controller architecture
+- validates precharge, current demand, relay behavior, and session stop on live hardware
 
-### `tools/simple_borrow_test.py` and `tools/timed_borrow_test.py`
+### `tools/mode2_serial_module_transition_test.py`
 
-These are controller-side borrow/release harnesses for multi-PLC testing.
-
-They are not `mode=0` examples. They assume controller-owned operation, and the intended operating model is:
-
-- borrower PLC runs the charging session
-- donor PLC releases leased modules and becomes relay/safety-only while leased out
-- by default, both harnesses now force each PLC into `mode=1` over serial before they start publishing CAN control traffic
-- use `--no-serial-bootstrap` only if the PLCs were already provisioned into controller-supported mode and you intentionally want a CAN-only run
+Focused transition harness for module/relay attach-release behavior in `mode=1`.
 
 ## Validation Snapshot
 
@@ -512,16 +473,8 @@ CTRL OWNERSHIP <connector_id> <module_addr>
 CTRL SAVE
 ```
 
-Controller-managed board:
-
-```text
-CTRL MODE 2 <plc_id> <controller_id>
-CTRL OWNERSHIP <connector_id> <module_addr>
-CTRL SAVE
-```
-
 Commissioning guidance:
 
-- use `controller-plc1` / `controller-plc2` PlatformIO envs when board identity is known at build time
+- use `controller-plc1` / `controller-plc2` or `standalone-plc1` / `standalone-plc2` PlatformIO envs when board identity is known at build time
 - use `CTRL STATUS` after boot to verify mode, CP phase, SLAC gate, energy gate, allowlist size, and controller-managed freshness flags
 - if you need to change runtime config without serial, hold SW4 during boot and use the setup portal

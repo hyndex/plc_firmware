@@ -19,28 +19,26 @@ The source of truth is `src/main.cpp`.
 
 - `mode=0` `Standalone`
   - PLC is autonomous for SLAC start, auth, module targets, HLC power replies, and Relay1.
-- `mode=1` `ControllerSupported`
-  - controller owns heartbeat, auth, SLAC permission, and allocation
-  - PLC still owns module targets, HLC power replies, and Relay1 timing
-- `mode=2` `ControllerManaged`
+- `mode=1` `ExternalController`
   - controller owns heartbeat, auth, SLAC permission, allocation, live power setpoints, live HLC power-side reply data, and may command Relay1 through `CTRL_AUX_RELAY`
   - PLC still owns CP, SLAC, HLC transport, and hard-stop safety overrides
+  - legacy `mode=2` / `mode=3` inputs are normalized to `mode=1`
 
 ### 1.2 Decision Ownership
 
 - CP sampling, SLAC FSM, HLC socket lifecycle: PLC-owned in all modes
-- SLAC permission in `mode=1/2`: controller-owned via `CTRL_SLAC_*`
-- energy permission in `mode=1/2`: controller-owned via heartbeat + auth + non-empty allowlist
-- module allowlist ownership in `mode=1/2`: controller-owned via allocation transaction API
+- SLAC permission in `mode=1`: controller-owned via `CTRL_SLAC_*`
+- energy permission in `mode=1`: controller-owned via heartbeat + auth + non-empty allowlist
+- module allowlist ownership in `mode=1`: controller-owned via allocation transaction API
 - module setpoints:
-  - `mode=0/1`: PLC-owned from HLC demand
-  - `mode=2`: controller-owned through `CTRL_POWER_SETPOINT`
+  - `mode=0`: PLC-owned from HLC demand
+  - `mode=1`: controller-owned through `CTRL_POWER_SETPOINT`
 - HLC power-side reply values:
-  - `mode=0/1`: PLC-owned from local module telemetry
-  - `mode=2`: controller-owned through `CTRL_HLC_FEEDBACK`
+  - `mode=0`: PLC-owned from local module telemetry
+  - `mode=1`: controller-owned through `CTRL_HLC_FEEDBACK`
 - Relay1:
-  - `mode=0/1`: PLC-owned
-  - `mode=2`: controller-commandable through `CTRL_AUX_RELAY` bit 2, but PLC safety logic can still force it open
+  - `mode=0`: PLC-owned
+  - `mode=1`: controller-commandable through `CTRL_AUX_RELAY` bit 2, but PLC safety logic can still force it open
 
 ### 1.3 Persisted PLC Identity
 
@@ -220,7 +218,7 @@ Reaction:
 - resets sequence state if heartbeat had expired or the session marker changed
 - returns `ACK_OK`
 
-In `mode=1/2`, missing heartbeat:
+In `mode=1`, missing heartbeat:
 
 - immediately clears controller SLAC arm/start permission after real heartbeat loss
 - forces safe stop after `3000 ms` if energy path is active
@@ -248,7 +246,7 @@ Reaction:
 
 Invalid auth state returns `ACK_BAD_VALUE`.
 
-HLC authorization behavior in `mode=1/2`:
+HLC authorization behavior in `mode=1`:
 
 - heartbeat missing or `Denied` -> auth response `FAILED`
 - `Pending` -> auth response `Ongoing`
@@ -283,7 +281,7 @@ Reaction:
 All valid commands return `ACK_OK`.
 Invalid command returns `ACK_BAD_VALUE`.
 
-SLAC start gate in `mode=1/2`:
+SLAC start gate in `mode=1`:
 
 - heartbeat must be alive
 - and either `slac_start_latched==true` or `(slac_armed && !expired)`
@@ -377,7 +375,7 @@ Payload:
 - `b3`: enable mask
   - bit0 -> Relay2 command valid
   - bit1 -> Relay3 command valid
-  - bit2 -> Relay1 command valid (`mode=2` only)
+  - bit2 -> Relay1 command valid (`mode=1` only)
 - `b4`: state mask
   - bit0 -> desired Relay2 state
   - bit1 -> desired Relay3 state
@@ -427,7 +425,7 @@ ACK:
 
 ## 4.10 `CTRL_POWER_SETPOINT` (`0x18FF5090`)
 
-Only valid in `mode=2`.
+Only valid in `mode=1`.
 
 Payload:
 
@@ -457,7 +455,7 @@ Managed power freshness timeout:
 
 ## 4.11 `CTRL_HLC_FEEDBACK` (`0x18FF50A0`)
 
-Only valid in `mode=2`.
+Only valid in `mode=1`.
 
 Payload:
 
@@ -577,7 +575,7 @@ Event kind `5` PLC identity tuple payload:
 
 ### 5.8 `PLC_BMS_STATUS` (`0x18FF6080`, every `250 ms` or on change)
 
-This frame is especially important in `mode=2`.
+This frame is especially important in `mode=1`.
 
 - `b2..b3`: latest EV-requested voltage in `0.1 V` units
 - `b4..b5`: latest EV-requested current in `0.1 A` units
@@ -592,33 +590,11 @@ Current stage codes used by firmware:
 - `2`: current demand
 - `3`: power-delivery update / stop edge
 
-The PLC sets this from decoded HLC demand. In `mode=2`, the external controller should treat it as the latest EV request snapshot and answer with fresh `CTRL_POWER_SETPOINT` and `CTRL_HLC_FEEDBACK`.
+The PLC sets this from decoded HLC demand. In `mode=1`, the external controller should treat it as the latest EV request snapshot and answer with fresh `CTRL_POWER_SETPOINT` and `CTRL_HLC_FEEDBACK`.
 
 ## 6. Controller Call Order
 
 ## 6.1 `mode=1` Recommended Flow
-
-1. Send `CTRL_HEARTBEAT` every `<= 400 ms`.
-2. Keep `CTRL_AUTH pending` alive until charging is allowed.
-3. Build the module assignment:
-   - `CTRL_ALLOC_BEGIN`
-   - `CTRL_ALLOC_DATA` for each module
-   - `CTRL_ALLOC_COMMIT`
-4. When policy allows, send `CTRL_SLAC arm` and `CTRL_SLAC start`.
-5. Wait for SLAC match and HLC activity.
-6. Once identity/business logic allows charging, refresh `CTRL_AUTH grant`.
-7. Let the PLC own precharge/current-demand targets and Relay1 behavior.
-8. For stop:
-   - `CTRL_SESSION stop_soft` or `stop_hard`
-   - `CTRL_AUTH deny`
-   - `CTRL_SLAC disarm`
-9. Wait for:
-   - `PLC_SESSION_STATUS.stop_complete=1`
-   - `PLC_POWER_STATUS assigned=0 active=0`
-
-## 6.2 `mode=2` Recommended Flow
-
-Use the same sequence as `mode=1`, plus a managed power loop:
 
 1. Watch `PLC_BMS_STATUS` for the latest EV target.
 2. Send `CTRL_POWER_SETPOINT` at a stable cadence faster than the `1200 ms` timeout.
@@ -629,7 +605,7 @@ Use the same sequence as `mode=1`, plus a managed power loop:
    - `CTRL_HLC_FEEDBACK valid=1 ready=0`
    - open Relay1
 
-In `mode=2`, controller mistakes directly affect what the EV sees, so the power/feedback loop should be treated as a real-time control loop, not a best-effort background update.
+In `mode=1`, controller mistakes directly affect what the EV sees, so the power/feedback loop should be treated as a real-time control loop, not a best-effort background update.
 
 ## 7. Stop, Shutdown, and Release Semantics
 
@@ -684,10 +660,10 @@ Controller-mode watchdogs:
   - timeout ACK emitted
 - Relay1/Relay2/Relay3 hold timeout:
   - relay auto-opens
-- managed power timeout in `mode=2`:
+- managed power timeout in `mode=1`:
   - modules off
   - Relay1 open
-- managed feedback timeout in `mode=2`:
+- managed feedback timeout in `mode=1`:
   - feedback cache cleared
   - HLC responses fall back to not-ready / zero-current behavior
 
@@ -695,21 +671,21 @@ Controller-mode watchdogs:
 
 ### 9.1 PreCharge
 
-- `mode=0/1`
+- `mode=0`
   - PLC applies requested voltage locally
   - current is limited to `2 A`
   - convergence is based on present voltage vs requested voltage
-- `mode=2`
+- `mode=1`
   - PLC publishes demand in `PLC_BMS_STATUS`
   - controller feedback drives `EVSEReady` / present voltage in the response
   - PLC does not compute the managed power response on its own
 
 ### 9.2 CurrentDemand
 
-- `mode=0/1`
+- `mode=0`
   - PLC applies requested voltage/current locally if energy allowed
   - telemetry and limit flags are derived from module status
-- `mode=2`
+- `mode=1`
   - PLC publishes demand in `PLC_BMS_STATUS`
   - controller feedback drives `ready`, present voltage/current, and limit flags
   - PLC does not synthesize those fields from local power telemetry
@@ -722,7 +698,7 @@ All modes:
 - modules off
 - Relay1 open
 
-`mode=2` also clears managed power cache so the next session cannot inherit stale controller intent.
+`mode=1` also clears managed power cache so the next session cannot inherit stale controller intent.
 
 ## 10. Serial Developer API
 
@@ -743,7 +719,7 @@ Commands:
 - `CTRL POWER <enable0|1> <voltage_v> <current_a>`
 - `CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1]`
 - `CTRL STOP <soft|hard|clear> [timeout_ms]`
-- `CTRL MODE <mode0|1|2> <plc_id 1..15> [controller_id 1..15]`
+- `CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]`
 - `CTRL OWNERSHIP <connector_id> <module_addr>`
 - `CTRL SAVE`
 - `CTRL STATUS`
@@ -751,13 +727,13 @@ Commands:
 Mode tokens accepted:
 
 - `0`, `standalone`, `local`
-- `1`, `controller`, `controller_supported`, `supported`
-- `2`, `managed`, `controller_managed`, `full`
+- `2`, `uart`, `router`, `controller_uart_router`, `uart_router`
+- legacy aliases `2`, `3`, `controller`, `controller_supported`, `managed`, `controller_managed`, `full` normalize to `mode=1`
 
 Notes:
 
 - `CTRL ALLOC1` is a convenience helper that allocates the current local module in the current local group with the module max-power limit.
-- `CTRL STOP` is valid in all 3 modes. In `mode=0`, it acts as a direct local operator/debug safe-stop path.
+- `CTRL STOP` is valid in both modes. In `mode=0`, it acts as a direct local operator/debug safe-stop path.
 - `CTRL MODE` changes runtime config in RAM only; `CTRL SAVE` persists it
 - `CTRL RESET` clears controller runtime state and performs safe stop
 - `CTRL STATUS` reports current mode and managed power / feedback freshness flags

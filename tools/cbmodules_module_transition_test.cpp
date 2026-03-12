@@ -808,7 +808,7 @@ private:
     }
 
     void bootstrap_plc(SerialClient& plc, int plc_id) {
-        plc.send_cmd("CTRL MODE 2 " + std::to_string(plc_id) + " " + std::to_string(cfg_.controller_id));
+        plc.send_cmd("CTRL MODE 1 " + std::to_string(plc_id) + " " + std::to_string(cfg_.controller_id));
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
         plc.pump();
         plc.send_cmd("CTRL STOP clear 3000");
@@ -817,7 +817,7 @@ private:
         plc.send_cmd("CTRL RELAY 4 0 0");
         plc.query_status();
         uint32_t last_query_ms = now_ms();
-        wait_until(5000, "PLC failed to enter mode 2", [&] {
+        wait_until(5000, "PLC failed to enter mode 1", [&] {
             plc.pump();
             const uint32_t now = now_ms();
             if (now >= last_query_ms + 750u) {
@@ -825,7 +825,7 @@ private:
                 last_query_ms = now;
             }
             const auto& st = plc.status();
-            return st.valid && st.mode_id == 2 && st.can_stack == 0 && st.module_mgr == 0;
+            return st.valid && st.mode_id == 1 && st.can_stack == 0 && st.module_mgr == 0;
         });
     }
 

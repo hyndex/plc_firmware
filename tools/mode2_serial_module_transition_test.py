@@ -9,7 +9,7 @@ Architecture under test:
   - PLC2 Relay2 is the donor bus contactor for module addr=3/group=2.
 
 Test sequence:
-  1. Put both PLCs into mode 2 and verify `can_stack=0 module_mgr=0`.
+  1. Put both PLCs into mode 1 and verify `can_stack=0 module_mgr=0`.
   2. Discover modules 0x01/group1 and 0x03/group2 directly on CAN.
   3. Soft-reset both modules into known-good defaults.
   4. Close PLC1 Relay1 and run the home module at 500 V for the home window.
@@ -696,8 +696,8 @@ class ModuleTransitionRunner:
     def _bootstrap_plc(self, plc_name: str, plc_id: int) -> PlcStatus:
         self._send(plc_name, "CTRL STATUS")
         status = self._wait_for_status(plc_name)
-        if status.mode_id != 2 or status.controller_id != self.args.controller_id:
-            self._send(plc_name, f"CTRL MODE 2 {plc_id} {self.args.controller_id}")
+        if status.mode_id != 1 or status.controller_id != self.args.controller_id:
+            self._send(plc_name, f"CTRL MODE 1 {plc_id} {self.args.controller_id}")
             time.sleep(0.3)
         self._send(plc_name, "CTRL STOP clear 3000")
         ack = self._wait_for_ack(plc_name, ACK_CMD_STOP)
@@ -707,8 +707,8 @@ class ModuleTransitionRunner:
         self._set_relay(plc_name, 2, False, 0)
         self._set_relay(plc_name, 3, False, 0)
         status = self._query_status(plc_name)
-        if status.mode_id != 2:
-            raise RuntimeError(f"{plc_name} did not enter mode 2")
+        if status.mode_id != 1:
+            raise RuntimeError(f"{plc_name} did not enter mode 1")
         if status.can_stack != 0 or status.module_mgr != 0:
             raise RuntimeError(
                 f"{plc_name} mode2 routing mismatch: can_stack={status.can_stack} module_mgr={status.module_mgr}"
