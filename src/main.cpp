@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <MFRC522.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <esp_system.h>
@@ -215,6 +216,16 @@ constexpr int CAN_SPI_MISO = 21;
 constexpr int CAN_SPI_MOSI = 47;
 constexpr uint32_t CAN_SPI_HZ = 8000000UL;
 constexpr uint32_t CAN_BITRATE_KBPS = 125;
+constexpr int RFID_SS_PIN = 18;
+constexpr int RFID_RST_PIN = 17;
+constexpr uint32_t RFID_SPI_HZ = 1000000UL;
+constexpr uint32_t RFID_POLL_MS = 30u;
+constexpr uint32_t RFID_CARD_RELEASE_MS = 350u;
+constexpr uint32_t RFID_REINIT_BACKOFF_MS = 5000u;
+constexpr uint32_t RFID_KEEPALIVE_MS = 1000u;
+constexpr uint32_t RFID_MISSING_LOG_MS = 30000u;
+constexpr size_t RFID_MAX_UID_BYTES = 10u;
+constexpr uint8_t PLC_IDENTITY_EVENT_RFID = 6u;
 
 constexpr uint32_t CFG_MAGIC = 0x4342504Cu; // "CBPL"
 constexpr uint16_t CFG_VERSION = 4u;
@@ -363,7 +374,7 @@ constexpr uint8_t ACK_BAD_SEQ = 4u;
 constexpr uint8_t ACK_BAD_STATE = 5u;
 constexpr uint8_t ACK_BAD_VALUE = 6u;
 
-SPIClass g_can_spi(FSPI);
+SPIClass& g_can_spi = SPI;
 PCA9555 g_relay_expander;
 
 extern SemaphoreHandle_t g_can_mutex;
@@ -1286,12 +1297,29 @@ struct SerialStatusTxSchedule {
     bool local_identity_sent{false};
 };
 
+struct RfidRuntimeState {
+    bool initialized{false};
+    bool reader_present{false};
+    bool card_latched{false};
+    uint8_t event_id{0u};
+    size_t uid_len{0u};
+    std::array<uint8_t, RFID_MAX_UID_BYTES> uid{};
+    uint32_t next_poll_ms{0u};
+    uint32_t last_present_ms{0u};
+    uint32_t last_good_ms{0u};
+    uint32_t next_keepalive_ms{0u};
+    uint32_t next_reinit_ms{0u};
+    uint32_t next_missing_log_ms{0u};
+};
+
 RuntimeConfig g_runtime_cfg{};
 ControllerRuntimeState g_ctrl{};
 ControllerManagedPowerState g_ctrl_power{};
 ControllerManagedFeedbackState g_ctrl_feedback{};
 ControllerStatusTxSchedule g_ctrl_tx{};
 SerialStatusTxSchedule g_serial_tx{};
+MFRC522 g_rfid(RFID_SS_PIN, RFID_RST_PIN);
+RfidRuntimeState g_rfid_state{};
 Preferences g_cfg_prefs{};
 std::string g_local_group_id = "PLC_GROUP_1";
 std::string g_local_module_id = "PLC1_MXR_01";
@@ -3399,6 +3427,224 @@ void controller_publish_emaid(const uint8_t* data, size_t len) {
     controller_publish_identity_segment(4u, data, len, 4u);
     serial_print_identity("EMAID", data, len);
     serial_tx_identity_hex("EMAID", data, len);
+}
+
+std::string uppercase_hex_token(const uint8_t* data, size_t len) {
+    static constexpr char kHex[] = "0123456789ABCDEF";
+    std::string token;
+    token.reserve(len * 2u);
+    for (size_t i = 0; i < len; ++i) {
+        const uint8_t byte = data[i];
+        token.push_back(kHex[(byte >> 4u) & 0x0Fu]);
+        token.push_back(kHex[byte & 0x0Fu]);
+    }
+    return token;
+}
+
+class ScopedCanBusLock {
+public:
+    explicit ScopedCanBusLock(uint32_t timeout_ms) {
+        if (!g_can_mutex) {
+            taken_ = true;
+            return;
+        }
+        taken_ = xSemaphoreTake(g_can_mutex, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
+    }
+
+    ~ScopedCanBusLock() {
+        if (taken_ && g_can_mutex) {
+            xSemaphoreGive(g_can_mutex);
+        }
+    }
+
+    bool locked() const {
+        return taken_;
+    }
+
+private:
+    bool taken_{false};
+};
+
+void rfid_log_missing(const char* reason, uint32_t now_ms) {
+    if (static_cast<int32_t>(now_ms - g_rfid_state.next_missing_log_ms) < 0) {
+        return;
+    }
+    g_rfid_state.next_missing_log_ms = now_ms + RFID_MISSING_LOG_MS;
+    Serial.printf("[RFID] reader unavailable (%s) ss=%d rst=%d sck=%d miso=%d mosi=%d\n",
+                  reason ? reason : "unknown",
+                  RFID_SS_PIN,
+                  RFID_RST_PIN,
+                  CAN_SPI_SCK,
+                  CAN_SPI_MISO,
+                  CAN_SPI_MOSI);
+}
+
+uint8_t rfid_next_event_id() {
+    g_rfid_state.event_id = static_cast<uint8_t>(g_rfid_state.event_id + 1u);
+    if (g_rfid_state.event_id == 0u) {
+        g_rfid_state.event_id = 1u;
+    }
+    return g_rfid_state.event_id;
+}
+
+bool rfid_probe_locked(uint32_t now_ms, const char* reason) {
+    const uint8_t version = g_rfid.PCD_ReadRegister(MFRC522::VersionReg);
+    if (version == 0x00u || version == 0xFFu) {
+        g_rfid_state.reader_present = false;
+        rfid_log_missing(reason, now_ms);
+        return false;
+    }
+    g_rfid.PCD_SetAntennaGain(MFRC522::RxGain_max);
+    g_rfid.PCD_AntennaOn();
+    g_rfid_state.reader_present = true;
+    g_rfid_state.last_good_ms = now_ms;
+    return true;
+}
+
+void rfid_publish_tap(const uint8_t* uid, size_t uid_len, uint32_t now_ms) {
+    if (!uid || uid_len == 0u || uid_len > RFID_MAX_UID_BYTES) {
+        return;
+    }
+    const uint8_t event_id = rfid_next_event_id();
+    const std::string token = uppercase_hex_token(uid, uid_len);
+    if (mode_uart_status_stream_active()) {
+        Serial.printf("[SERCTRL] EVT RFID plc_id=%u connector_id=%u token=%s event=%u\n",
+                      static_cast<unsigned>(g_runtime_cfg.plc_id),
+                      static_cast<unsigned>(g_runtime_cfg.connector_id),
+                      token.c_str(),
+                      static_cast<unsigned>(event_id));
+    } else {
+        Serial.printf("[RFID] tap plc=%u connector=%u token=%s event=%u\n",
+                      static_cast<unsigned>(g_runtime_cfg.plc_id),
+                      static_cast<unsigned>(g_runtime_cfg.connector_id),
+                      token.c_str(),
+                      static_cast<unsigned>(event_id));
+    }
+    if (mode_uses_plc_can_stack()) {
+        std::array<uint8_t, RFID_MAX_UID_BYTES + 1u> payload{};
+        payload[0] = static_cast<uint8_t>(uid_len);
+        memcpy(payload.data() + 1u, uid, uid_len);
+        controller_publish_identity_segment(PLC_IDENTITY_EVENT_RFID, payload.data(), uid_len + 1u, event_id);
+    }
+}
+
+void rfid_mark_card_released() {
+    g_rfid_state.card_latched = false;
+    g_rfid_state.uid_len = 0u;
+    g_rfid_state.uid.fill(0u);
+}
+
+void rfid_init_device(uint32_t now_ms, const char* reason) {
+    ScopedCanBusLock guard(20u);
+    if (!guard.locked()) {
+        return;
+    }
+
+    pinMode(CAN_CS_PIN, OUTPUT);
+    digitalWrite(CAN_CS_PIN, HIGH);
+    pinMode(RFID_SS_PIN, OUTPUT);
+    digitalWrite(RFID_SS_PIN, HIGH);
+    pinMode(RFID_RST_PIN, OUTPUT);
+    digitalWrite(RFID_RST_PIN, LOW);
+    delay(2);
+    digitalWrite(RFID_RST_PIN, HIGH);
+
+    SPI.begin(CAN_SPI_SCK, CAN_SPI_MISO, CAN_SPI_MOSI, RFID_SS_PIN);
+    SPI.setFrequency(RFID_SPI_HZ);
+    SPI.setDataMode(SPI_MODE0);
+
+    g_rfid.PCD_Init(RFID_SS_PIN, RFID_RST_PIN);
+    delay(10);
+    g_rfid_state.initialized = true;
+    g_rfid_state.next_reinit_ms = now_ms + RFID_REINIT_BACKOFF_MS;
+    g_rfid_state.next_keepalive_ms = now_ms + RFID_KEEPALIVE_MS;
+    if (rfid_probe_locked(now_ms, reason)) {
+        Serial.printf("[RFID] ready ss=%d rst=%d event_mode=%s\n",
+                      RFID_SS_PIN,
+                      RFID_RST_PIN,
+                      mode_uart_status_stream_active() ? "uart" : "can");
+    }
+}
+
+void rfid_keepalive(uint32_t now_ms) {
+    if (!g_rfid_state.initialized || !g_rfid_state.reader_present ||
+        static_cast<int32_t>(now_ms - g_rfid_state.next_keepalive_ms) < 0) {
+        return;
+    }
+
+    g_rfid_state.next_keepalive_ms = now_ms + RFID_KEEPALIVE_MS;
+    ScopedCanBusLock guard(5u);
+    if (!guard.locked()) {
+        return;
+    }
+    const uint8_t version = g_rfid.PCD_ReadRegister(MFRC522::VersionReg);
+    if (version == 0x00u || version == 0xFFu) {
+        g_rfid_state.reader_present = false;
+        g_rfid_state.next_reinit_ms = now_ms + RFID_REINIT_BACKOFF_MS;
+        rfid_log_missing("comm_lost", now_ms);
+        rfid_mark_card_released();
+        return;
+    }
+    g_rfid_state.last_good_ms = now_ms;
+}
+
+void rfid_poll(uint32_t now_ms) {
+    if (static_cast<int32_t>(now_ms - g_rfid_state.next_poll_ms) < 0) {
+        return;
+    }
+    g_rfid_state.next_poll_ms = now_ms + RFID_POLL_MS;
+
+    if (!g_rfid_state.initialized ||
+        (!g_rfid_state.reader_present && static_cast<int32_t>(now_ms - g_rfid_state.next_reinit_ms) >= 0)) {
+        rfid_init_device(now_ms, g_rfid_state.initialized ? "retry" : "boot");
+    }
+
+    rfid_keepalive(now_ms);
+    if (!g_rfid_state.reader_present) {
+        return;
+    }
+
+    ScopedCanBusLock guard(5u);
+    if (!guard.locked()) {
+        return;
+    }
+
+    bool present = g_rfid.PICC_IsNewCardPresent();
+    if (!present) {
+        byte atqa[2] = {0u, 0u};
+        byte atqa_len = sizeof(atqa);
+        present = g_rfid.PICC_WakeupA(atqa, &atqa_len) == MFRC522::STATUS_OK;
+    }
+
+    if (!present) {
+        if (g_rfid_state.card_latched &&
+            static_cast<int32_t>(now_ms - (g_rfid_state.last_present_ms + RFID_CARD_RELEASE_MS)) >= 0) {
+            rfid_mark_card_released();
+        }
+        return;
+    }
+
+    g_rfid_state.last_present_ms = now_ms;
+    if (!g_rfid.PICC_ReadCardSerial()) {
+        return;
+    }
+
+    size_t uid_len = std::min<size_t>(g_rfid.uid.size, RFID_MAX_UID_BYTES);
+    std::array<uint8_t, RFID_MAX_UID_BYTES> uid{};
+    memcpy(uid.data(), g_rfid.uid.uidByte, uid_len);
+    g_rfid.PICC_HaltA();
+    g_rfid.PCD_StopCrypto1();
+
+    const bool same_uid = g_rfid_state.card_latched && uid_len == g_rfid_state.uid_len &&
+                          memcmp(uid.data(), g_rfid_state.uid.data(), uid_len) == 0;
+    if (same_uid) {
+        return;
+    }
+
+    g_rfid_state.card_latched = true;
+    g_rfid_state.uid_len = uid_len;
+    g_rfid_state.uid = uid;
+    rfid_publish_tap(uid.data(), uid_len, now_ms);
 }
 
 bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, const char* reason) {
@@ -6316,6 +6562,7 @@ void setup() {
     }
     request_modules_off("Boot");
     controller_publish_local_identity_once();
+    rfid_init_device(millis(), "boot");
 
     (void)try_init_qca_and_fsm(millis());
 }
@@ -6342,6 +6589,7 @@ void loop() {
     if (mode_uses_plc_module_manager()) {
         service_module_manager_once(now_ms);
     }
+    rfid_poll(now_ms);
     service_lwip_tx_queue_once();
     const bool hlc_priority = g_session_started || g_hlc_active || cp_connected(g_cp_state);
     delay(hlc_priority ? 1 : 5);

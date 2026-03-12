@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 from collections import deque
 import datetime as dt
+import glob
 import json
 import math
 import os
@@ -68,6 +69,13 @@ try:
     )
 except Exception as exc:
     print(f"[ERR] failed importing transition-test helpers: {exc}", file=sys.stderr)
+    sys.exit(2)
+
+try:
+    import serial  # type: ignore
+    from serial.tools import list_ports  # type: ignore
+except Exception as exc:
+    print(f"[ERR] pyserial import failed: {exc}", file=sys.stderr)
     sys.exit(2)
 
 ACK_CMD_HEARTBEAT = 0x10
@@ -139,6 +147,205 @@ def normalize_stage_name(raw: str) -> str:
     if text == "currentdemand":
         return "current_demand"
     return text
+
+
+def parse_status_line(line: str) -> Optional[PlcStatus]:
+    match = STATUS_RE.search(line)
+    if not match:
+        return None
+    return PlcStatus(
+        mode_id=int(match.group(1)),
+        mode_name=match.group(2),
+        plc_id=int(match.group(3)),
+        connector_id=int(match.group(4)),
+        controller_id=int(match.group(5)),
+        module_addr=int(match.group(6), 16),
+        local_group=int(match.group(7)),
+        module_id=match.group(8),
+        can_stack=int(match.group(9)),
+        module_mgr=int(match.group(10)),
+        cp=match.group(11),
+        duty=int(match.group(12)),
+        relay1=int(match.group(19)),
+        relay2=int(match.group(20)),
+        relay3=int(match.group(21)),
+        alloc_sz=int(match.group(22)),
+    )
+
+
+def parse_input_mode_arg(raw: str) -> Optional[int]:
+    token = str(raw).strip().lower()
+    if token in ("", "auto", "preserve", "detected", "live"):
+        return None
+    try:
+        value = int(token, 0)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid input mode {raw!r}") from exc
+    if value not in (1, 2, 3):
+        raise argparse.ArgumentTypeError("input mode must be 1, 2, 3, or 'auto'")
+    return value
+
+
+@dataclass
+class SerialProbeResult:
+    path: str
+    real_path: str
+    status: PlcStatus
+
+
+def append_serial_candidate(candidates: list[str], seen: set[str], path: str) -> None:
+    if not path:
+        return
+    expanded = os.path.realpath(path)
+    chosen = path
+    if not os.path.exists(chosen) and expanded and os.path.exists(expanded):
+        chosen = expanded
+    if not os.path.exists(chosen):
+        return
+    key = os.path.realpath(chosen)
+    if key in seen:
+        return
+    seen.add(key)
+    candidates.append(chosen)
+
+
+def collect_serial_candidates() -> list[str]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    by_id_dir = Path("/dev/serial/by-id")
+    if by_id_dir.is_dir():
+        for entry in sorted(by_id_dir.iterdir()):
+            append_serial_candidate(candidates, seen, str(entry))
+    for pattern in ("/dev/ttyACM*", "/dev/ttyUSB*"):
+        for path in sorted(glob.glob(pattern)):
+            append_serial_candidate(candidates, seen, path)
+    return candidates
+
+
+def probe_serial_status(port: str, baud: int, timeout_s: float) -> Optional[SerialProbeResult]:
+    kwargs = {
+        "port": port,
+        "baudrate": baud,
+        "timeout": 0.05,
+        "write_timeout": 0.5,
+    }
+    ser = None
+    try:
+        try:
+            ser = serial.Serial(exclusive=True, **kwargs)
+        except TypeError:
+            ser = serial.Serial(**kwargs)
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
+        deadline = time.time() + max(0.5, timeout_s)
+        next_status = 0.0
+        while time.time() < deadline:
+            now = time.time()
+            if now >= next_status:
+                ser.write(b"CTRL STATUS\n")
+                ser.flush()
+                next_status = now + 0.25
+            raw = ser.readline()
+            if not raw:
+                continue
+            line = raw.decode(errors="ignore").strip()
+            status = parse_status_line(line)
+            if status is None:
+                continue
+            return SerialProbeResult(path=port, real_path=os.path.realpath(port), status=status)
+    except Exception:
+        return None
+    finally:
+        if ser is not None:
+            try:
+                ser.close()
+            except Exception:
+                pass
+    return None
+
+
+def resolve_uart_ports(args: argparse.Namespace) -> None:
+    manual_ports = [args.borrower_port, args.donor_port]
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for port in manual_ports:
+        if port and port.lower() != "auto":
+            append_serial_candidate(candidates, seen, port)
+    for port in collect_serial_candidates():
+        append_serial_candidate(candidates, seen, port)
+    if not candidates:
+        raise RuntimeError("no candidate PLC serial ports found for auto-discovery")
+
+    results: list[SerialProbeResult] = []
+    for candidate in candidates:
+        result = probe_serial_status(candidate, args.baud, args.discovery_timeout_s)
+        if result is not None:
+            results.append(result)
+    if not results:
+        raise RuntimeError("unable to read [SERCTRL] STATUS from any candidate PLC serial port")
+
+    borrower: Optional[SerialProbeResult] = None
+    donor: Optional[SerialProbeResult] = None
+
+    if args.borrower_plc_id is not None:
+        borrower = next((item for item in results if item.status.plc_id == args.borrower_plc_id), None)
+    if args.donor_plc_id is not None:
+        donor = next((item for item in results if item.status.plc_id == args.donor_plc_id), None)
+
+    if borrower is None:
+        borrower = next(
+            (
+                item
+                for item in results
+                if item.status.module_addr == args.home_addr and item.status.local_group == args.home_group
+            ),
+            None,
+        )
+    if donor is None:
+        donor = next(
+            (
+                item
+                for item in results
+                if item.status.module_addr == args.donor_addr and item.status.local_group == args.donor_group
+            ),
+            None,
+        )
+
+    if borrower is None:
+        borrower = next((item for item in results if item.status.connector_id == 1), None)
+    if donor is None:
+        donor = next((item for item in results if item.status.connector_id == 2), None)
+
+    if borrower is None or donor is None:
+        discovered = ", ".join(
+            f"{item.path}:plc_id={item.status.plc_id},connector_id={item.status.connector_id},"
+            f"module=0x{item.status.module_addr:02X}/g{item.status.local_group}"
+            for item in results
+        )
+        raise RuntimeError(f"failed to resolve borrower/donor PLC ports from discovery results: {discovered}")
+    if borrower.real_path == donor.real_path:
+        raise RuntimeError(
+            f"borrower and donor resolved to the same serial endpoint {borrower.path} "
+            f"(plc_id={borrower.status.plc_id})"
+        )
+
+    args.borrower_port = borrower.path
+    args.donor_port = donor.path
+    if args.borrower_plc_id is None:
+        args.borrower_plc_id = borrower.status.plc_id
+    if args.donor_plc_id is None:
+        args.donor_plc_id = donor.status.plc_id
+
+    print(
+        "[DISCOVERY] borrower="
+        f"{args.borrower_port} plc_id={borrower.status.plc_id} connector_id={borrower.status.connector_id} "
+        f"module=0x{borrower.status.module_addr:02X}/g{borrower.status.local_group}; "
+        "donor="
+        f"{args.donor_port} plc_id={donor.status.plc_id} connector_id={donor.status.connector_id} "
+        f"module=0x{donor.status.module_addr:02X}/g{donor.status.local_group}",
+        flush=True,
+    )
 
 
 @dataclass
@@ -293,27 +500,7 @@ class VehicleChargeRunner:
         return self.donor_link if plc_name == "donor" else self.borrower_link
 
     def _parse_status(self, line: str) -> Optional[PlcStatus]:
-        match = STATUS_RE.search(line)
-        if not match:
-            return None
-        return PlcStatus(
-            mode_id=int(match.group(1)),
-            mode_name=match.group(2),
-            plc_id=int(match.group(3)),
-            connector_id=int(match.group(4)),
-            controller_id=int(match.group(5)),
-            module_addr=int(match.group(6), 16),
-            local_group=int(match.group(7)),
-            module_id=match.group(8),
-            can_stack=int(match.group(9)),
-            module_mgr=int(match.group(10)),
-            cp=match.group(11),
-            duty=int(match.group(12)),
-            relay1=int(match.group(19)),
-            relay2=int(match.group(20)),
-            relay3=int(match.group(21)),
-            alloc_sz=int(match.group(22)),
-        )
+        return parse_status_line(line)
 
     def _parse_line_common(self, plc_name: str, line: str) -> None:
         state, lock = self._state(plc_name)
@@ -1680,12 +1867,12 @@ class VehicleChargeRunner:
 def parse_args() -> argparse.Namespace:
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     parser = argparse.ArgumentParser(description="Live vehicle mode-2 UART-router charge test with direct Maxwell CAN")
-    parser.add_argument("--borrower-port", default="/dev/ttyACM0")
-    parser.add_argument("--donor-port", default="/dev/ttyACM1")
+    parser.add_argument("--borrower-port", default="auto")
+    parser.add_argument("--donor-port", default="auto")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--can-iface", default="can0")
-    parser.add_argument("--borrower-plc-id", type=int, default=1)
-    parser.add_argument("--donor-plc-id", type=int, default=2)
+    parser.add_argument("--borrower-plc-id", type=int, default=None)
+    parser.add_argument("--donor-plc-id", type=int, default=None)
     parser.add_argument("--controller-id", type=int, default=1)
     parser.add_argument("--borrower-power-relay", type=int, default=1)
     parser.add_argument("--donor-bridge-relay", type=int, default=2)
@@ -1693,7 +1880,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--home-group", type=int, default=1)
     parser.add_argument("--donor-addr", type=int, default=3)
     parser.add_argument("--donor-group", type=int, default=2)
-    parser.add_argument("--input-mode", type=int, default=3)
+    parser.add_argument("--input-mode", type=parse_input_mode_arg, default=None)
     parser.add_argument("--target-voltage-v", type=float, default=500.0)
     parser.add_argument("--precharge-current-a", type=float, default=2.0)
     parser.add_argument("--single-home-current-a", type=float, default=40.0)
@@ -1706,6 +1893,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--post-release-duration-s", type=int, default=40)
     parser.add_argument("--session-start-timeout-s", type=float, default=120.0)
     parser.add_argument("--max-total-s", type=float, default=240.0)
+    parser.add_argument("--discovery-timeout-s", type=float, default=1.5)
     parser.add_argument("--attach-timeout-s", type=float, default=25.0)
     parser.add_argument("--release-timeout-s", type=float, default=25.0)
     parser.add_argument("--share-ramp-s", type=float, default=3.0)
@@ -1767,7 +1955,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    runner = VehicleChargeRunner(parse_args())
+    args = parse_args()
+    resolve_uart_ports(args)
+    runner = VehicleChargeRunner(args)
     return runner.run()
 
 

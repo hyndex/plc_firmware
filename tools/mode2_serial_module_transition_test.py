@@ -40,6 +40,7 @@ import math
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -362,7 +363,41 @@ class DirectMaxwellCan:
         if self.log_fp:
             self.log_fp.write(f"{ts()} {line}\n")
 
-    def scan_expected(self, home_addr: int, home_group: int, donor_addr: int, donor_group: int) -> tuple[mxr.ModuleInfo, mxr.ModuleInfo]:
+    def _module_responding(self, module: mxr.ModuleInfo) -> bool:
+        last_seen = getattr(module, "last_seen", 0.0) or 0.0
+        return (
+            last_seen > 0.0
+            and (
+                module.status is not None
+                or module.voltage_v is not None
+                or module.current_a is not None
+                or module.current_limit_point is not None
+            )
+        )
+
+    def _probe_expected(self, address: int, group: int, response_window_s: float = 0.8) -> Optional[mxr.ModuleInfo]:
+        if not self.sock:
+            raise RuntimeError("CAN socket not open")
+        module = mxr.ModuleInfo(address=address, group=group)
+        mxr.refresh_module_details(self.sock, module, response_window_s=response_window_s)
+        if not self._module_responding(module):
+            return None
+        self._log(
+            f"PROBE addr={module.address} grp={module.group} V={module.voltage_v} I={module.current_a} "
+            f"Ilim={module.current_limit_point} Pin={module.input_power_w} "
+            f"mode={module.input_mode if module.input_mode is not None else 'n/a'} "
+            f"rated={module.rated_current_a if module.rated_current_a is not None else 'n/a'} "
+            f"{module_status_text(module)}"
+        )
+        return module
+
+    def _scan_known_modules(
+        self,
+        home_addr: int,
+        home_group: int,
+        donor_addr: int,
+        donor_group: int,
+    ) -> tuple[Optional[mxr.ModuleInfo], Optional[mxr.ModuleInfo], list[tuple[int, int]]]:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
         mods = mxr.scan_modules(
@@ -374,16 +409,62 @@ class DirectMaxwellCan:
             listen_s=0.4,
         )
         found = {(mod.address, mod.group): mod for mod in mods}
-        home = found.get((home_addr, home_group))
-        donor = found.get((donor_addr, donor_group))
-        if home is None or donor is None:
-            raise RuntimeError(
-                f"module scan incomplete: found={sorted(found.keys())} expected={(home_addr, home_group)} and {(donor_addr, donor_group)}"
-            )
-        self._log(
-            f"SCAN found home addr={home.address} grp={home.group}; donor addr={donor.address} grp={donor.group}"
+        return found.get((home_addr, home_group)), found.get((donor_addr, donor_group)), sorted(found.keys())
+
+    def recover_interface(self) -> bool:
+        commands = [
+            ["sudo", "-n", "ip", "link", "set", self.iface, "down"],
+            ["sudo", "-n", "ip", "link", "set", self.iface, "type", "can", "bitrate", "125000", "triple-sampling", "on", "restart-ms", "100"],
+            ["sudo", "-n", "ip", "link", "set", self.iface, "up"],
+        ]
+
+        def run_all(cmds: list[list[str]]) -> bool:
+            for cmd in cmds:
+                proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+                if proc.returncode != 0:
+                    self._log(
+                        f"CAN_RECOVER fail cmd={' '.join(cmd)} rc={proc.returncode} "
+                        f"stderr={proc.stderr.strip()}"
+                    )
+                    return False
+            return True
+
+        self._log(f"CAN_RECOVER begin iface={self.iface}")
+        self.close()
+        ok = run_all(commands)
+        if not ok:
+            commands = [cmd[2:] if cmd[:2] == ["sudo", "-n"] else cmd for cmd in commands]
+            ok = run_all(commands)
+        if not ok:
+            return False
+        self.open()
+        self._log(f"CAN_RECOVER done iface={self.iface}")
+        return True
+
+    def scan_expected(self, home_addr: int, home_group: int, donor_addr: int, donor_group: int) -> tuple[mxr.ModuleInfo, mxr.ModuleInfo]:
+        if not self.sock:
+            raise RuntimeError("CAN socket not open")
+        for attempt in range(2):
+            home, donor, found_keys = self._scan_known_modules(home_addr, home_group, donor_addr, donor_group)
+            if home is None:
+                home = self._probe_expected(home_addr, home_group)
+            if donor is None:
+                donor = self._probe_expected(donor_addr, donor_group)
+            if home is not None and donor is not None:
+                self._log(
+                    f"SCAN found home addr={home.address} grp={home.group}; donor addr={donor.address} grp={donor.group}"
+                )
+                return home, donor
+            if attempt == 0:
+                self._log(
+                    f"SCAN incomplete found={found_keys} expected={(home_addr, home_group)} and {(donor_addr, donor_group)}; "
+                    "attempting CAN interface recovery"
+                )
+                if not self.recover_interface():
+                    break
+        raise RuntimeError(
+            f"module scan incomplete: found={found_keys} expected={(home_addr, home_group)} and {(donor_addr, donor_group)}"
         )
-        return home, donor
 
     def refresh(self, module: mxr.ModuleInfo, response_window_s: float) -> None:
         if not self.sock:
@@ -391,14 +472,24 @@ class DirectMaxwellCan:
         mxr.refresh_module_details(self.sock, module, response_window_s=response_window_s)
         self._log(
             f"TEL addr={module.address} grp={module.group} V={module.voltage_v} I={module.current_a} "
-            f"Ilim={module.current_limit_point} Pin={module.input_power_w} {module_status_text(module)}"
+            f"Ilim={module.current_limit_point} Pin={module.input_power_w} "
+            f"mode={module.input_mode if module.input_mode is not None else 'n/a'} "
+            f"rated={module.rated_current_a if module.rated_current_a is not None else 'n/a'} "
+            f"{module_status_text(module)}"
         )
 
-    def soft_reset(self, module: mxr.ModuleInfo, input_mode: int = 3) -> None:
+    def soft_reset(self, module: mxr.ModuleInfo, input_mode: Optional[int] = None) -> None:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
-        self._log(f"RESET addr={module.address} grp={module.group} input_mode={input_mode}")
-        mxr.soft_reset_defaults(self.sock, module, input_mode=input_mode)
+        desired_mode = input_mode if input_mode in {1, 2, 3} else module.input_mode
+        if desired_mode not in {1, 2, 3}:
+            desired_mode = 3
+        # Clear both absolute and ratio current paths before applying defaults so a prior
+        # absolute-current run cannot leak stale setpoints into the next session.
+        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, 0)
+        time.sleep(0.02)
+        self._log(f"RESET addr={module.address} grp={module.group} input_mode={desired_mode}")
+        mxr.soft_reset_defaults(self.sock, module, input_mode=desired_mode)
         self.refresh(module, response_window_s=0.4)
 
     def set_output(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> None:
