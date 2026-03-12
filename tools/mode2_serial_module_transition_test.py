@@ -210,6 +210,7 @@ class SerialLink:
         self.reader_thread: Optional[threading.Thread] = None
         self.reader_error: Optional[str] = None
         self.write_lock = threading.Lock()
+        self.reconnect_lock = threading.Lock()
         self.last_write_ts = 0.0
         self.pending_status_line = ""
 
@@ -237,28 +238,33 @@ class SerialLink:
             self.ser = None
 
     def _reconnect(self, reason: str, timeout_s: float = 12.0) -> bool:
-        deadline = time.time() + max(1.0, timeout_s)
-        last_exc: Optional[Exception] = None
-        self._log(f"{ts()} [HOST] reconnecting {self.port}: {reason}")
-        while not self.stop_event.is_set() and time.time() < deadline:
-            try:
-                ser = self._build_serial()
-            except Exception as exc:
-                last_exc = exc
-                time.sleep(0.25)
-                continue
+        with self.reconnect_lock:
+            deadline = time.time() + max(1.0, timeout_s)
+            last_exc: Optional[Exception] = None
+            self._log(f"{ts()} [HOST] reconnecting {self.port}: {reason}")
             with self.write_lock:
                 self._close_serial_locked()
-                self.ser = ser
                 self.last_write_ts = 0.0
-            self.reader_error = None
-            self.pending_status_line = ""
-            self._log(f"{ts()} [HOST] reconnected {self.port}")
-            return True
-        detail = f"{reason}: {last_exc}" if last_exc else reason
-        self.reader_error = f"reconnect failed on {self.port}: {detail}"
-        self._log(f"{ts()} [HOST] {self.reader_error}")
-        return False
+            time.sleep(0.1)
+            while not self.stop_event.is_set() and time.time() < deadline:
+                try:
+                    ser = self._build_serial()
+                except Exception as exc:
+                    last_exc = exc
+                    time.sleep(0.25)
+                    continue
+                with self.write_lock:
+                    self._close_serial_locked()
+                    self.ser = ser
+                    self.last_write_ts = 0.0
+                self.reader_error = None
+                self.pending_status_line = ""
+                self._log(f"{ts()} [HOST] reconnected {self.port}")
+                return True
+            detail = f"{reason}: {last_exc}" if last_exc else reason
+            self.reader_error = f"reconnect failed on {self.port}: {detail}"
+            self._log(f"{ts()} [HOST] {self.reader_error}")
+            return False
 
     def open(self) -> None:
         ensure_parent(self.log_file)

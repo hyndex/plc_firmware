@@ -8,7 +8,9 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
 #include <WiFi.h>
+#include <esp_heap_caps.h>
 
 #include <array>
 #include <algorithm>
@@ -191,13 +193,17 @@ constexpr uint16_t PLC_PEER_MAC_DEFAULT[3] = {0x00B0, 0x5200, 0x0001};
 constexpr char ISO_EVSE_ID[] = "IN*JPE*E000100010001";
 constexpr float PRECHARGE_CURRENT_LIMIT_A = 2.0f;
 constexpr float PRECHARGE_VOLTAGE_TOLERANCE_V = 20.0f;
+constexpr float PRECHARGE_START_ACCEPT_MIN_RATIO = 0.05f;
+constexpr float PRECHARGE_START_ACCEPT_MIN_V = 5.0f;
+constexpr float PRECHARGE_START_ACCEPT_MIN_CURRENT_A = 0.50f;
+constexpr uint32_t PRECHARGE_RELAX_MIN_COUNT = 2u;
 constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_TIMEOUT_MS = 120u;
 constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_POLL_MS = 5u;
+constexpr uint32_t HLC_UNEXPECTED_DISCONNECT_HOLD_MS = 10000u;
 constexpr float MODULE_MAX_VOLTAGE_V = 1000.0f;
 constexpr float MODULE_MAX_CURRENT_A = 100.0f;
 constexpr float MODULE_MAX_POWER_KW = 30.0f;
 constexpr uint32_t MODULE_ALLOWLIST_LEASE_MS = 3000;
-constexpr uint32_t REMOTE_ALLOC_DISCOVERY_RETRY_MS = 1500;
 constexpr uint32_t MODULE_TELEMETRY_FRESH_MS = 10000;
 constexpr uint32_t MODULE_RUNTIME_LOG_INTERVAL_MS = 1000;
 constexpr uint32_t MODULE_SERVICE_INTERVAL_MS = 10;
@@ -226,8 +232,6 @@ constexpr uint32_t RFID_REINIT_BACKOFF_MS = 5000u;
 constexpr uint32_t RFID_KEEPALIVE_MS = 1000u;
 constexpr uint32_t RFID_MISSING_LOG_MS = 30000u;
 constexpr size_t RFID_MAX_UID_BYTES = 10u;
-constexpr uint8_t PLC_IDENTITY_EVENT_RFID = 6u;
-
 struct RfidPinMap {
     const char* name;
     int ss_pin;
@@ -240,7 +244,7 @@ constexpr std::array<RfidPinMap, 2> RFID_PIN_MAPS{{
 }};
 
 constexpr uint32_t CFG_MAGIC = 0x4342504Cu; // "CBPL"
-constexpr uint16_t CFG_VERSION = 4u;
+constexpr uint16_t CFG_VERSION = 5u;
 
 #ifndef CBPLC_DEFAULT_MODE
 #ifdef CBPLC_DEFAULT_STANDALONE_MODE
@@ -292,12 +296,10 @@ constexpr uint8_t DEFAULT_LOCAL_MODULE_ADDRESS = static_cast<uint8_t>(CBPLC_DEFA
 constexpr uint8_t DEFAULT_CAN_NODE_ID = static_cast<uint8_t>(CBPLC_DEFAULT_CAN_NODE_ID);
 constexpr uint32_t DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS = 1200u;
 constexpr uint32_t DEFAULT_CONTROLLER_AUTH_TTL_MS = 2500u;
-constexpr uint32_t DEFAULT_CONTROLLER_ALLOC_TTL_MS = 3000u;
 constexpr uint32_t DEFAULT_SLAC_ARM_TIMEOUT_MS = 10000u;
 constexpr uint32_t CONTROLLER_HB_SOFT_STOP_GRACE_MS = 3000u;
 constexpr uint32_t CONTROLLER_HB_HARD_STOP_GRACE_MS = 15000u;
 constexpr uint32_t CONTROLLER_ENERGY_HOLD_GRACE_MS = 1200u;
-constexpr uint32_t CONTROLLER_POWER_TIMEOUT_MS = 1200u;
 constexpr uint32_t CONTROLLER_FEEDBACK_TIMEOUT_MS = 1200u;
 constexpr uint8_t MAX_RUNTIME_PLC_ID = 15u;
 constexpr uint8_t MAX_RUNTIME_CONTROLLER_ID = 15u;
@@ -313,32 +315,10 @@ constexpr uint32_t CTRL_MSG_VERSION = 1u;
 constexpr uint32_t CAN_ID_CTRL_HEARTBEAT = 0x18FF5000u;
 constexpr uint32_t CAN_ID_CTRL_AUTH = 0x18FF5010u;
 constexpr uint32_t CAN_ID_CTRL_SLAC = 0x18FF5020u;
-constexpr uint32_t CAN_ID_CTRL_ALLOC_BEGIN = 0x18FF5030u;
-constexpr uint32_t CAN_ID_CTRL_ALLOC_DATA = 0x18FF5040u;
-constexpr uint32_t CAN_ID_CTRL_ALLOC_COMMIT = 0x18FF5050u;
-constexpr uint32_t CAN_ID_CTRL_ALLOC_ABORT = 0x18FF5060u;
 constexpr uint32_t CAN_ID_CTRL_AUX_RELAY = 0x18FF5070u;
 constexpr uint32_t CAN_ID_CTRL_SESSION = 0x18FF5080u;
-constexpr uint32_t CAN_ID_CTRL_POWER_SETPOINT = 0x18FF5090u;
 constexpr uint32_t CAN_ID_CTRL_HLC_FEEDBACK = 0x18FF50A0u;
 
-constexpr uint32_t CAN_ID_PLC_HEARTBEAT = 0x18FF6000u;
-constexpr uint32_t CAN_ID_PLC_CP_STATUS = 0x18FF6010u;
-constexpr uint32_t CAN_ID_PLC_SLAC_STATUS = 0x18FF6020u;
-constexpr uint32_t CAN_ID_PLC_HLC_STATUS = 0x18FF6030u;
-constexpr uint32_t CAN_ID_PLC_POWER_STATUS = 0x18FF6040u;
-constexpr uint32_t CAN_ID_PLC_SESSION_STATUS = 0x18FF6050u;
-constexpr uint32_t CAN_ID_PLC_IDENTITY_EVT = 0x18FF6060u;
-constexpr uint32_t CAN_ID_PLC_CMD_ACK = 0x18FF6070u;
-constexpr uint32_t CAN_ID_PLC_BMS_STATUS = 0x18FF6080u;
-
-constexpr uint32_t PLC_TX_HEARTBEAT_MS = 500u;
-constexpr uint32_t PLC_TX_CP_STATUS_MS = 200u;
-constexpr uint32_t PLC_TX_SLAC_STATUS_MS = 500u;
-constexpr uint32_t PLC_TX_HLC_STATUS_MS = 500u;
-constexpr uint32_t PLC_TX_POWER_STATUS_MS = 200u;
-constexpr uint32_t PLC_TX_SESSION_STATUS_MS = 500u;
-constexpr uint32_t PLC_TX_BMS_STATUS_MS = 250u;
 constexpr uint32_t PLC_TX_IDENTITY_RETRY_MS = 1000u;
 constexpr uint32_t SERIAL_TX_CP_STATUS_MS = 500u;
 constexpr uint32_t SERIAL_TX_SLAC_STATUS_MS = 500u;
@@ -387,7 +367,6 @@ extern SemaphoreHandle_t g_can_mutex;
 void tap_controller_rx_frame(uint32_t id, bool extended, uint8_t dlc, const uint8_t data[8], uint32_t now_ms);
 uint8_t crc8_07(const uint8_t* data, size_t len);
 uint32_t can_with_plc_id(uint32_t base_id);
-bool is_controller_rx_base(uint32_t base_id);
 bool is_allowed_module_can_frame(uint32_t id, bool extended, uint8_t dlc, const uint8_t data[8]);
 void controller_publish_local_identity_once();
 const char* bms_stage_name(uint8_t stage);
@@ -404,6 +383,7 @@ bool lock_modules(uint32_t timeout_ms);
 void unlock_modules();
 void stop_hlc_stack();
 void stop_session(uint32_t now_ms);
+float snapshot_present_group_voltage_v();
 
 class Mcp2515Transport : public cbmodules::CanTransport {
 public:
@@ -1140,7 +1120,22 @@ struct RuntimeConfig {
     uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
     uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
     uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
-    uint32_t controller_alloc_ttl_ms{DEFAULT_CONTROLLER_ALLOC_TTL_MS};
+    uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
+};
+
+struct RuntimeConfigV4 {
+    uint32_t magic{CFG_MAGIC};
+    uint16_t version{4u};
+    uint8_t mode{static_cast<uint8_t>(DEFAULT_MODE)};
+    bool slac_requires_controller_start{DEFAULT_SLAC_REQUIRES_CONTROLLER_START};
+    uint8_t plc_id{DEFAULT_PLC_ID};
+    uint8_t connector_id{DEFAULT_CONNECTOR_ID};
+    uint8_t controller_id{DEFAULT_CONTROLLER_ID};
+    uint8_t local_module_address{DEFAULT_LOCAL_MODULE_ADDRESS};
+    uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
+    uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
+    uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
+    uint32_t controller_alloc_ttl_ms{3000u};
     uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
 };
 
@@ -1156,7 +1151,7 @@ struct RuntimeConfigV3 {
     uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
     uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
     uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
-    uint32_t controller_alloc_ttl_ms{DEFAULT_CONTROLLER_ALLOC_TTL_MS};
+    uint32_t controller_alloc_ttl_ms{3000u};
     uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
 };
 
@@ -1173,48 +1168,29 @@ struct ControllerRuntimeState {
     uint32_t auth_expiry_ms{0};
     uint32_t last_energy_allowed_ms{0};
     uint32_t slac_arm_expiry_ms{0};
-    uint32_t alloc_txn_expiry_ms{0};
     uint32_t hb_lost_since_ms{0};
     bool heartbeat_seen{false};
     uint32_t heartbeat_session_marker{0};
     bool slac_armed{false};
     bool slac_start_latched{false};
     ControllerAuthState auth_state{ControllerAuthState::Unknown};
-    bool alloc_txn_active{false};
-    uint8_t alloc_txn_id{0};
-    uint8_t alloc_expected_modules{0};
-    std::vector<std::string> staged_allowlist{};
-    std::map<std::string, float> staged_module_power_limits_kw{};
-    float staged_power_limit_kw{0.0f};
     uint8_t last_seq_heartbeat{0};
     uint8_t last_seq_auth{0};
     uint8_t last_seq_slac{0};
-    uint8_t last_seq_alloc{0};
     uint8_t last_seq_aux{0};
     uint8_t last_seq_session{0};
-    uint8_t last_seq_power{0};
     uint8_t last_seq_feedback{0};
     bool seq_seen_heartbeat{false};
     bool seq_seen_auth{false};
     bool seq_seen_slac{false};
-    bool seq_seen_alloc{false};
     bool seq_seen_aux{false};
     bool seq_seen_session{false};
-    bool seq_seen_power{false};
     bool seq_seen_feedback{false};
     bool stop_active{false};
     bool stop_hard{false};
     bool stop_force_issued{false};
     uint8_t stop_reason{0};
     uint32_t stop_deadline_ms{0};
-};
-
-struct ControllerManagedPowerState {
-    uint32_t last_update_ms{0};
-    bool seen{false};
-    bool enable{false};
-    float target_voltage_v{0.0f};
-    float target_current_a{0.0f};
 };
 
 struct ControllerManagedFeedbackState {
@@ -1230,25 +1206,7 @@ struct ControllerManagedFeedbackState {
     float present_current_a{0.0f};
 };
 
-struct ControllerStatusTxSchedule {
-    uint32_t next_heartbeat_ms{0};
-    uint32_t next_cp_status_ms{0};
-    uint32_t next_slac_status_ms{0};
-    uint32_t next_hlc_status_ms{0};
-    uint32_t next_power_status_ms{0};
-    uint32_t next_session_status_ms{0};
-    uint32_t next_bms_status_ms{0};
-    uint32_t next_identity_evt_ms{0};
-    uint8_t seq_heartbeat{0};
-    uint8_t seq_cp{0};
-    uint8_t seq_slac{0};
-    uint8_t seq_hlc{0};
-    uint8_t seq_power{0};
-    uint8_t seq_session{0};
-    uint8_t seq_bms{0};
-    uint8_t seq_event{0};
-    uint8_t seq_ack{0};
-};
+bool controller_get_managed_feedback(uint32_t now_ms, ControllerManagedFeedbackState* out);
 
 struct SerialStatusTxSchedule {
     uint32_t next_cp_status_ms{0};
@@ -1256,6 +1214,8 @@ struct SerialStatusTxSchedule {
     uint32_t next_hlc_status_ms{0};
     uint32_t next_session_status_ms{0};
     uint32_t next_bms_status_ms{0};
+    uint32_t next_identity_evt_ms{0};
+    uint8_t ack_seq{0};
     bool local_identity_sent{false};
 };
 
@@ -1277,9 +1237,7 @@ struct RfidRuntimeState {
 
 RuntimeConfig g_runtime_cfg{};
 ControllerRuntimeState g_ctrl{};
-ControllerManagedPowerState g_ctrl_power{};
 ControllerManagedFeedbackState g_ctrl_feedback{};
-ControllerStatusTxSchedule g_ctrl_tx{};
 SerialStatusTxSchedule g_serial_tx{};
 MFRC522 g_rfid;
 RfidRuntimeState g_rfid_state{};
@@ -1297,6 +1255,7 @@ uint32_t g_cp_candidate_since_ms = 0;
 uint32_t g_cp_connected_since_ms = 0;
 uint32_t g_cp_last_seen_connected_ms = 0;
 uint32_t g_cp_next_spike_log_ms = 0;
+uint32_t g_hlc_disconnect_hold_until_ms = 0;
 
 uint16_t g_last_cp_duty_pct = 100;
 bool g_ef_pulse_active = false;
@@ -1318,6 +1277,7 @@ typedef struct {
     bool precharge_seen;
     bool precharge_converged;
     bool power_delivery_enabled;
+    bool stop_requested;
     uint32_t precharge_count;
     uint8_t sa_schedule_tuple_id;
 } HlcAppContext;
@@ -1332,6 +1292,8 @@ uint8_t g_secc_ip[16] = {0};
 uint32_t g_next_hlc_wait_log_ms = 0;
 QueueHandle_t g_hlc_client_queue = nullptr;
 TaskHandle_t g_hlc_worker_task = nullptr;
+TaskHandle_t g_loop_task = nullptr;
+uint32_t g_next_mem_log_ms = 0;
 struct netif g_plc_netif{};
 bool g_plc_netif_ready = false;
 char g_plc_ifname[JPV2G_IFACE_NAME_MAX] = {0};
@@ -1373,6 +1335,61 @@ bool g_last_bms_valid = false;
 bool g_last_bms_delivery_ready = false;
 uint32_t g_last_bms_update_ms = 0;
 bool g_last_bms_dirty = true;
+
+constexpr uint32_t MEMORY_LOG_PERIOD_MS = 30000u;
+
+size_t stack_free_bytes(TaskHandle_t handle) {
+    if (!handle) {
+        return 0u;
+    }
+    return static_cast<size_t>(uxTaskGetStackHighWaterMark(handle)) * sizeof(StackType_t);
+}
+
+void log_memory_runtime(const char* reason) {
+    const bool has_psram = psramFound();
+    const size_t heap_free = ESP.getFreeHeap();
+    const size_t heap_min = ESP.getMinFreeHeap();
+    const size_t heap_largest = ESP.getMaxAllocHeap();
+    const size_t internal_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const size_t internal_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const size_t internal_largest =
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const size_t psram_free = has_psram ? ESP.getFreePsram() : 0u;
+    const size_t psram_min = has_psram ? ESP.getMinFreePsram() : 0u;
+    const size_t psram_largest =
+        has_psram ? heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) : 0u;
+    const size_t idle0_stack_free =
+        stack_free_bytes(xTaskGetIdleTaskHandleForCPU(0));
+#ifndef CONFIG_FREERTOS_UNICORE
+    const size_t idle1_stack_free =
+        stack_free_bytes(xTaskGetIdleTaskHandleForCPU(1));
+#else
+    const size_t idle1_stack_free = 0u;
+#endif
+
+    Serial.printf(
+        "[MEM] {\"reason\":\"%s\",\"heapFree\":%u,\"heapMin\":%u,\"heapLargest\":%u,"
+        "\"internalFree\":%u,\"internalMin\":%u,\"internalLargest\":%u,"
+        "\"psramFound\":%d,\"psramFree\":%u,\"psramMin\":%u,\"psramLargest\":%u,"
+        "\"loopStackFree\":%u,\"hlcStackFree\":%u,\"idle0StackFree\":%u,\"idle1StackFree\":%u,"
+        "\"arduinoCore\":%d}\n",
+        reason ? reason : "-",
+        static_cast<unsigned>(heap_free),
+        static_cast<unsigned>(heap_min),
+        static_cast<unsigned>(heap_largest),
+        static_cast<unsigned>(internal_free),
+        static_cast<unsigned>(internal_min),
+        static_cast<unsigned>(internal_largest),
+        has_psram ? 1 : 0,
+        static_cast<unsigned>(psram_free),
+        static_cast<unsigned>(psram_min),
+        static_cast<unsigned>(psram_largest),
+        static_cast<unsigned>(stack_free_bytes(g_loop_task)),
+        static_cast<unsigned>(stack_free_bytes(g_hlc_worker_task)),
+        static_cast<unsigned>(idle0_stack_free),
+        static_cast<unsigned>(idle1_stack_free),
+        static_cast<int>(ARDUINO_RUNNING_CORE));
+}
 int16_t g_last_ev_soc_pct = -1;
 uint32_t g_last_module_runtime_log_ms = 0;
 
@@ -1395,16 +1412,12 @@ struct SerialControllerSeqState {
     uint8_t heartbeat{1u};
     uint8_t auth{1u};
     uint8_t slac{1u};
-    uint8_t alloc{1u};
     uint8_t aux{1u};
     uint8_t session{1u};
-    uint8_t power{1u};
     uint8_t feedback{1u};
 };
 
 SerialControllerSeqState g_serial_ctrl_seq{};
-uint8_t g_serial_alloc_txn_id = 1u;
-
 uint32_t can_with_plc_id(uint32_t base_id) {
     return (base_id & 0x1FFFFFF0u) | static_cast<uint32_t>(g_runtime_cfg.can_node_id & 0x0Fu);
 }
@@ -1575,49 +1588,11 @@ cbmodules::ModuleSpec build_module_spec_for_addr(uint8_t module_addr) {
 }
 
 float effective_module_limit_kw_for_id(const std::string& module_id) {
-    const auto staged_it = g_ctrl.staged_module_power_limits_kw.find(module_id);
-    if (staged_it != g_ctrl.staged_module_power_limits_kw.end() && staged_it->second > 0.0f) {
-        return staged_it->second;
-    }
     const auto active_it = g_active_module_power_limits_kw.find(module_id);
     if (active_it != g_active_module_power_limits_kw.end() && active_it->second > 0.0f) {
         return active_it->second;
     }
     return MODULE_MAX_POWER_KW;
-}
-
-std::map<std::string, float> normalized_module_limits(const std::vector<std::string>& allowlist,
-                                                      const std::map<std::string, float>& limits) {
-    std::map<std::string, float> out;
-    for (const auto& id : allowlist) {
-        const auto it = limits.find(id);
-        const float limit_kw = (it != limits.end() && it->second > 0.0f) ? it->second : MODULE_MAX_POWER_KW;
-        out[id] = limit_kw;
-    }
-    return out;
-}
-
-bool module_limit_maps_equal(const std::map<std::string, float>& lhs,
-                             const std::map<std::string, float>& rhs) {
-    if (lhs.size() != rhs.size()) {
-        return false;
-    }
-    for (const auto& [id, lhs_limit_kw] : lhs) {
-        const auto it = rhs.find(id);
-        if (it == rhs.end()) {
-            return false;
-        }
-        if (std::fabs(lhs_limit_kw - it->second) > 0.05f) {
-            return false;
-        }
-    }
-    return true;
-}
-
-void apply_module_limit_map(const std::map<std::string, float>& limits) {
-    for (const auto& [id, limit_kw] : limits) {
-        g_module_mgr.set_module_hard_limits(id, MODULE_MAX_CURRENT_A, limit_kw);
-    }
 }
 
 
@@ -1687,11 +1662,6 @@ bool module_addr_allowed_for_rx(uint8_t module_addr) {
             return true;
         }
     }
-    for (const auto& id : g_ctrl.staged_allowlist) {
-        if (module_addr_from_id(id) == module_addr) {
-            return true;
-        }
-    }
     return false;
 }
 
@@ -1712,20 +1682,6 @@ bool local_group_released() {
     const bool released = local_group_released_locked();
     unlock_modules();
     return released;
-}
-
-bool is_controller_rx_base(uint32_t base_id) {
-    return base_id == (CAN_ID_CTRL_HEARTBEAT & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_AUTH & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_SLAC & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_ALLOC_BEGIN & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_ALLOC_DATA & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_ALLOC_COMMIT & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_ALLOC_ABORT & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_AUX_RELAY & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_SESSION & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_POWER_SETPOINT & 0x1FFFFFF0u) ||
-           base_id == (CAN_ID_CTRL_HLC_FEEDBACK & 0x1FFFFFF0u);
 }
 
 bool is_allowed_module_can_frame(uint32_t id, bool extended, uint8_t dlc, const uint8_t data[8]) {
@@ -1801,22 +1757,6 @@ bool pop_controller_rx_frame(CtrlRxFrame* out) {
     return ok;
 }
 
-bool can_send_frame_raw(uint32_t id, const uint8_t payload[8]) {
-    if (!payload) return false;
-    cbmodules::CanFrame f{};
-    f.id = id & 0x1FFFFFFFu;
-    f.extended = true;
-    f.dlc = 8;
-    memcpy(f.data, payload, 8);
-    return g_can.send(f);
-}
-
-bool can_send_ctrl_frame(uint32_t base_id, uint8_t payload[8]) {
-    (void)base_id;
-    (void)payload;
-    return false;
-}
-
 bool ctrl_seq_accept(uint8_t seq, uint8_t* last_seq, bool* seq_seen) {
     if (!last_seq || !seq_seen) return false;
     if (!*seq_seen) {
@@ -1839,47 +1779,23 @@ void controller_reset_command_seq_state(bool include_heartbeat) {
     }
     g_ctrl.last_seq_auth = 0;
     g_ctrl.last_seq_slac = 0;
-    g_ctrl.last_seq_alloc = 0;
     g_ctrl.last_seq_aux = 0;
     g_ctrl.last_seq_session = 0;
-    g_ctrl.last_seq_power = 0;
     g_ctrl.last_seq_feedback = 0;
     g_ctrl.seq_seen_auth = false;
     g_ctrl.seq_seen_slac = false;
-    g_ctrl.seq_seen_alloc = false;
     g_ctrl.seq_seen_aux = false;
     g_ctrl.seq_seen_session = false;
-    g_ctrl.seq_seen_power = false;
     g_ctrl.seq_seen_feedback = false;
 }
 
 void controller_clear_managed_power_cache() {
-    g_ctrl_power = ControllerManagedPowerState{};
+    // Bridge mode no longer accepts PLC-side power setpoints. Keep the reset hook
+    // for call-site simplicity, but there is no managed-power cache to clear.
 }
 
 void controller_clear_managed_feedback_cache() {
     g_ctrl_feedback = ControllerManagedFeedbackState{};
-}
-
-bool controller_power_command_fresh(uint32_t now_ms) {
-    if (!g_ctrl_power.seen || now_ms < g_ctrl_power.last_update_ms) {
-        return false;
-    }
-    if (mode_controller_routes_power_externally_over_uart()) {
-        return false;
-    }
-    if (mode_controller_has_final_decision()) {
-        return true;
-    }
-    // On the UART controller path, control commands share the same CDC link as
-    // verbose logs. Allow managed-power freshness to track the controller
-    // heartbeat budget instead of a fixed 1.2 s window so transient serial
-    // congestion does not collapse the DC bus mid-session.
-    const uint32_t timeout_ms =
-        std::min<uint32_t>(5000u,
-                           std::max<uint32_t>(CONTROLLER_POWER_TIMEOUT_MS,
-                                              g_runtime_cfg.controller_heartbeat_timeout_ms + 500u));
-    return (now_ms - g_ctrl_power.last_update_ms) <= timeout_ms;
 }
 
 bool controller_feedback_fresh(uint32_t now_ms) {
@@ -1977,10 +1893,49 @@ bool precharge_voltage_converged(float requested_v, float present_v) {
     return std::fabs(measured_v - target_v) <= tolerance_v || measured_v >= (target_v - tolerance_v);
 }
 
+bool snapshot_live_present_values(cbmodules::GroupStatus* out_st,
+                                  float* out_present_v,
+                                  float* out_present_i);
+
+bool standalone_precharge_start_ready(HlcAppContext* ctx, float requested_v) {
+    if (!ctx || mode_requires_controller_contract()) {
+        return false;
+    }
+    if (!ctx->precharge_seen || !g_relay1_closed || !g_module_output_enabled) {
+        return false;
+    }
+    cbmodules::GroupStatus st{};
+    float present_v = 0.0f;
+    float present_i = 0.0f;
+    (void)snapshot_live_present_values(&st, &present_v, &present_i);
+    if (precharge_voltage_converged(requested_v, present_v)) {
+        return true;
+    }
+    const float target_v = std::isfinite(requested_v) ? std::max(0.0f, requested_v) : 0.0f;
+    const float accept_floor_v = std::max(PRECHARGE_START_ACCEPT_MIN_V, target_v * PRECHARGE_START_ACCEPT_MIN_RATIO);
+    const bool current_flow_ready =
+        ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT && present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A;
+    const bool relaxed_ready = present_v >= accept_floor_v || current_flow_ready;
+    if (relaxed_ready) {
+        Serial.printf("[HLC] {\"msg\":\"PreChargeRelaxedStart\",\"targetV\":%.1f,\"presentV\":%.1f,"
+                      "\"presentI\":%.2f,\"acceptFloorV\":%.1f,\"minCurrentA\":%.2f,\"prechargeCount\":%lu,"
+                      "\"relay1\":%d,\"moduleOn\":%d}\n",
+                      target_v,
+                      present_v,
+                      present_i,
+                      accept_floor_v,
+                      PRECHARGE_START_ACCEPT_MIN_CURRENT_A,
+                      static_cast<unsigned long>(ctx->precharge_count),
+                      g_relay1_closed ? 1 : 0,
+                      g_module_output_enabled ? 1 : 0);
+    }
+    return relaxed_ready;
+}
+
 void send_ctrl_ack(uint8_t cmd_type, uint8_t seq, uint8_t status, uint8_t detail0, uint8_t detail1) {
     uint8_t p[8]{};
     p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_ack++;
+    p[1] = g_serial_tx.ack_seq++;
     p[2] = cmd_type;
     p[3] = seq;
     p[4] = status;
@@ -2012,20 +1967,6 @@ uint16_t encode_current_d01(float current_a, uint16_t max_raw) {
     const float sane_current = std::isfinite(current_a) ? std::max(0.0f, current_a) : 0.0f;
     const float clamped = std::max(0.0f, std::min(static_cast<float>(max_raw) / 10.0f, sane_current));
     return static_cast<uint16_t>(std::lround(clamped * 10.0f));
-}
-
-uint32_t pack_ctrl_power_setpoint(bool enable, float voltage_v, float current_a) {
-    const uint32_t v01 = encode_voltage_d01(voltage_v, 0x3FFFu);
-    const uint32_t i01 = encode_current_d01(current_a, 0x0FFFu);
-    return static_cast<uint32_t>(enable ? 1u : 0u) |
-           ((v01 & 0x3FFFu) << 1u) |
-           ((i01 & 0x0FFFu) << 15u);
-}
-
-void unpack_ctrl_power_setpoint(uint32_t packed, bool* enable, float* voltage_v, float* current_a) {
-    if (enable) *enable = (packed & 0x01u) != 0u;
-    if (voltage_v) *voltage_v = static_cast<float>((packed >> 1u) & 0x3FFFu) / 10.0f;
-    if (current_a) *current_a = static_cast<float>((packed >> 15u) & 0x0FFFu) / 10.0f;
 }
 
 uint32_t pack_ctrl_hlc_feedback(bool valid,
@@ -2299,15 +2240,22 @@ void apply_fresh_measurements_from_states(cbmodules::GroupStatus* st, uint32_t n
     float sum_i = 0.0f;
     const float target_v = sane_non_negative(st->applied_voltage_v);
     auto voltage_sample_ready = [target_v](const cbmodules::ModuleStateView& s) {
-        if (!s.telemetry.online || s.telemetry.module_off) {
+        if (!s.telemetry.online) {
             return false;
         }
-        if (std::max(0.0f, s.telemetry.current_a) >= 1.0f) {
+        const float current_a = sane_non_negative(s.telemetry.current_a);
+        const float voltage_v = sane_non_negative(s.telemetry.voltage_v);
+        const bool live_output_sample =
+            !s.telemetry.module_off || current_a >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A ||
+            voltage_v >= PRECHARGE_START_ACCEPT_MIN_V;
+        if (!live_output_sample) {
+            return false;
+        }
+        if (current_a >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A) {
             return true;
         }
-        const float voltage_v = sane_non_negative(s.telemetry.voltage_v);
         if (target_v <= 50.0f) {
-            return voltage_v >= 25.0f;
+            return voltage_v >= PRECHARGE_START_ACCEPT_MIN_V;
         }
         const float required_voltage = std::max(50.0f, target_v * 0.85f);
         return voltage_v >= required_voltage;
@@ -2451,6 +2399,24 @@ bool snapshot_live_present_values(cbmodules::GroupStatus* out_st,
     return ok && st.valid;
 }
 
+float snapshot_welding_present_voltage_v(uint32_t now_ms) {
+    if (!g_relay1_closed) {
+        return 0.0f;
+    }
+    if (mode_controller_uses_external_feedback()) {
+        ControllerManagedFeedbackState fb{};
+        if (controller_get_managed_feedback(now_ms, &fb)) {
+            return sane_non_negative(fb.present_voltage_v);
+        }
+        return sane_non_negative(g_ctrl_feedback.present_voltage_v);
+    }
+    float present_v = snapshot_present_group_voltage_v();
+    if (present_v <= 0.1f) {
+        present_v = sane_non_negative(g_last_measured_v);
+    }
+    return sane_non_negative(present_v);
+}
+
 uint32_t latest_local_group_telemetry_ms() {
     const auto states = g_module_mgr.module_states();
     uint32_t latest_ms = 0;
@@ -2544,11 +2510,6 @@ void update_last_ev_soc_from_request(jpv2g_message_type_t type, const jpv2g_secc
                 update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
                 break;
             }
-            case JPV2G_WELDING_DETECTION_REQ: {
-                const auto* rq = static_cast<const iso2_WeldingDetectionReqType*>(req->body);
-                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
-                break;
-            }
             default:
                 break;
         }
@@ -2575,11 +2536,6 @@ void update_last_ev_soc_from_request(jpv2g_message_type_t type, const jpv2g_secc
             }
             case JPV2G_CURRENT_DEMAND_REQ: {
                 const auto* rq = static_cast<const din_CurrentDemandReqType*>(req->body);
-                update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
-                break;
-            }
-            case JPV2G_WELDING_DETECTION_REQ: {
-                const auto* rq = static_cast<const din_WeldingDetectionReqType*>(req->body);
                 update_last_ev_soc_pct(static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
                 break;
             }
@@ -2718,10 +2674,29 @@ void normalize_runtime_config(RuntimeConfig* cfg) {
         std::max<uint32_t>(500u, std::min<uint32_t>(cfg->controller_heartbeat_timeout_ms, 10000u));
     cfg->controller_auth_ttl_ms =
         std::max<uint32_t>(500u, std::min<uint32_t>(cfg->controller_auth_ttl_ms, 30000u));
-    cfg->controller_alloc_ttl_ms =
-        std::max<uint32_t>(500u, std::min<uint32_t>(cfg->controller_alloc_ttl_ms, 30000u));
     cfg->controller_slac_arm_timeout_ms =
         std::max<uint32_t>(1000u, std::min<uint32_t>(cfg->controller_slac_arm_timeout_ms, 60000u));
+}
+
+bool migrate_runtime_config_v4(const RuntimeConfigV4& legacy, RuntimeConfig* out) {
+    if (!out) return false;
+    if (legacy.magic != CFG_MAGIC || legacy.version != 4u) {
+        return false;
+    }
+    RuntimeConfig migrated{};
+    migrated.mode = legacy.mode;
+    migrated.slac_requires_controller_start = legacy.slac_requires_controller_start;
+    migrated.plc_id = legacy.plc_id;
+    migrated.connector_id = legacy.connector_id;
+    migrated.controller_id = legacy.controller_id;
+    migrated.local_module_address = legacy.local_module_address;
+    migrated.can_node_id = legacy.can_node_id;
+    migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
+    migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
+    migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    normalize_runtime_config(&migrated);
+    *out = migrated;
+    return true;
 }
 
 bool migrate_runtime_config_v3(const RuntimeConfigV3& legacy, RuntimeConfig* out) {
@@ -2741,7 +2716,6 @@ bool migrate_runtime_config_v3(const RuntimeConfigV3& legacy, RuntimeConfig* out
     migrated.can_node_id = legacy.can_node_id;
     migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
     migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
-    migrated.controller_alloc_ttl_ms = legacy.controller_alloc_ttl_ms;
     migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
     normalize_runtime_config(&migrated);
     *out = migrated;
@@ -2749,7 +2723,7 @@ bool migrate_runtime_config_v3(const RuntimeConfigV3& legacy, RuntimeConfig* out
 }
 
 void print_runtime_config() {
-    Serial.printf("[CFG] mode=%u(%s) slac_ctrl=%d plc_id=%u can_node_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u owner_id=0x%04X hb_to=%lu auth_ttl=%lu alloc_ttl=%lu slac_arm_to=%lu\n",
+    Serial.printf("[CFG] mode=%u(%s) slac_ctrl=%d plc_id=%u can_node_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u owner_id=0x%04X hb_to=%lu auth_ttl=%lu slac_arm_to=%lu\n",
                   static_cast<unsigned>(g_runtime_cfg.mode),
                   runtime_mode_name(),
                   g_runtime_cfg.slac_requires_controller_start ? 1 : 0,
@@ -2762,7 +2736,6 @@ void print_runtime_config() {
                   static_cast<unsigned>(runtime_module_manager_owner_id()),
                   static_cast<unsigned long>(g_runtime_cfg.controller_heartbeat_timeout_ms),
                   static_cast<unsigned long>(g_runtime_cfg.controller_auth_ttl_ms),
-                  static_cast<unsigned long>(g_runtime_cfg.controller_alloc_ttl_ms),
                   static_cast<unsigned long>(g_runtime_cfg.controller_slac_arm_timeout_ms));
 }
 
@@ -2788,20 +2761,19 @@ bool load_runtime_config_from_nvs() {
     if (stored == sizeof(nvs_cfg)) {
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &nvs_cfg, sizeof(nvs_cfg));
         loaded = (got == sizeof(nvs_cfg));
-        if (loaded && nvs_cfg.version == 3u) {
-            RuntimeConfigV3 legacy{};
-            memcpy(&legacy, &nvs_cfg, sizeof(legacy));
-            loaded = migrate_runtime_config_v3(legacy, &nvs_cfg);
-            if (loaded) {
-                Serial.println("[CFG] migrated legacy v3 config to mode-based config");
-            }
+    } else if (stored == sizeof(RuntimeConfigV4)) {
+        RuntimeConfigV4 legacy{};
+        const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
+        loaded = (got == sizeof(legacy)) && migrate_runtime_config_v4(legacy, &nvs_cfg);
+        if (loaded) {
+            Serial.println("[CFG] migrated legacy v4 config to v5");
         }
     } else if (stored == sizeof(RuntimeConfigV3)) {
         RuntimeConfigV3 legacy{};
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
         loaded = (got == sizeof(legacy)) && migrate_runtime_config_v3(legacy, &nvs_cfg);
         if (loaded) {
-            Serial.println("[CFG] migrated legacy v3 config to mode-based config");
+            Serial.println("[CFG] migrated legacy v3 config to v5");
         }
     }
     g_cfg_prefs.end();
@@ -2883,7 +2855,6 @@ void launch_sw4_setup_portal_if_requested() {
         html += "Local module address <input name='module_addr' value='" + String(g_runtime_cfg.local_module_address) + "'/><br/>";
         html += "Heartbeat timeout ms <input name='hb_ms' value='" + String(g_runtime_cfg.controller_heartbeat_timeout_ms) + "'/><br/>";
         html += "Auth TTL ms <input name='auth_ms' value='" + String(g_runtime_cfg.controller_auth_ttl_ms) + "'/><br/>";
-        html += "Alloc TTL ms <input name='alloc_ms' value='" + String(g_runtime_cfg.controller_alloc_ttl_ms) + "'/><br/>";
         html += "SLAC arm timeout ms <input name='slac_arm_ms' value='" + String(g_runtime_cfg.controller_slac_arm_timeout_ms) + "'/><br/>";
         html += "<button type='submit'>Save & Reboot</button></form></body></html>";
         server.send(200, "text/html", html);
@@ -2904,7 +2875,6 @@ void launch_sw4_setup_portal_if_requested() {
         if (server.hasArg("module_addr")) next.local_module_address = static_cast<uint8_t>(std::max<long>(0, server.arg("module_addr").toInt()));
         if (server.hasArg("hb_ms")) next.controller_heartbeat_timeout_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("hb_ms").toInt()));
         if (server.hasArg("auth_ms")) next.controller_auth_ttl_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("auth_ms").toInt()));
-        if (server.hasArg("alloc_ms")) next.controller_alloc_ttl_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("alloc_ms").toInt()));
         if (server.hasArg("slac_arm_ms")) next.controller_slac_arm_timeout_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("slac_arm_ms").toInt()));
         normalize_runtime_config(&next);
         g_runtime_cfg = next;
@@ -3079,7 +3049,10 @@ bool ensure_power_delivery_started(HlcAppContext* ctx, float target_v, const cha
     if (!ctx) {
         return false;
     }
-    if (!controller_allows_energy(millis()) || !ctx->precharge_converged || g_module_allowlist.empty()) {
+    const bool standalone_handoff_allowed =
+        !mode_controller_has_final_decision() && ctx->precharge_seen && g_relay1_closed && g_module_output_enabled;
+    if (!controller_allows_energy(millis()) || (!ctx->precharge_converged && !standalone_handoff_allowed) ||
+        g_module_allowlist.empty()) {
         return false;
     }
     if (!modules_apply_target(true,
@@ -3129,7 +3102,7 @@ void release_controller_allowlist_if_idle(const char* reason) {
     if (!mode_requires_controller_contract() || !g_module_ready) {
         return;
     }
-    if (g_ctrl.alloc_txn_active || g_session_started || g_hlc_active || g_relay1_closed) {
+    if (g_session_started || g_hlc_active || g_relay1_closed) {
         return;
     }
     if (g_module_allowlist.empty()) {
@@ -3141,7 +3114,7 @@ void release_controller_allowlist_if_idle(const char* reason) {
 void service_module_manager_once(uint32_t now_ms) {
     if (!g_module_ready) return;
     const bool module_control_active =
-        mode_is_local_autonomous() || g_ctrl.alloc_txn_active || !g_module_allowlist.empty() || g_module_output_enabled;
+        mode_is_local_autonomous() || !g_module_allowlist.empty() || g_module_output_enabled;
     if (!module_control_active) {
         return;
     }
@@ -3196,7 +3169,9 @@ void controller_force_safe_stop(const char* reason) {
     g_relay2_deadline_ms = 0;
     g_relay3_deadline_ms = 0;
     request_modules_off(reason ? reason : "ControllerSafeStop");
-    (void)relay1_set(false, reason ? reason : "ControllerSafeStop");
+    if (!mode_controller_has_final_decision()) {
+        (void)relay1_set(false, reason ? reason : "ControllerSafeStop");
+    }
     stop_hlc_stack();
     stop_session(millis());
     release_controller_allowlist_if_idle(reason ? reason : "ControllerSafeStop");
@@ -3212,12 +3187,6 @@ void controller_reset_runtime_state() {
     g_ctrl.heartbeat_seen = false;
     g_ctrl.last_heartbeat_ms = 0;
     g_ctrl.hb_lost_since_ms = 0;
-    g_ctrl.alloc_txn_active = false;
-    g_ctrl.staged_allowlist.clear();
-    g_ctrl.staged_module_power_limits_kw.clear();
-    g_ctrl.staged_power_limit_kw = 0.0f;
-    g_ctrl.alloc_expected_modules = 0;
-    g_ctrl.alloc_txn_expiry_ms = 0;
     controller_reset_command_seq_state(true);
     g_ctrl.stop_active = false;
     g_ctrl.stop_hard = false;
@@ -3231,7 +3200,6 @@ void controller_reset_runtime_state() {
     g_last_requested_target_i = 0.0f;
     g_last_seen_ev_mac_valid = false;
     g_session_started_ms = 0;
-    g_ctrl_tx = ControllerStatusTxSchedule{};
     g_serial_tx = SerialStatusTxSchedule{};
 }
 
@@ -3267,11 +3235,6 @@ void controller_apply_mode_transition(OperatingMode next_mode) {
         g_module_allowlist.clear();
         g_assignment_power_limit_kw = 0.0f;
         g_active_module_power_limits_kw.clear();
-        g_ctrl.alloc_txn_active = false;
-        g_ctrl.alloc_expected_modules = 0;
-        g_ctrl.staged_allowlist.clear();
-        g_ctrl.staged_module_power_limits_kw.clear();
-        g_ctrl.staged_power_limit_kw = 0.0f;
         g_module_output_enabled = false;
         g_module_ready = false;
         Serial.printf("[MOD] mode=%s runtime transition: PLC module CAN/control stack disabled\n", runtime_mode_name());
@@ -3290,7 +3253,7 @@ void controller_apply_mode_transition(OperatingMode next_mode) {
 
 bool controller_stop_is_complete() {
     if (!mode_uses_plc_module_manager()) {
-        return !g_relay1_closed && !g_module_output_enabled && !g_session_started && !g_hlc_active;
+        return !g_module_output_enabled && !g_session_started && !g_hlc_active;
     }
     if (g_relay1_closed || g_module_output_enabled || g_session_started || g_hlc_active ||
         !g_module_allowlist.empty()) {
@@ -3318,8 +3281,12 @@ void controller_begin_stop(uint32_t now_ms, bool hard, uint32_t timeout_ms, uint
     g_relay1_deadline_ms = 0;
     request_modules_off(hard ? "CtrlStopHard" : "CtrlStopSoft");
     // Release module ownership after we have driven the currently leased set to zero.
-    (void)apply_new_allowlist({}, 0.0f, hard ? "CtrlStopHard" : "CtrlStopSoft");
-    (void)relay1_set(false, hard ? "CtrlStopHard" : "CtrlStopSoft");
+    if (mode_uses_plc_module_manager()) {
+        (void)apply_new_allowlist({}, 0.0f, hard ? "CtrlStopHard" : "CtrlStopSoft");
+    }
+    if (!mode_controller_has_final_decision()) {
+        (void)relay1_set(false, hard ? "CtrlStopHard" : "CtrlStopSoft");
+    }
 }
 
 void controller_apply_stop_policy(uint32_t now_ms) {
@@ -3336,10 +3303,12 @@ void controller_apply_stop_policy(uint32_t now_ms) {
     controller_clear_managed_feedback_cache();
     g_relay1_deadline_ms = 0;
     request_modules_off(g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
-    if (!g_module_allowlist.empty()) {
+    if (mode_uses_plc_module_manager() && !g_module_allowlist.empty()) {
         (void)apply_new_allowlist({}, 0.0f, g_ctrl.stop_hard ? "CtrlStopHardRelease" : "CtrlStopSoftRelease");
     }
-    (void)relay1_set(false, g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
+    if (!mode_controller_has_final_decision()) {
+        (void)relay1_set(false, g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
+    }
 
     if (g_ctrl.stop_hard) {
         if (!g_ctrl.stop_force_issued) {
@@ -3361,26 +3330,8 @@ void controller_apply_stop_policy(uint32_t now_ms) {
     }
 }
 
-void controller_publish_identity_segment(uint8_t event_kind, const uint8_t* data, size_t len, uint8_t event_id) {
-    (void)event_kind;
-    (void)data;
-    (void)len;
-    (void)event_id;
-}
-
 void controller_publish_local_identity_once() {
-    controller_publish_identity_segment(1u, g_local_mac, sizeof(g_local_mac), 1u);
-    const uint16_t owner_id = runtime_module_manager_owner_id();
-    const uint8_t identity[7] = {
-        static_cast<uint8_t>(g_runtime_cfg.plc_id),
-        static_cast<uint8_t>(g_runtime_cfg.connector_id),
-        static_cast<uint8_t>(g_runtime_cfg.controller_id),
-        static_cast<uint8_t>(g_runtime_cfg.local_module_address),
-        static_cast<uint8_t>(g_local_module_group),
-        static_cast<uint8_t>((owner_id >> 8) & 0xFFu),
-        static_cast<uint8_t>(owner_id & 0xFFu),
-    };
-    controller_publish_identity_segment(5u, identity, sizeof(identity), 5u);
+    g_serial_tx.local_identity_sent = false;
 }
 
 void controller_publish_ev_mac_if_changed(const uint8_t ev_mac[ETH_ALEN]) {
@@ -3391,22 +3342,7 @@ void controller_publish_ev_mac_if_changed(const uint8_t ev_mac[ETH_ALEN]) {
     memcpy(g_last_seen_ev_mac, ev_mac, ETH_ALEN);
     g_last_seen_ev_mac_valid = true;
     serial_tx_identity_hex("EVMAC", ev_mac, ETH_ALEN);
-    controller_publish_identity_segment(2u, ev_mac, ETH_ALEN, 2u);
-    g_ctrl_tx.next_identity_evt_ms = millis() + PLC_TX_IDENTITY_RETRY_MS;
-}
-
-void controller_publish_ev_mac_refresh_if_needed(uint32_t now_ms) {
-    if (!mode_requires_controller_contract() || !g_last_seen_ev_mac_valid) return;
-    if (!g_session_matched && !g_hlc_ready && !g_hlc_active) return;
-    if (controller_auth_granted(now_ms) && g_session_started) return;
-    if (static_cast<int32_t>(now_ms - g_ctrl_tx.next_identity_evt_ms) < 0) return;
-    if (mode_controller_routes_power_externally_over_uart()) {
-        serial_tx_identity_hex("EVMAC", g_last_seen_ev_mac, sizeof(g_last_seen_ev_mac));
-        g_ctrl_tx.next_identity_evt_ms = now_ms + PLC_TX_IDENTITY_RETRY_MS;
-        return;
-    }
-    controller_publish_identity_segment(2u, g_last_seen_ev_mac, sizeof(g_last_seen_ev_mac), 2u);
-    g_ctrl_tx.next_identity_evt_ms = now_ms + PLC_TX_IDENTITY_RETRY_MS;
+    g_serial_tx.next_identity_evt_ms = millis() + PLC_TX_IDENTITY_RETRY_MS;
 }
 
 void serial_print_identity(const char* label, const uint8_t* data, size_t len) {
@@ -3420,14 +3356,12 @@ void serial_print_identity(const char* label, const uint8_t* data, size_t len) {
 
 void controller_publish_evccid(const uint8_t* data, size_t len) {
     if (!data || len == 0) return;
-    controller_publish_identity_segment(3u, data, len, 3u);
     serial_print_identity("EVCCID", data, len);
     serial_tx_identity_hex("EVCCID", data, len);
 }
 
 void controller_publish_emaid(const uint8_t* data, size_t len) {
     if (!data || len == 0) return;
-    controller_publish_identity_segment(4u, data, len, 4u);
     serial_print_identity("EMAID", data, len);
     serial_tx_identity_hex("EMAID", data, len);
 }
@@ -3533,19 +3467,13 @@ void rfid_publish_tap(const uint8_t* uid, size_t uid_len, uint32_t now_ms) {
                       static_cast<unsigned>(g_runtime_cfg.connector_id),
                       token.c_str(),
                       static_cast<unsigned>(event_id));
-    } else {
-        Serial.printf("[RFID] tap plc=%u connector=%u token=%s event=%u\n",
-                      static_cast<unsigned>(g_runtime_cfg.plc_id),
-                      static_cast<unsigned>(g_runtime_cfg.connector_id),
-                      token.c_str(),
-                      static_cast<unsigned>(event_id));
+        return;
     }
-    if (mode_uses_plc_can_stack()) {
-        std::array<uint8_t, RFID_MAX_UID_BYTES + 1u> payload{};
-        payload[0] = static_cast<uint8_t>(uid_len);
-        memcpy(payload.data() + 1u, uid, uid_len);
-        controller_publish_identity_segment(PLC_IDENTITY_EVENT_RFID, payload.data(), uid_len + 1u, event_id);
-    }
+    Serial.printf("[RFID] tap plc=%u connector=%u token=%s event=%u\n",
+                  static_cast<unsigned>(g_runtime_cfg.plc_id),
+                  static_cast<unsigned>(g_runtime_cfg.connector_id),
+                  token.c_str(),
+                  static_cast<unsigned>(event_id));
 }
 
 void rfid_mark_card_released() {
@@ -3930,240 +3858,6 @@ void controller_handle_slac(const CtrlRxFrame& f) {
     send_ctrl_ack(0x12u, seq, ACK_BAD_VALUE, cmd, 0);
 }
 
-void controller_handle_alloc_begin(const CtrlRxFrame& f) {
-    const uint8_t seq = f.data[1];
-    if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_alloc, &g_ctrl.seq_seen_alloc)) {
-        send_ctrl_ack(0x13u, seq, ACK_BAD_SEQ, 0, 0);
-        return;
-    }
-    if (!mode_uses_plc_module_manager()) {
-        send_ctrl_ack(0x13u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-    const uint8_t txn_id = f.data[3];
-    const uint8_t expected = f.data[4];
-    const uint8_t ttl_100ms = f.data[5];
-    const float limit_kw = static_cast<float>(f.data[6]) * 0.5f;
-    if (expected == 0u || expected > MAX_STAGED_ALLOC_MODULES) {
-        send_ctrl_ack(0x13u, seq, ACK_BAD_VALUE, expected, 0);
-        return;
-    }
-    g_ctrl.alloc_txn_active = true;
-    g_ctrl.alloc_txn_id = txn_id;
-    g_ctrl.alloc_expected_modules = expected;
-    g_ctrl.staged_allowlist.clear();
-    g_ctrl.staged_module_power_limits_kw.clear();
-    g_ctrl.staged_allowlist.reserve(expected);
-    g_ctrl.staged_power_limit_kw = limit_kw;
-    const uint32_t ttl_ms = (ttl_100ms > 0u) ? (static_cast<uint32_t>(ttl_100ms) * 100u)
-                                             : g_runtime_cfg.controller_alloc_ttl_ms;
-    g_ctrl.alloc_txn_expiry_ms = f.rx_ms + ttl_ms;
-    send_ctrl_ack(0x13u, seq, ACK_OK, txn_id, expected);
-}
-
-void controller_handle_alloc_data(const CtrlRxFrame& f) {
-    const uint8_t seq = f.data[1];
-    if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_alloc, &g_ctrl.seq_seen_alloc)) {
-        send_ctrl_ack(0x14u, seq, ACK_BAD_SEQ, 0, 0);
-        return;
-    }
-    if (!mode_uses_plc_module_manager()) {
-        send_ctrl_ack(0x14u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-    if (!g_ctrl.alloc_txn_active) {
-        send_ctrl_ack(0x14u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-    const uint8_t txn_id = f.data[3];
-    const uint8_t module_group = f.data[4];
-    const uint8_t module_addr = f.data[5];
-    const float module_limit_kw = static_cast<float>(f.data[6]) * 0.5f;
-    if (txn_id != g_ctrl.alloc_txn_id) {
-        send_ctrl_ack(0x14u, seq, ACK_BAD_VALUE, txn_id, g_ctrl.alloc_txn_id);
-        return;
-    }
-    if (module_group == 0u || module_group > MAX_MODULE_GROUP_ID) {
-        send_ctrl_ack(0x14u, seq, ACK_BAD_VALUE, module_group, 0);
-        return;
-    }
-    g_known_module_can_groups[module_addr] = module_group;
-    std::string id = module_id_from_addr(module_addr);
-    if (id.empty()) {
-        g_known_module_can_groups.erase(module_addr);
-        send_ctrl_ack(0x14u, seq, ACK_BAD_VALUE, module_addr, 0);
-        return;
-    }
-    if (std::find(g_ctrl.staged_allowlist.begin(), g_ctrl.staged_allowlist.end(), id) ==
-        g_ctrl.staged_allowlist.end()) {
-        if (g_ctrl.staged_allowlist.size() >= g_ctrl.alloc_expected_modules) {
-            send_ctrl_ack(0x14u, seq, ACK_BAD_VALUE, static_cast<uint8_t>(g_ctrl.staged_allowlist.size()), g_ctrl.alloc_expected_modules);
-            return;
-        }
-        g_ctrl.staged_allowlist.push_back(id);
-    }
-    g_ctrl.staged_module_power_limits_kw[id] =
-        (module_limit_kw > 0.0f) ? module_limit_kw : MODULE_MAX_POWER_KW;
-    send_ctrl_ack(0x14u, seq, ACK_OK, module_addr, static_cast<uint8_t>(g_ctrl.staged_allowlist.size()));
-}
-
-void controller_handle_alloc_commit(const CtrlRxFrame& f) {
-    const uint8_t seq = f.data[1];
-    if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_alloc, &g_ctrl.seq_seen_alloc)) {
-        send_ctrl_ack(0x15u, seq, ACK_BAD_SEQ, 0, 0);
-        return;
-    }
-    if (!mode_uses_plc_module_manager()) {
-        send_ctrl_ack(0x15u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-    if (!g_ctrl.alloc_txn_active) {
-        send_ctrl_ack(0x15u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-    const uint8_t txn_id = f.data[3];
-    if (txn_id != g_ctrl.alloc_txn_id) {
-        send_ctrl_ack(0x15u, seq, ACK_BAD_VALUE, txn_id, g_ctrl.alloc_txn_id);
-        return;
-    }
-    if (g_ctrl.staged_allowlist.empty() || g_ctrl.staged_allowlist.size() != g_ctrl.alloc_expected_modules) {
-        send_ctrl_ack(0x15u,
-                      seq,
-                      ACK_BAD_VALUE,
-                      static_cast<uint8_t>(g_ctrl.staged_allowlist.size()),
-                      g_ctrl.alloc_expected_modules);
-        return;
-    }
-    const auto committed_limits = normalized_module_limits(g_ctrl.staged_allowlist, g_ctrl.staged_module_power_limits_kw);
-    const bool allowlist_changed = g_ctrl.staged_allowlist != g_module_allowlist;
-    const bool assignment_limit_changed = std::fabs(g_ctrl.staged_power_limit_kw - g_assignment_power_limit_kw) > 0.05f;
-    const bool module_limits_changed = !module_limit_maps_equal(committed_limits, g_active_module_power_limits_kw);
-    const auto previous_limits = g_active_module_power_limits_kw;
-
-    apply_module_limit_map(committed_limits);
-    bool ok = apply_new_allowlist(g_ctrl.staged_allowlist, g_ctrl.staged_power_limit_kw, "CtrlAllocCommit");
-    const bool has_remote_modules =
-        std::any_of(g_ctrl.staged_allowlist.begin(), g_ctrl.staged_allowlist.end(), [](const std::string& id) {
-            return id != runtime_local_module_id();
-        });
-    if (!ok && has_remote_modules) {
-        const uint32_t retry_deadline_ms = millis() + REMOTE_ALLOC_DISCOVERY_RETRY_MS;
-        while (!ok && static_cast<int32_t>(millis() - retry_deadline_ms) < 0) {
-            if (lock_modules(20)) {
-                g_module_mgr.poll_rx(24);
-                g_module_mgr.tick(millis());
-                unlock_modules();
-            }
-            delay(20);
-            ok = apply_new_allowlist(g_ctrl.staged_allowlist, g_ctrl.staged_power_limit_kw, "CtrlAllocCommitRetry");
-        }
-    }
-    if (ok) {
-        restore_default_module_limits(previous_limits, committed_limits);
-        g_active_module_power_limits_kw = committed_limits;
-        if ((allowlist_changed || assignment_limit_changed || module_limits_changed) &&
-            g_module_output_enabled && g_last_requested_target_i > 0.05f) {
-            ok = modules_apply_target(true,
-                                      g_last_requested_target_v,
-                                      g_last_requested_target_i,
-                                      "CtrlAllocRetarget");
-        }
-    } else {
-        apply_module_limit_map(previous_limits);
-    }
-    g_ctrl.alloc_txn_active = false;
-    g_ctrl.alloc_expected_modules = 0;
-    g_ctrl.staged_allowlist.clear();
-    g_ctrl.staged_module_power_limits_kw.clear();
-    g_ctrl.staged_power_limit_kw = 0.0f;
-    g_ctrl.alloc_txn_expiry_ms = 0;
-    send_ctrl_ack(0x15u, seq, ok ? ACK_OK : ACK_BAD_VALUE, static_cast<uint8_t>(g_module_allowlist.size()), 0);
-}
-
-void controller_handle_alloc_abort(const CtrlRxFrame& f) {
-    const uint8_t seq = f.data[1];
-    if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_alloc, &g_ctrl.seq_seen_alloc)) {
-        send_ctrl_ack(0x16u, seq, ACK_BAD_SEQ, 0, 0);
-        return;
-    }
-    if (!mode_uses_plc_module_manager()) {
-        g_ctrl.alloc_txn_active = false;
-        g_ctrl.alloc_expected_modules = 0;
-        g_ctrl.staged_allowlist.clear();
-        g_ctrl.staged_module_power_limits_kw.clear();
-        g_ctrl.staged_power_limit_kw = 0.0f;
-        g_ctrl.alloc_txn_expiry_ms = 0;
-        send_ctrl_ack(0x16u, seq, ACK_OK, 0, 0);
-        return;
-    }
-    g_ctrl.alloc_txn_active = false;
-    g_ctrl.alloc_expected_modules = 0;
-    g_ctrl.staged_allowlist.clear();
-    g_ctrl.staged_module_power_limits_kw.clear();
-    g_ctrl.staged_power_limit_kw = 0.0f;
-    g_ctrl.alloc_txn_expiry_ms = 0;
-    if (!g_session_started && !g_hlc_active && !g_relay1_closed && !g_module_allowlist.empty()) {
-        (void)apply_new_allowlist({}, 0.0f, "CtrlAllocAbort");
-    }
-    send_ctrl_ack(0x16u, seq, ACK_OK, 0, 0);
-}
-
-void controller_handle_power_setpoint(const CtrlRxFrame& f) {
-    const uint8_t seq = f.data[1];
-    if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_power, &g_ctrl.seq_seen_power)) {
-        send_ctrl_ack(0x19u, seq, ACK_BAD_SEQ, 0, 0);
-        return;
-    }
-    if (!mode_controller_owns_power_path()) {
-        send_ctrl_ack(0x19u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-    if (!mode_uses_plc_module_manager()) {
-        controller_clear_managed_power_cache();
-        send_ctrl_ack(0x19u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-
-    bool enable = false;
-    float target_v = 0.0f;
-    float target_i = 0.0f;
-    unpack_ctrl_power_setpoint(ctrl_unpack_u32_le(&f.data[3]), &enable, &target_v, &target_i);
-
-    const bool power_denied =
-        enable &&
-        (g_module_allowlist.empty() ||
-         (!mode_controller_has_final_decision() &&
-          (!controller_allows_energy(f.rx_ms) || !cp_connected(g_cp_state))));
-    if (power_denied) {
-        controller_clear_managed_power_cache();
-        if (!mode_controller_has_final_decision()) {
-            request_modules_off("CtrlPowerDenied");
-            (void)relay1_set(false, "CtrlPowerDenied");
-        }
-        send_ctrl_ack(0x19u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-
-    bool ok = true;
-    if (enable) {
-        ok = modules_apply_target(true, target_v, target_i, "CtrlPowerSet");
-    } else {
-        request_modules_off("CtrlPowerOff");
-    }
-    if (!ok) {
-        controller_clear_managed_power_cache();
-        send_ctrl_ack(0x19u, seq, ACK_BAD_STATE, 0, 0);
-        return;
-    }
-
-    g_ctrl_power.seen = true;
-    g_ctrl_power.last_update_ms = f.rx_ms;
-    g_ctrl_power.enable = enable;
-    g_ctrl_power.target_voltage_v = std::max(0.0f, std::min(MODULE_MAX_VOLTAGE_V, target_v));
-    g_ctrl_power.target_current_a = std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, target_i));
-    send_ctrl_ack(0x19u, seq, ACK_OK, enable ? 1u : 0u, 0u);
-}
-
 void controller_handle_hlc_feedback(const CtrlRxFrame& f) {
     const uint8_t seq = f.data[1];
     if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_feedback, &g_ctrl.seq_seen_feedback)) {
@@ -4312,20 +4006,10 @@ void controller_process_rx_frame(const CtrlRxFrame& f) {
         controller_handle_auth(f);
     } else if (base == (CAN_ID_CTRL_SLAC & 0x1FFFFFF0u)) {
         controller_handle_slac(f);
-    } else if (base == (CAN_ID_CTRL_ALLOC_BEGIN & 0x1FFFFFF0u)) {
-        controller_handle_alloc_begin(f);
-    } else if (base == (CAN_ID_CTRL_ALLOC_DATA & 0x1FFFFFF0u)) {
-        controller_handle_alloc_data(f);
-    } else if (base == (CAN_ID_CTRL_ALLOC_COMMIT & 0x1FFFFFF0u)) {
-        controller_handle_alloc_commit(f);
-    } else if (base == (CAN_ID_CTRL_ALLOC_ABORT & 0x1FFFFFF0u)) {
-        controller_handle_alloc_abort(f);
     } else if (base == (CAN_ID_CTRL_AUX_RELAY & 0x1FFFFFF0u)) {
         controller_handle_aux_relay(f);
     } else if (base == (CAN_ID_CTRL_SESSION & 0x1FFFFFF0u)) {
         controller_handle_session(f);
-    } else if (base == (CAN_ID_CTRL_POWER_SETPOINT & 0x1FFFFFF0u)) {
-        controller_handle_power_setpoint(f);
     } else if (base == (CAN_ID_CTRL_HLC_FEEDBACK & 0x1FFFFFF0u)) {
         controller_handle_hlc_feedback(f);
     }
@@ -4342,15 +4026,6 @@ void controller_service_rx() {
 void controller_service_watchdogs(uint32_t now_ms) {
     controller_apply_stop_policy(now_ms);
 
-    if (g_ctrl.alloc_txn_active && g_ctrl.alloc_txn_expiry_ms != 0 &&
-        static_cast<int32_t>(now_ms - g_ctrl.alloc_txn_expiry_ms) > 0) {
-        g_ctrl.alloc_txn_active = false;
-        g_ctrl.alloc_expected_modules = 0;
-        g_ctrl.staged_allowlist.clear();
-        g_ctrl.staged_module_power_limits_kw.clear();
-        g_ctrl.alloc_txn_expiry_ms = 0;
-        send_ctrl_ack(0x16u, 0, ACK_BAD_STATE, 0xEEu, 0);
-    }
     if (g_relay1_deadline_ms != 0 && static_cast<int32_t>(now_ms - g_relay1_deadline_ms) > 0) {
         g_relay1_deadline_ms = 0;
         (void)relay1_set(false, "Relay1Timeout");
@@ -4418,124 +4093,10 @@ void controller_service_watchdogs(uint32_t now_ms) {
             g_ctrl.slac_start_latched = false;
             g_ctrl.slac_arm_expiry_ms = 0;
         }
-        if (mode_controller_owns_power_path()) {
-            if (g_ctrl_power.seen && !controller_power_command_fresh(now_ms)) {
-                controller_clear_managed_power_cache();
-                request_modules_off("CtrlPowerTimeout");
-                (void)relay1_set(false, "CtrlPowerTimeout");
-            }
-            if (g_ctrl_feedback.seen && !controller_feedback_fresh(now_ms)) {
-                controller_clear_managed_feedback_cache();
-            }
+        if (mode_controller_owns_power_path() && g_ctrl_feedback.seen && !controller_feedback_fresh(now_ms)) {
+            controller_clear_managed_feedback_cache();
         }
     }
-}
-
-void controller_tx_heartbeat(uint32_t now_ms) {
-    uint8_t p[8]{};
-    p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_heartbeat++;
-    p[2] = static_cast<uint8_t>(g_runtime_cfg.mode);
-    p[3] = g_cp_state;
-    p[4] = static_cast<uint8_t>(g_hlc_ready ? 1u : 0u) |
-           static_cast<uint8_t>(g_hlc_active ? 2u : 0u) |
-           static_cast<uint8_t>(g_module_output_enabled ? 4u : 0u);
-    p[5] = static_cast<uint8_t>((now_ms / 1000u) & 0xFFu);
-    p[6] = static_cast<uint8_t>(((now_ms / 1000u) >> 8) & 0xFFu);
-    (void)can_send_ctrl_frame(CAN_ID_PLC_HEARTBEAT, p);
-}
-
-void controller_tx_cp_status(uint32_t now_ms) {
-    const int cp_mv = g_last_cp_mv;
-    uint8_t p[8]{};
-    p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_cp++;
-    p[2] = static_cast<uint8_t>(g_cp_state);
-    p[3] = static_cast<uint8_t>(g_last_cp_duty_pct);
-    p[4] = static_cast<uint8_t>(cp_mv & 0xFF);
-    p[5] = static_cast<uint8_t>((cp_mv >> 8) & 0xFF);
-    const uint32_t since = g_cp_connected_since_ms ? (now_ms - g_cp_connected_since_ms) : 0u;
-    p[6] = static_cast<uint8_t>((since / 100u) & 0xFFu);
-    (void)can_send_ctrl_frame(CAN_ID_PLC_CP_STATUS, p);
-}
-
-void controller_tx_slac_status() {
-    uint8_t p[8]{};
-    p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_slac++;
-    p[2] = static_cast<uint8_t>(g_session_started ? 1u : 0u);
-    p[3] = static_cast<uint8_t>(g_session_matched ? 1u : 0u);
-    p[4] = static_cast<uint8_t>(g_fsm ? static_cast<uint8_t>(g_fsm->get_state()) : 0xFFu);
-    p[5] = g_slac_failures_this_cp;
-    p[6] = static_cast<uint8_t>(g_ctrl.slac_armed ? 1u : 0u) |
-           static_cast<uint8_t>(g_ctrl.slac_start_latched ? 2u : 0u);
-    (void)can_send_ctrl_frame(CAN_ID_PLC_SLAC_STATUS, p);
-}
-
-void controller_tx_hlc_status() {
-    uint8_t p[8]{};
-    p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_hlc++;
-    p[2] = static_cast<uint8_t>(g_hlc_ready ? 1u : 0u) |
-           static_cast<uint8_t>(g_hlc_active ? 2u : 0u);
-    p[3] = static_cast<uint8_t>(g_ctrl.auth_state);
-    p[4] = static_cast<uint8_t>(controller_heartbeat_alive(millis()) ? 1u : 0u);
-    p[5] = static_cast<uint8_t>(controller_auth_granted(millis()) ? 1u : 0u);
-    p[6] = static_cast<uint8_t>((g_hlc_ctx.precharge_seen ? 0x01u : 0u) |
-                                (g_hlc_ctx.precharge_converged ? 0x02u : 0u));
-    (void)can_send_ctrl_frame(CAN_ID_PLC_HLC_STATUS, p);
-}
-
-void controller_tx_power_status() {
-    cbmodules::GroupStatus st{};
-    if (!snapshot_group_status(&st)) return;
-    const uint16_t v01 = static_cast<uint16_t>(std::max(0.0f, std::min(6553.5f, st.combined_voltage_v)) * 10.0f);
-    const uint16_t i01 = static_cast<uint16_t>(std::max(0.0f, std::min(6553.5f, st.combined_current_a)) * 10.0f);
-    uint8_t p[8]{};
-    p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_power++;
-    p[2] = static_cast<uint8_t>(v01 & 0xFFu);
-    p[3] = static_cast<uint8_t>((v01 >> 8) & 0xFFu);
-    p[4] = static_cast<uint8_t>(i01 & 0xFFu);
-    p[5] = static_cast<uint8_t>((i01 >> 8) & 0xFFu);
-    p[6] = static_cast<uint8_t>((st.active_modules & 0x0Fu) | ((st.assigned_modules & 0x0Fu) << 4));
-    (void)can_send_ctrl_frame(CAN_ID_PLC_POWER_STATUS, p);
-}
-
-void controller_tx_session_status(uint32_t now_ms) {
-    uint8_t p[8]{};
-    p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_session++;
-    p[2] = static_cast<uint8_t>(g_session_started ? 1u : 0u) |
-           static_cast<uint8_t>(g_session_matched ? 2u : 0u);
-    p[3] = static_cast<uint8_t>(g_relay1_closed ? 1u : 0u) |
-           static_cast<uint8_t>(g_relay2_closed ? 2u : 0u) |
-           static_cast<uint8_t>(g_relay3_closed ? 4u : 0u) |
-           static_cast<uint8_t>(g_ctrl.stop_active ? 8u : 0u) |
-           static_cast<uint8_t>(g_ctrl.stop_hard ? 16u : 0u) |
-           static_cast<uint8_t>(controller_stop_is_complete() ? 32u : 0u);
-    const uint32_t wh = static_cast<uint32_t>(std::max<int64_t>(0, std::min<int64_t>(real_meter_wh_i64(), 65535)));
-    p[4] = static_cast<uint8_t>(wh & 0xFFu);
-    p[5] = static_cast<uint8_t>((wh >> 8) & 0xFFu);
-    p[6] = encode_last_ev_soc_pct();
-    (void)can_send_ctrl_frame(CAN_ID_PLC_SESSION_STATUS, p);
-}
-
-void controller_tx_bms_status() {
-    const uint16_t v01 = static_cast<uint16_t>(std::max(0.0f, std::min(6553.5f, g_last_bms_requested_v)) * 10.0f);
-    const uint16_t i01 = static_cast<uint16_t>(std::max(0.0f, std::min(6553.5f, g_last_bms_requested_i)) * 10.0f);
-    uint8_t p[8]{};
-    p[0] = static_cast<uint8_t>(CTRL_MSG_VERSION);
-    p[1] = g_ctrl_tx.seq_bms++;
-    p[2] = static_cast<uint8_t>(v01 & 0xFFu);
-    p[3] = static_cast<uint8_t>((v01 >> 8) & 0xFFu);
-    p[4] = static_cast<uint8_t>(i01 & 0xFFu);
-    p[5] = static_cast<uint8_t>((i01 >> 8) & 0xFFu);
-    p[6] = static_cast<uint8_t>(g_last_bms_valid ? 1u : 0u) |
-           static_cast<uint8_t>(g_last_bms_delivery_ready ? 2u : 0u) |
-           static_cast<uint8_t>((g_last_bms_hlc_stage & 0x3Fu) << 2u);
-    (void)can_send_ctrl_frame(CAN_ID_PLC_BMS_STATUS, p);
-    g_last_bms_dirty = false;
 }
 
 const char* bms_stage_name(uint8_t stage) {
@@ -4681,10 +4242,10 @@ void controller_service_uart_router_tx(uint32_t now_ms) {
         g_serial_tx.next_bms_status_ms = now_ms + SERIAL_TX_BMS_STATUS_MS;
     }
     if (g_last_seen_ev_mac_valid &&
-        static_cast<int32_t>(now_ms - g_ctrl_tx.next_identity_evt_ms) >= 0 &&
+        static_cast<int32_t>(now_ms - g_serial_tx.next_identity_evt_ms) >= 0 &&
         (g_session_matched || g_hlc_ready || g_hlc_active)) {
         serial_tx_identity_hex("EVMAC", g_last_seen_ev_mac, sizeof(g_last_seen_ev_mac));
-        g_ctrl_tx.next_identity_evt_ms = now_ms + PLC_TX_IDENTITY_RETRY_MS;
+        g_serial_tx.next_identity_evt_ms = now_ms + PLC_TX_IDENTITY_RETRY_MS;
     }
 }
 
@@ -4735,17 +4296,8 @@ void serial_inject_controller_frame(uint32_t base_id, uint8_t payload[8]) {
         case (CAN_ID_CTRL_SLAC & 0x1FFFFFF0u):
             seq = &g_serial_ctrl_seq.slac;
             break;
-        case (CAN_ID_CTRL_ALLOC_BEGIN & 0x1FFFFFF0u):
-        case (CAN_ID_CTRL_ALLOC_DATA & 0x1FFFFFF0u):
-        case (CAN_ID_CTRL_ALLOC_COMMIT & 0x1FFFFFF0u):
-        case (CAN_ID_CTRL_ALLOC_ABORT & 0x1FFFFFF0u):
-            seq = &g_serial_ctrl_seq.alloc;
-            break;
         case (CAN_ID_CTRL_AUX_RELAY & 0x1FFFFFF0u):
             seq = &g_serial_ctrl_seq.aux;
-            break;
-        case (CAN_ID_CTRL_POWER_SETPOINT & 0x1FFFFFF0u):
-            seq = &g_serial_ctrl_seq.power;
             break;
         case (CAN_ID_CTRL_HLC_FEEDBACK & 0x1FFFFFF0u):
             seq = &g_serial_ctrl_seq.feedback;
@@ -4781,51 +4333,12 @@ void serial_ctrl_send_slac(uint8_t cmd, uint32_t arm_ms) {
     serial_inject_controller_frame(CAN_ID_CTRL_SLAC, p);
 }
 
-void serial_ctrl_send_alloc_begin(uint8_t txn_id, uint8_t expected_modules, uint32_t ttl_ms, float limit_kw = 0.0f) {
-    uint8_t p[8]{};
-    p[3] = txn_id;
-    p[4] = expected_modules;
-    p[5] = static_cast<uint8_t>(std::max<uint32_t>(1u, std::min<uint32_t>(255u, ttl_ms / 100u)));
-    p[6] = static_cast<uint8_t>(std::clamp(static_cast<int>(std::lround(std::max(0.0f, limit_kw) * 2.0f)), 0, 255));
-    serial_inject_controller_frame(CAN_ID_CTRL_ALLOC_BEGIN, p);
-}
-
-void serial_ctrl_send_alloc_data(uint8_t txn_id, uint8_t module_group, uint8_t module_addr, float limit_kw = 0.0f) {
-    uint8_t p[8]{};
-    p[3] = txn_id;
-    p[4] = module_group;
-    p[5] = module_addr;
-    p[6] = static_cast<uint8_t>(std::clamp(static_cast<int>(std::lround(std::max(0.0f, limit_kw) * 2.0f)), 0, 255));
-    serial_inject_controller_frame(CAN_ID_CTRL_ALLOC_DATA, p);
-}
-
-void serial_ctrl_send_alloc_commit(uint8_t txn_id) {
-    uint8_t p[8]{};
-    p[3] = txn_id;
-    serial_inject_controller_frame(CAN_ID_CTRL_ALLOC_COMMIT, p);
-}
-
-void serial_ctrl_send_alloc_abort() {
-    uint8_t p[8]{};
-    serial_inject_controller_frame(CAN_ID_CTRL_ALLOC_ABORT, p);
-}
-
 void serial_ctrl_send_relay(uint8_t enable_mask, uint8_t state_mask, uint32_t hold_ms) {
     uint8_t p[8]{};
     p[3] = enable_mask;
     p[4] = state_mask;
     p[5] = static_cast<uint8_t>(std::min<uint32_t>(255u, hold_ms / 100u));
     serial_inject_controller_frame(CAN_ID_CTRL_AUX_RELAY, p);
-}
-
-void serial_ctrl_send_power_setpoint(bool enable, float voltage_v, float current_a) {
-    uint8_t p[8]{};
-    const uint32_t packed = pack_ctrl_power_setpoint(enable, voltage_v, current_a);
-    p[3] = static_cast<uint8_t>(packed & 0xFFu);
-    p[4] = static_cast<uint8_t>((packed >> 8u) & 0xFFu);
-    p[5] = static_cast<uint8_t>((packed >> 16u) & 0xFFu);
-    p[6] = static_cast<uint8_t>((packed >> 24u) & 0xFFu);
-    serial_inject_controller_frame(CAN_ID_CTRL_POWER_SETPOINT, p);
 }
 
 void serial_ctrl_send_hlc_feedback(bool valid,
@@ -4860,20 +4373,14 @@ void serial_ctrl_print_help() {
     Serial.println("  CTRL AUTH <deny|pending|grant> [ttl_ms]");
     Serial.println("  CTRL SLAC <disarm|arm|start|abort> [arm_ms]");
     Serial.println("  CTRL RESET");
-    Serial.println("  CTRL ALLOC1");
-    Serial.println("  CTRL ALLOC BEGIN <txn> <expected> [ttl_ms] [limit_kw]");
-    Serial.println("  CTRL ALLOC DATA <txn> <module_group> <module_addr> [limit_kw]");
-    Serial.println("  CTRL ALLOC COMMIT <txn>");
-    Serial.println("  CTRL ALLOC ABORT");
     Serial.println("  CTRL RELAY <enable_mask> <state_mask> [hold_ms]");
-    Serial.println("  CTRL POWER <enable0|1> <voltage_v> <current_a>  (mode 1 only)");
     Serial.println("  CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]");
     Serial.println("  CTRL STOP <soft|hard|clear> [timeout_ms]");
     Serial.println("  CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]");
     Serial.println("  CTRL OWNERSHIP <connector_id> <module_addr>");
     Serial.println("  CTRL SAVE");
     Serial.println("  CTRL STATUS");
-    Serial.println("  mode1/external_controller: PLC relays + HLC over UART, external controller owns module CAN");
+    Serial.println("  mode1/external_controller: PLC bridges CP/SLAC/HLC, controller owns relay decisions + module CAN");
 }
 
 void serial_ctrl_handle_line(String line) {
@@ -4951,81 +4458,6 @@ void serial_ctrl_handle_line(String line) {
         Serial.println("[SERCTRL] RESET done");
         return;
     }
-    if (op == "ALLOC1") {
-        const uint8_t txn = g_serial_alloc_txn_id++;
-        serial_ctrl_send_alloc_begin(txn, 1u, g_runtime_cfg.controller_alloc_ttl_ms, MODULE_MAX_POWER_KW);
-        serial_ctrl_send_alloc_data(txn,
-                                    runtime_local_group_numeric(),
-                                    g_runtime_cfg.local_module_address,
-                                    MODULE_MAX_POWER_KW);
-        serial_ctrl_send_alloc_commit(txn);
-        Serial.printf("[SERCTRL] ALLOC1 txn=%u group=%u module=0x%02X\n",
-                      static_cast<unsigned>(txn),
-                      static_cast<unsigned>(runtime_local_group_numeric()),
-                      static_cast<unsigned>(g_runtime_cfg.local_module_address));
-        return;
-    }
-    if (op == "ALLOC") {
-        if (t.size() < 3) {
-            Serial.println("[SERCTRL] ALLOC missing subcommand");
-            return;
-        }
-        String sub = t[2];
-        sub.toUpperCase();
-        if (sub == "BEGIN") {
-            if (t.size() < 5) {
-                Serial.println("[SERCTRL] ALLOC BEGIN <txn> <expected> [ttl_ms] [limit_kw]");
-                return;
-            }
-            const uint8_t txn = static_cast<uint8_t>(parse_u32_token(t[3], 1u) & 0xFFu);
-            const uint8_t expected = static_cast<uint8_t>(parse_u32_token(t[4], 1u) & 0xFFu);
-            const uint32_t ttl_ms = (t.size() >= 6) ? parse_u32_token(t[5], g_runtime_cfg.controller_alloc_ttl_ms)
-                                                    : g_runtime_cfg.controller_alloc_ttl_ms;
-            const float limit_kw =
-                (t.size() >= 7) ? static_cast<float>(t[6].toFloat()) : 0.0f;
-            serial_ctrl_send_alloc_begin(txn, expected, ttl_ms, limit_kw);
-            Serial.printf("[SERCTRL] ALLOC BEGIN txn=%u expected=%u ttl_ms=%lu limit_kw=%.1f\n",
-                          static_cast<unsigned>(txn),
-                          static_cast<unsigned>(expected),
-                          static_cast<unsigned long>(ttl_ms),
-                          static_cast<double>(limit_kw));
-            return;
-        }
-        if (sub == "DATA") {
-            if (t.size() < 6) {
-                Serial.println("[SERCTRL] ALLOC DATA <txn> <module_group> <module_addr> [limit_kw]");
-                return;
-            }
-            const uint8_t txn = static_cast<uint8_t>(parse_u32_token(t[3], 0u) & 0xFFu);
-            const uint8_t module_group = static_cast<uint8_t>(parse_u32_token(t[4], 0u) & 0xFFu);
-            const uint8_t addr = static_cast<uint8_t>(parse_u32_token(t[5], 0u) & 0xFFu);
-            const float limit_kw = (t.size() >= 7) ? static_cast<float>(t[6].toFloat()) : 0.0f;
-            serial_ctrl_send_alloc_data(txn, module_group, addr, limit_kw);
-            Serial.printf("[SERCTRL] ALLOC DATA txn=%u group=%u addr=0x%02X limit_kw=%.1f\n",
-                          static_cast<unsigned>(txn),
-                          static_cast<unsigned>(module_group),
-                          static_cast<unsigned>(addr),
-                          static_cast<double>(limit_kw));
-            return;
-        }
-        if (sub == "COMMIT") {
-            if (t.size() < 4) {
-                Serial.println("[SERCTRL] ALLOC COMMIT <txn>");
-                return;
-            }
-            const uint8_t txn = static_cast<uint8_t>(parse_u32_token(t[3], 0u) & 0xFFu);
-            serial_ctrl_send_alloc_commit(txn);
-            Serial.printf("[SERCTRL] ALLOC COMMIT txn=%u\n", static_cast<unsigned>(txn));
-            return;
-        }
-        if (sub == "ABORT") {
-            serial_ctrl_send_alloc_abort();
-            Serial.println("[SERCTRL] ALLOC ABORT");
-            return;
-        }
-        Serial.println("[SERCTRL] unknown ALLOC subcommand");
-        return;
-    }
     if (op == "RELAY") {
         if (t.size() < 4) {
             Serial.println("[SERCTRL] RELAY <enable_mask> <state_mask> [hold_ms]");
@@ -5037,21 +4469,6 @@ void serial_ctrl_handle_line(String line) {
         serial_ctrl_send_relay(en, st, hold_ms);
         Serial.printf("[SERCTRL] RELAY en=0x%02X st=0x%02X hold_ms=%lu\n",
                       static_cast<unsigned>(en), static_cast<unsigned>(st), static_cast<unsigned long>(hold_ms));
-        return;
-    }
-    if (op == "POWER") {
-        if (t.size() < 5) {
-            Serial.println("[SERCTRL] POWER <enable0|1> <voltage_v> <current_a>");
-            return;
-        }
-        const bool enable = parse_u32_token(t[2], 0u) != 0u;
-        const float voltage_v = t[3].toFloat();
-        const float current_a = t[4].toFloat();
-        serial_ctrl_send_power_setpoint(enable, voltage_v, current_a);
-        Serial.printf("[SERCTRL] POWER enable=%d voltage_v=%.1f current_a=%.1f\n",
-                      enable ? 1 : 0,
-                      static_cast<double>(voltage_v),
-                      static_cast<double>(current_a));
         return;
     }
     if (op == "FEEDBACK") {
@@ -5150,7 +4567,7 @@ void serial_ctrl_handle_line(String line) {
         return;
     }
     if (op == "STATUS") {
-        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_power=%d ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d\n",
+        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d\n",
                       static_cast<unsigned>(g_runtime_cfg.mode),
                       runtime_mode_name(),
                       static_cast<unsigned>(g_runtime_cfg.plc_id),
@@ -5173,7 +4590,6 @@ void serial_ctrl_handle_line(String line) {
                       g_relay2_closed ? 1 : 0,
                       g_relay3_closed ? 1 : 0,
                       static_cast<unsigned>(g_module_allowlist.size()),
-                      controller_power_command_fresh(millis()) ? 1 : 0,
                       controller_feedback_fresh(millis()) ? 1 : 0,
                       g_ctrl.stop_active ? 1 : 0,
                       g_ctrl.stop_hard ? 1 : 0,
@@ -5402,8 +4818,10 @@ void hlc_reset_session_state(HlcAppContext* ctx) {
     ctx->precharge_seen = false;
     ctx->precharge_converged = false;
     ctx->power_delivery_enabled = false;
+    ctx->stop_requested = false;
     ctx->precharge_count = 0;
     ctx->sa_schedule_tuple_id = 1u;
+    g_hlc_disconnect_hold_until_ms = 0;
     clear_last_bms_request();
 }
 
@@ -5610,15 +5028,23 @@ int hlc_handle_precharge(HlcAppContext* ctx,
     if (allow_energy && !g_relay1_closed) {
         (void)relay1_set(true, "PreCharge");
     }
-    const bool precharge_ready = refresh_precharge_convergence(ctx, req_v);
-    const float present_v = snapshot_present_group_voltage_v();
+    bool precharge_ready = refresh_precharge_convergence(ctx, req_v);
+    if (!precharge_ready && standalone_precharge_start_ready(ctx, req_v)) {
+        ctx->precharge_converged = true;
+        precharge_ready = true;
+    }
+    cbmodules::GroupStatus present_st{};
+    float present_v = 0.0f;
+    float present_i = 0.0f;
+    (void)snapshot_live_present_values(&present_st, &present_v, &present_i);
     Serial.printf("[HLC] {\"msg\":\"PreChargeRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"allow\":%d,\"ready\":%d,"
-                  "\"presentV\":%.1f,\"relay1\":%d,\"prechargeDone\":%d}\n",
+                  "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d}\n",
                   req_v,
                   req_i,
                   allow_energy ? 1 : 0,
                   precharge_ready ? 1 : 0,
                   present_v,
+                  present_i,
                   g_relay1_closed ? 1 : 0,
                   ctx->precharge_converged ? 1 : 0);
 
@@ -5778,6 +5204,9 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     }
     if (allow_energy && ctx->precharge_seen && !ctx->precharge_converged) {
         (void)refresh_precharge_convergence(ctx, requested_v);
+        if (!ctx->precharge_converged && standalone_precharge_start_ready(ctx, requested_v)) {
+            ctx->precharge_converged = true;
+        }
     }
     if (allow_energy && ctx->precharge_converged && req_i > 0.05f && !ctx->power_delivery_enabled) {
         (void)ensure_power_delivery_started(ctx, requested_v, "CurrentDemandStart");
@@ -5927,11 +5356,12 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
     bool ready = false;
     bool stop_charging = false;
     if (stop) {
+        ctx->stop_requested = true;
         ctx->power_delivery_enabled = false;
         update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
-        (void)relay1_set(false, "PowerDeliveryStop");
         if (!mode_controller_has_final_decision()) {
             controller_clear_managed_power_cache();
+            (void)relay1_set(false, "PowerDeliveryStop");
             request_modules_off("PowerDeliveryStop");
         }
         ctx->precharge_converged = false;
@@ -5940,30 +5370,47 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
         ready = false;
         stop_charging = true;
     } else if (renegotiate) {
+        ctx->stop_requested = false;
         ctx->power_delivery_enabled = false;
         update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
-        (void)relay1_set(false, "PowerDeliveryRenegotiate");
         if (!mode_controller_has_final_decision()) {
+            (void)relay1_set(false, "PowerDeliveryRenegotiate");
             request_modules_off("PowerDeliveryRenegotiate");
         }
         ctx->precharge_converged = false;
         applied = true;
         ready = false;
     } else if (start) {
+        ctx->stop_requested = false;
         if (!mode_controller_has_final_decision() && !allow_energy) {
             applied = false;
         } else if (mode_controller_uses_external_feedback()) {
             ControllerManagedFeedbackState fb{};
             const bool fb_ok = controller_get_managed_feedback(millis(), &fb);
-            ready = fb_ok && fb.ready && g_relay1_closed;
+            const bool relaxed_start_ready =
+                fb_ok && fb.valid && g_relay1_closed && sane_non_negative(fb.present_voltage_v) > 1.0f;
+            ready = fb_ok && g_relay1_closed && (fb.ready || relaxed_start_ready);
             ctx->precharge_converged = ctx->precharge_converged || ready;
             ctx->power_delivery_enabled = ready;
             applied = ready;
         } else {
+            const bool standalone_path_armed =
+                !mode_controller_has_final_decision() && ctx->precharge_seen && g_relay1_closed && g_module_output_enabled;
             if (!ctx->precharge_converged) {
                 (void)refresh_precharge_convergence(ctx, g_last_requested_target_v);
+                if (!ctx->precharge_converged && standalone_precharge_start_ready(ctx, g_last_requested_target_v)) {
+                    ctx->precharge_converged = true;
+                }
             }
-            if (ctx->precharge_converged) {
+            if (ctx->precharge_converged || standalone_path_armed) {
+                if (standalone_path_armed && !ctx->precharge_converged) {
+                    Serial.printf("[HLC] {\"msg\":\"PowerDeliveryArmedStart\",\"targetV\":%.1f,"
+                                  "\"relay1\":%d,\"moduleOn\":%d}\n",
+                                  g_last_requested_target_v,
+                                  g_relay1_closed ? 1 : 0,
+                                  g_module_output_enabled ? 1 : 0);
+                    ctx->precharge_converged = true;
+                }
                 applied = ensure_power_delivery_started(ctx, g_last_requested_target_v, "PowerDeliveryStart");
                 ready = applied && g_relay1_closed;
             }
@@ -6020,17 +5467,76 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
     return -ENOTSUP;
 }
 
+int hlc_handle_welding_detection(HlcAppContext* ctx,
+                                 const jpv2g_secc_request_t* req,
+                                 uint8_t* out,
+                                 size_t out_len,
+                                 size_t* written) {
+    if (!ctx || !ctx->secc || !req) return -EINVAL;
+
+    const uint32_t now_ms = millis();
+    const float present_v = snapshot_welding_present_voltage_v(now_ms);
+    const bool shutdown = ctx->stop_requested || !ctx->power_delivery_enabled || !g_relay1_closed;
+
+    Serial.printf("[HLC] {\"msg\":\"WeldingDetectionRuntime\",\"stopRequested\":%d,\"shutdown\":%d,"
+                  "\"relay1\":%d,\"presentV\":%.1f,\"measuredV\":%.1f,\"moduleTargetV\":%.1f,"
+                  "\"moduleTargetI\":%.2f}\n",
+                  ctx->stop_requested ? 1 : 0,
+                  shutdown ? 1 : 0,
+                  g_relay1_closed ? 1 : 0,
+                  present_v,
+                  static_cast<double>(g_last_measured_v),
+                  static_cast<double>(g_last_module_target_v),
+                  static_cast<double>(g_last_module_target_i));
+
+    const uint8_t* sid = ctx->secc->session_id;
+    if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
+        iso2_WeldingDetectionResType res;
+        init_iso2_WeldingDetectionResType(&res);
+        if (shutdown) {
+            set_iso_dc_status_shutdown(&res.DC_EVSEStatus, iso2_EVSENotificationType_StopCharging);
+        } else {
+            set_iso_dc_status_ready(&res.DC_EVSEStatus);
+        }
+        set_iso_physical(&res.EVSEPresentVoltage, iso2_unitSymbolType_V, present_v);
+        return jpv2g_cbv2g_encode_welding_detection_res(
+            sid, iso2_responseCodeType_OK, &res, out, out_len, written);
+    }
+
+    if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
+        din_WeldingDetectionResType res;
+        init_din_WeldingDetectionResType(&res);
+        if (shutdown) {
+            set_din_dc_status_shutdown(&res.DC_EVSEStatus, din_EVSENotificationType_StopCharging);
+        } else {
+            set_din_dc_status_ready(&res.DC_EVSEStatus);
+        }
+        set_din_physical(&res.EVSEPresentVoltage, din_unitSymbolType_V, present_v);
+        return jpv2g_cbv2g_encode_din_welding_detection_res(
+            sid, din_responseCodeType_OK, &res, out, out_len, written);
+    }
+
+    return -ENOTSUP;
+}
+
 void hlc_apply_power_side_effects(HlcAppContext* ctx,
                                   jpv2g_message_type_t type,
                                   const jpv2g_secc_request_t* req) {
     if (!ctx || !req) return;
 
     if (type == JPV2G_SESSION_STOP_REQ) {
+        Serial.printf("[HLC] {\"msg\":\"SessionStopRuntime\",\"relay1\":%d,\"presentV\":%.1f,\"measuredV\":%.1f,"
+                      "\"stopRequested\":%d}\n",
+                      g_relay1_closed ? 1 : 0,
+                      snapshot_welding_present_voltage_v(millis()),
+                      static_cast<double>(g_last_measured_v),
+                      ctx->stop_requested ? 1 : 0);
         ctx->precharge_converged = false;
         ctx->power_delivery_enabled = false;
+        ctx->stop_requested = false;
         clear_last_bms_request();
-        (void)relay1_set(false, "SessionStop");
         if (!mode_controller_has_final_decision()) {
+            (void)relay1_set(false, "SessionStop");
             request_modules_off("SessionStop");
         }
         stop_session(millis());
@@ -6067,6 +5573,9 @@ int hlc_handle_request(jpv2g_message_type_t type,
     }
     if (type == JPV2G_CURRENT_DEMAND_REQ) {
         return hlc_handle_current_demand(ctx, req, out, out_len, written);
+    }
+    if (type == JPV2G_WELDING_DETECTION_REQ) {
+        return hlc_handle_welding_detection(ctx, req, out, out_len, written);
     }
     const int rc = jpv2g_secc_default_handle(ctx->secc, type, req, out, out_len, written);
     if (rc == 0) {
@@ -6107,14 +5616,31 @@ void hlc_worker_task_main(void* arg) {
         jpv2g_socket_close(client_fd);
         g_hlc_active = false;
 
-        g_hlc_ctx.precharge_converged = false;
-        g_hlc_ctx.power_delivery_enabled = false;
-        clear_last_bms_request();
-        if (!mode_controller_has_final_decision()) {
-            request_modules_off("ClientSessionDone");
-            (void)relay1_set(false, "ClientSessionDone");
+        const uint32_t done_ms = millis();
+        const bool unexpected_disconnect_hold =
+            !mode_controller_has_final_decision() && !g_hlc_ctx.stop_requested && cp_connected(g_cp_state) &&
+            (g_hlc_ctx.precharge_seen || g_hlc_ctx.power_delivery_enabled || g_relay1_closed || g_module_output_enabled);
+        if (unexpected_disconnect_hold) {
+            g_hlc_disconnect_hold_until_ms = done_ms + HLC_UNEXPECTED_DISCONNECT_HOLD_MS;
+            Serial.printf("[HLC] unexpected disconnect: holding power path for %lu ms"
+                          " (cp=%c relay1=%d moduleOn=%d prechargeSeen=%d delivery=%d)\n",
+                          static_cast<unsigned long>(HLC_UNEXPECTED_DISCONNECT_HOLD_MS),
+                          g_cp_state,
+                          g_relay1_closed ? 1 : 0,
+                          g_module_output_enabled ? 1 : 0,
+                          g_hlc_ctx.precharge_seen ? 1 : 0,
+                          g_hlc_ctx.power_delivery_enabled ? 1 : 0);
+        } else {
+            g_hlc_ctx.precharge_converged = false;
+            g_hlc_ctx.power_delivery_enabled = false;
+            g_hlc_ctx.stop_requested = false;
+            clear_last_bms_request();
+            if (!mode_controller_has_final_decision()) {
+                request_modules_off("ClientSessionDone");
+                (void)relay1_set(false, "ClientSessionDone");
+            }
+            stop_session(done_ms);
         }
-        stop_session(millis());
 
         if (g_hlc_ctx.precharge_seen) {
             Serial.printf("[HLC] precharge reached, count=%lu\n", static_cast<unsigned long>(g_hlc_ctx.precharge_count));
@@ -6181,6 +5707,7 @@ void stop_hlc_stack() {
     g_hlc_active = false;
     g_hlc_ctx.precharge_converged = false;
     g_hlc_ctx.power_delivery_enabled = false;
+    g_hlc_ctx.stop_requested = false;
     if (!mode_controller_has_final_decision()) {
         request_modules_off("StopHlc");
         (void)relay1_set(false, "StopHlc");
@@ -6293,6 +5820,9 @@ void service_sdp_once() {
 
 void service_hlc_tcp_once() {
     if (!g_hlc_ready) return;
+    if (g_hlc_active || g_hlc_active_client_fd >= 0) {
+        return;
+    }
 
     int client_fd = -1;
     struct sockaddr_in6 client_addr;
@@ -6382,6 +5912,7 @@ void stop_session(uint32_t now_ms) {
     g_session_started_ms = 0;
     g_bcd_entered = false;
     g_session_matched = false;
+    g_hlc_disconnect_hold_until_ms = 0;
     g_last_fsm_state = slac::evse::State::Reset;
     g_last_ev_soc_pct = -1;
 }
@@ -6446,6 +5977,36 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
     g_next_qca_init_ms = 0;
     Serial.println("[APP] ready, waiting for CP B/C/D");
     return true;
+}
+
+void service_hlc_disconnect_hold(uint32_t now_ms) {
+    if (g_hlc_disconnect_hold_until_ms == 0u) {
+        return;
+    }
+    if (g_hlc_active) {
+        g_hlc_disconnect_hold_until_ms = 0u;
+        return;
+    }
+    if (!cp_connected(g_cp_state)) {
+        g_hlc_disconnect_hold_until_ms = 0u;
+        return;
+    }
+    if (static_cast<int32_t>(now_ms - g_hlc_disconnect_hold_until_ms) < 0) {
+        return;
+    }
+
+    Serial.printf("[HLC] unexpected disconnect hold expired after %lu ms, stopping power path\n",
+                  static_cast<unsigned long>(HLC_UNEXPECTED_DISCONNECT_HOLD_MS));
+    g_hlc_disconnect_hold_until_ms = 0u;
+    g_hlc_ctx.precharge_converged = false;
+    g_hlc_ctx.power_delivery_enabled = false;
+    g_hlc_ctx.stop_requested = false;
+    clear_last_bms_request();
+    if (!mode_controller_has_final_decision()) {
+        request_modules_off("HlcDisconnectTimeout");
+        (void)relay1_set(false, "HlcDisconnectTimeout");
+    }
+    stop_session(now_ms);
 }
 
 void process_cp_and_fsm(uint32_t now_ms) {
@@ -6620,6 +6181,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
 void setup() {
     Serial.begin(115200);
     delay(200);
+    g_loop_task = xTaskGetCurrentTaskHandle();
 
     Serial.println();
     Serial.println("cbslac + jpv2g ESP32-S3 SLAC/HLC (to PreCharge)");
@@ -6691,6 +6253,8 @@ void setup() {
     }
 
     (void)try_init_qca_and_fsm(millis());
+    log_memory_runtime("boot");
+    g_next_mem_log_ms = millis() + MEMORY_LOG_PERIOD_MS;
 }
 
 void loop() {
@@ -6709,6 +6273,7 @@ void loop() {
     controller_service_watchdogs(now_ms);
     controller_service_periodic_tx(now_ms);
     process_cp_and_fsm(now_ms);
+    service_hlc_disconnect_hold(now_ms);
     if (mode_uses_plc_module_manager()) {
         service_module_manager_once(now_ms);
     }
@@ -6716,6 +6281,10 @@ void loop() {
         rfid_poll(now_ms);
     }
     service_lwip_tx_queue_once();
+    if (static_cast<int32_t>(now_ms - g_next_mem_log_ms) >= 0) {
+        log_memory_runtime("periodic");
+        g_next_mem_log_ms = now_ms + MEMORY_LOG_PERIOD_MS;
+    }
     const bool hlc_priority = g_session_started || g_hlc_active || cp_connected(g_cp_state);
     delay(hlc_priority ? 1 : 5);
 }

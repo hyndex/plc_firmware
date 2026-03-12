@@ -1,84 +1,117 @@
-# Controller UART Router Mode
+# Controller UART Bridge Mode
 
-`mode=2` is the direct-controller split:
+Current controller-managed operation is the runtime mode reported as:
 
-- `Controller -> PLC` over `UART`
-- `Controller -> Modules` over external `CAN`
-- the PLC stays responsible for `CP`, `SLAC`, `HLC`, and physical relays
-- the PLC does not start its local MCP2515/module-manager path in this mode
+- `mode=1`
+- `external_controller`
 
-## What Changes In `mode=2`
+Legacy aliases such as `mode=2`, `mode=3`, `uart_router`, `controller_managed`, and
+`controller_supported` are normalized into this same runtime mode by the firmware.
 
-- PLC-side module CAN is disabled at boot.
-- PLC-side `cbmodules::ModuleManager` is not initialized.
-- PLC does not poll controller CAN RX frames.
-- PLC does not publish PLC controller-status CAN frames.
-- `CTRL ALLOC ...` is rejected.
-- `CTRL POWER ...` is rejected.
-- `CTRL FEEDBACK ...` remains valid and is what drives EV-facing HLC readiness / present V/I.
-- `CTRL RELAY ...` remains valid and directly controls Relay1/2/3.
-- `CTRL AUTH ...`, `CTRL SLAC ...`, `CTRL STOP ...`, `CTRL STATUS`, and `CTRL MODE` remain valid.
+## Architecture
+
+In `external_controller` mode the split is:
+
+- `Controller -> PLC` over UART / USB CDC
+- `Controller -> modules` over the controller's external CAN path
+- PLC owns `CP`, `SLAC`, `HLC`, session decoding, and serial status export
+- Controller owns relay decisions and all module-power decisions
+
+The PLC does not run its own module-manager / module-control stack in this mode.
+It reports EV demand and session state, and it executes controller commands.
+
+## Relay Ownership
+
+Relay ownership in this mode is controller-side:
+
+- `CTRL RELAY` commands directly drive `Relay1`, `Relay2`, and `Relay3`
+- `CTRL STOP` is an explicit controller stop request for PLC-side session policy
+- PLC HLC / CP / SLAC events do not autonomously toggle relays in this mode
+
+Bit mapping for `CTRL RELAY`:
+
+- bit0 -> `Relay1`
+- bit1 -> `Relay2`
+- bit2 -> `Relay3`
+
+## Supported UART Commands
+
+Supported controller commands are plain text, one line per command:
+
+- `CTRL HB [timeout_ms]`
+- `CTRL AUTH <deny|pending|grant> [ttl_ms]`
+- `CTRL SLAC <disarm|arm|start|abort> [arm_ms]`
+- `CTRL RELAY <enable_mask> <state_mask> [hold_ms]`
+- `CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]`
+- `CTRL STOP <soft|hard|clear> [timeout_ms]`
+- `CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]`
+- `CTRL OWNERSHIP <connector_id> <module_addr>`
+- `CTRL SAVE`
+- `CTRL STATUS`
+- `CTRL RESET`
+
+Removed from the supported UART surface:
+
+- `CTRL ALLOC ...`
+- `CTRL ALLOC1`
+- `CTRL POWER ...`
+
+Those belonged to the older PLC-owned-module controller flow and are not part of the
+current bridge-mode contract.
 
 ## UART Event Stream
 
-When the PLC is in `mode=2`, it emits a stable serial event stream:
+The PLC emits a structured serial event stream in this mode:
 
 - `[SERCTRL] LOCAL ...`
-  - one-line identity/config summary
-  - includes mode, PLC ID, connector ID, controller ID, local module identity, and whether PLC CAN/module-manager are enabled
-
 - `[SERCTRL] EVT CP ...`
-  - CP phase/duty
-  - controller heartbeat/auth view
-  - SLAC-start permission
-  - energy permission
-
 - `[SERCTRL] EVT SLAC ...`
-  - session-started
-  - matched
-  - FSM state
-  - failure count
-
 - `[SERCTRL] EVT HLC ...`
-  - HLC ready/active
-  - auth state
-  - feedback valid/ready
-  - feedback present V/I
-
 - `[SERCTRL] EVT SESSION ...`
-  - session/match state
-  - Relay1/2/3 state
-  - stop state
-  - meter Wh
-  - EV SOC if known
-
 - `[SERCTRL] EVT BMS ...`
-  - HLC stage
-  - target voltage/current requested by the EV
-  - delivery-ready flag
-  - latest controller feedback snapshot
+- `[SERCTRL] IDENTITY ...`
+- `[SERCTRL] ACK ...`
+- `[SERCTRL] EVT RFID ...`
 
-- `[SERCTRL] EVT ID ...`
-  - `EVMAC`, `EVCCID`, or `EMAID` when available
+The controller should primarily consume:
 
-## Intended Controller Behavior
+- `EVT BMS` for EV-requested voltage/current and HLC stage
+- `EVT HLC` for readiness and feedback visibility
+- `EVT SESSION` for relay and stop state
+- `EVT CP` / `EVT SLAC` for CP and matching progression
 
-The external controller should:
+## Important Runtime Behavior
 
-1. Put the PLC into `mode=2`.
-2. Keep `CTRL HB` alive.
-3. Drive `CTRL AUTH` and `CTRL SLAC`.
-4. Read `[SERCTRL] EVT BMS ...` and `[SERCTRL] EVT HLC ...` to learn requested EV targets and session state.
-5. Control modules directly over its own CAN path.
-6. Feed the live bus result back to the PLC with `CTRL FEEDBACK ...`.
-7. Close/open relays with `CTRL RELAY ...`.
+- The PLC still gates PWM / SLAC start from controller auth + SLAC commands.
+- The PLC still answers ISO 15118 / DIN requests locally.
+- EV-facing present voltage/current and readiness come from `CTRL FEEDBACK`.
+- The PLC does not compute or command module setpoints in this mode.
+
+## UART Integrity
+
+There is no end-to-end application checksum appended to the ASCII UART command line.
+
+What exists today:
+
+- USB CDC / USB transport already has lower-layer integrity and retries
+- after parsing a `CTRL ...` line, the firmware internally injects the command into
+  the legacy control-frame parser and generates an internal CRC-8 for that in-memory
+  frame
+
+That internal CRC is not an end-to-end UART checksum. It only preserves one common
+validation path inside the firmware.
+
+Practical guidance:
+
+- for the current USB CDC deployment, an extra UART checksum is not strictly required
+- if this is moved to a raw/noisy UART link later, add explicit framing plus checksum
+  or CRC on the wire
 
 ## Helper Tool
 
-Use [uart_router_serial_monitor.py](/home/jpi/Desktop/EVSE/plc_firmware/tools/uart_router_serial_monitor.py) as the basic keepalive/status monitor for this mode:
+Use [uart_router_serial_monitor.py](/home/jpi/Desktop/EVSE/plc_firmware/tools/uart_router_serial_monitor.py)
+for keepalive and event monitoring:
 
 ```bash
 python3 -u tools/uart_router_serial_monitor.py --port /dev/ttyACM0 --plc-id 1 --controller-id 1
 ```
-
-It does not control modules. It only keeps the PLC UART contract alive and surfaces the serial event stream.
