@@ -2,6 +2,10 @@
 """
 Live vehicle end-to-end external-controller charging test with direct Maxwell CAN.
 
+Historical filename note:
+  - The runtime under test is mode 1 / external_controller only.
+  - The file name is legacy and no longer reflects a distinct PLC mode.
+
 Important mode note:
   - The requested "controller-controlled / UART-only" architecture is firmware
     `mode=1` (`external_controller`).

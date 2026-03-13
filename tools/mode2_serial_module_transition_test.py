@@ -2,6 +2,10 @@
 """
 Mode-2 UART-router plus direct Maxwell module transition test.
 
+Historical filename note:
+  - The runtime under test is mode 1 / external_controller only.
+  - The file name is legacy and no longer reflects a distinct PLC mode.
+
 Architecture under test:
   - Controller -> PLC over UART for relay control/status only.
   - Controller -> Modules over CAN directly using the Maxwell V1.50 protocol.
@@ -818,7 +822,7 @@ class ModuleTransitionRunner:
             raise RuntimeError(f"{plc_name} did not enter mode 1")
         if status.can_stack != 0 or status.module_mgr != 0:
             raise RuntimeError(
-                f"{plc_name} mode2 routing mismatch: can_stack={status.can_stack} module_mgr={status.module_mgr}"
+                f"{plc_name} external-controller routing mismatch: can_stack={status.can_stack} module_mgr={status.module_mgr}"
             )
         return status
 

@@ -12,6 +12,15 @@
 #include <WiFi.h>
 #include <esp_heap_caps.h>
 
+#ifndef CBPLC_ENABLE_STATUS_LEDS
+#define CBPLC_ENABLE_STATUS_LEDS 1
+#endif
+
+#ifndef FASTLED_INTERNAL
+#define FASTLED_INTERNAL
+#endif
+#include <FastLED.h>
+
 #include <array>
 #include <algorithm>
 #include <cerrno>
@@ -216,7 +225,13 @@ constexpr int RELAY1_EXP_PIN = 0;
 constexpr int RELAY2_EXP_PIN = 1;
 constexpr int RELAY3_EXP_PIN = 2;
 constexpr int SW4_EXP_PIN = 6;
+constexpr int EMERGENCY_EXP_PIN = 8;
 constexpr bool RELAY_ACTIVE_HIGH = true;
+
+constexpr int LED_DATA_PIN = 3;
+constexpr uint8_t DEFAULT_LED_COUNT = 10u;
+constexpr uint8_t MAX_LED_COUNT = 32u;
+constexpr uint8_t LED_BRIGHTNESS = 96u;
 
 constexpr int CAN_CS_PIN = 41;
 constexpr int CAN_INT_PIN = 40;
@@ -232,6 +247,8 @@ constexpr uint32_t RFID_REINIT_BACKOFF_MS = 5000u;
 constexpr uint32_t RFID_KEEPALIVE_MS = 1000u;
 constexpr uint32_t RFID_MISSING_LOG_MS = 30000u;
 constexpr size_t RFID_MAX_UID_BYTES = 10u;
+constexpr uint32_t EMERGENCY_POLL_MS = 25u;
+constexpr uint32_t EMERGENCY_DEBOUNCE_MS = 50u;
 struct RfidPinMap {
     const char* name;
     int ss_pin;
@@ -244,13 +261,13 @@ constexpr std::array<RfidPinMap, 2> RFID_PIN_MAPS{{
 }};
 
 constexpr uint32_t CFG_MAGIC = 0x4342504Cu; // "CBPL"
-constexpr uint16_t CFG_VERSION = 5u;
+constexpr uint16_t CFG_VERSION = 6u;
 
 #ifndef CBPLC_DEFAULT_MODE
 #ifdef CBPLC_DEFAULT_STANDALONE_MODE
 #define CBPLC_DEFAULT_MODE ((CBPLC_DEFAULT_STANDALONE_MODE) ? 0 : 1)
 #else
-#define CBPLC_DEFAULT_MODE 0
+#define CBPLC_DEFAULT_MODE 1
 #endif
 #endif
 
@@ -281,6 +298,16 @@ constexpr uint16_t CFG_VERSION = 5u;
 enum class OperatingMode : uint8_t {
     Standalone = 0u,
     ExternalController = 1u,
+};
+
+enum class LedPreset : uint8_t {
+    Booting = 0u,
+    Available = 1u,
+    Preparing = 2u,
+    Charging = 3u,
+    Finishing = 4u,
+    Faulted = 5u,
+    Emergency = 6u,
 };
 
 constexpr uint8_t DEFAULT_MODE_RAW = static_cast<uint8_t>(CBPLC_DEFAULT_MODE);
@@ -378,12 +405,18 @@ void serial_tx_slac_status();
 void serial_tx_hlc_status(uint32_t now_ms);
 void serial_tx_session_status(uint32_t now_ms);
 void serial_tx_bms_status();
+void serial_tx_emergency_event(bool active);
 bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, const char* reason);
 bool lock_modules(uint32_t timeout_ms);
 void unlock_modules();
 void stop_hlc_stack();
 void stop_session(uint32_t now_ms);
 float snapshot_present_group_voltage_v();
+void controller_force_safe_stop(const char* reason);
+bool read_emergency_pressed();
+void service_emergency_stop(uint32_t now_ms);
+void init_status_leds();
+void service_status_leds(uint32_t now_ms);
 
 class Mcp2515Transport : public cbmodules::CanTransport {
 public:
@@ -1121,6 +1154,22 @@ struct RuntimeConfig {
     uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
     uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
     uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
+    uint8_t led_count{DEFAULT_LED_COUNT};
+};
+
+struct RuntimeConfigV5 {
+    uint32_t magic{CFG_MAGIC};
+    uint16_t version{5u};
+    uint8_t mode{static_cast<uint8_t>(DEFAULT_MODE)};
+    bool slac_requires_controller_start{DEFAULT_SLAC_REQUIRES_CONTROLLER_START};
+    uint8_t plc_id{DEFAULT_PLC_ID};
+    uint8_t connector_id{DEFAULT_CONNECTOR_ID};
+    uint8_t controller_id{DEFAULT_CONTROLLER_ID};
+    uint8_t local_module_address{DEFAULT_LOCAL_MODULE_ADDRESS};
+    uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
+    uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
+    uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
+    uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
 };
 
 struct RuntimeConfigV4 {
@@ -1206,6 +1255,12 @@ struct ControllerManagedFeedbackState {
     float present_current_a{0.0f};
 };
 
+struct LedRuntimeState {
+    bool initialized{false};
+    LedPreset preset{LedPreset::Booting};
+    uint32_t last_update_ms{0};
+};
+
 bool controller_get_managed_feedback(uint32_t now_ms, ControllerManagedFeedbackState* out);
 
 struct SerialStatusTxSchedule {
@@ -1238,6 +1293,7 @@ struct RfidRuntimeState {
 RuntimeConfig g_runtime_cfg{};
 ControllerRuntimeState g_ctrl{};
 ControllerManagedFeedbackState g_ctrl_feedback{};
+LedRuntimeState g_led_state{};
 SerialStatusTxSchedule g_serial_tx{};
 MFRC522 g_rfid;
 RfidRuntimeState g_rfid_state{};
@@ -1269,6 +1325,7 @@ uint8_t g_slac_failures_this_cp = 0;
 uint32_t g_slac_hold_until_ms = 0;
 slac::evse::State g_last_fsm_state = slac::evse::State::Reset;
 uint32_t g_next_qca_init_ms = 0;
+bool g_emergency_stop_active = false;
 
 typedef struct {
     jpv2g_secc_t* secc;
@@ -1294,6 +1351,7 @@ QueueHandle_t g_hlc_client_queue = nullptr;
 TaskHandle_t g_hlc_worker_task = nullptr;
 TaskHandle_t g_loop_task = nullptr;
 uint32_t g_next_mem_log_ms = 0;
+CRGB g_leds[MAX_LED_COUNT];
 struct netif g_plc_netif{};
 bool g_plc_netif_ready = false;
 char g_plc_ifname[JPV2G_IFACE_NAME_MAX] = {0};
@@ -1306,6 +1364,190 @@ QueueHandle_t g_lwip_tx_queue = nullptr;
 uint32_t g_next_lwip_tx_drop_log_ms = 0;
 Mcp2515Transport g_can;
 cbmodules::ModuleManager g_module_mgr{};
+
+uint8_t active_led_count() {
+    return std::max<uint8_t>(1u, std::min<uint8_t>(g_runtime_cfg.led_count, MAX_LED_COUNT));
+}
+
+const char* led_preset_name(LedPreset preset) {
+    switch (preset) {
+        case LedPreset::Booting:
+            return "booting";
+        case LedPreset::Available:
+            return "available";
+        case LedPreset::Preparing:
+            return "preparing";
+        case LedPreset::Charging:
+            return "charging";
+        case LedPreset::Finishing:
+            return "finishing";
+        case LedPreset::Faulted:
+            return "faulted";
+        case LedPreset::Emergency:
+            return "emergency";
+        default:
+            return "available";
+    }
+}
+
+bool parse_led_preset_token(String token, LedPreset* out) {
+    token.trim();
+    token.toLowerCase();
+    LedPreset preset = LedPreset::Available;
+    if (token == "boot" || token == "booting" || token == "0") {
+        preset = LedPreset::Booting;
+    } else if (token == "available" || token == "ready" || token == "1") {
+        preset = LedPreset::Available;
+    } else if (token == "preparing" || token == "prepare" || token == "plugged" || token == "2") {
+        preset = LedPreset::Preparing;
+    } else if (token == "charging" || token == "charge" || token == "3") {
+        preset = LedPreset::Charging;
+    } else if (token == "finishing" || token == "finish" || token == "stopping" || token == "4") {
+        preset = LedPreset::Finishing;
+    } else if (token == "faulted" || token == "fault" || token == "error" || token == "5") {
+        preset = LedPreset::Faulted;
+    } else if (token == "emergency" || token == "estop" || token == "e-stop" || token == "6") {
+        preset = LedPreset::Emergency;
+    } else {
+        return false;
+    }
+    if (out) {
+        *out = preset;
+    }
+    return true;
+}
+
+LedPreset effective_led_preset() {
+    return g_emergency_stop_active ? LedPreset::Emergency : g_led_state.preset;
+}
+
+void led_fill_active(const CRGB& color) {
+    const uint8_t count = active_led_count();
+    fill_solid(g_leds, MAX_LED_COUNT, CRGB::Black);
+    fill_solid(g_leds, count, color);
+}
+
+void anim_solid(const CRGB& color) {
+    led_fill_active(color);
+}
+
+void anim_blink(const CRGB& color, uint16_t on_ms, uint16_t off_ms, uint32_t now_ms) {
+    const uint32_t cycle = static_cast<uint32_t>(on_ms) + static_cast<uint32_t>(off_ms);
+    const bool on = cycle > 0u && (now_ms % cycle) < on_ms;
+    if (on) {
+        led_fill_active(color);
+    } else {
+        led_fill_active(CRGB::Black);
+    }
+}
+
+void anim_double_flash(const CRGB& color, uint16_t flash_ms, uint16_t gap_ms, uint16_t pause_ms, uint32_t now_ms) {
+    const uint32_t cycle = static_cast<uint32_t>(flash_ms) + gap_ms + flash_ms + pause_ms;
+    const uint32_t t = cycle > 0u ? (now_ms % cycle) : 0u;
+    const bool on = (t < flash_ms) || (t >= (flash_ms + gap_ms) && t < (flash_ms + gap_ms + flash_ms));
+    if (on) {
+        led_fill_active(color);
+    } else {
+        led_fill_active(CRGB::Black);
+    }
+}
+
+void anim_chase(const CRGB& color, uint8_t width, uint16_t period_ms, uint8_t tail_dim, uint32_t now_ms) {
+    const uint8_t count = active_led_count();
+    const uint16_t phase = period_ms > 0u ? static_cast<uint16_t>(now_ms % period_ms) : 0u;
+    const uint8_t head = period_ms > 0u ? static_cast<uint8_t>((static_cast<uint32_t>(phase) * count) / period_ms) : 0u;
+    fill_solid(g_leds, MAX_LED_COUNT, CRGB::Black);
+    for (uint8_t k = 0; k < width; ++k) {
+        const uint8_t idx = static_cast<uint8_t>((head + k) % count);
+        g_leds[idx] = color;
+        if (tail_dim != 0u && k > 0u) {
+            g_leds[idx].nscale8_video(255u - static_cast<uint8_t>(std::min<int>(254, k * tail_dim)));
+        }
+    }
+}
+
+void anim_theater_chase(const CRGB& color, uint8_t spacing, uint16_t step_ms, uint32_t now_ms) {
+    const uint8_t count = active_led_count();
+    if (spacing == 0u || step_ms == 0u) {
+        anim_solid(color);
+        return;
+    }
+    fill_solid(g_leds, MAX_LED_COUNT, CRGB::Black);
+    const uint8_t phase = static_cast<uint8_t>((now_ms / step_ms) % spacing);
+    for (uint8_t i = 0; i < count; ++i) {
+        g_leds[i] = ((i % spacing) == phase) ? color : CRGB::Black;
+    }
+}
+
+void anim_battery_fill(const CRGB& color, uint16_t fill_ms, uint16_t hold_full_ms, uint32_t now_ms) {
+    const uint8_t count = active_led_count();
+    const uint32_t cycle = static_cast<uint32_t>(fill_ms) + static_cast<uint32_t>(hold_full_ms);
+    const uint32_t t = cycle > 0u ? (now_ms % cycle) : 0u;
+    uint8_t lit = count;
+    if (t < fill_ms && fill_ms > 0u) {
+        lit = 1u + static_cast<uint8_t>((static_cast<uint32_t>(count) * t) / fill_ms);
+        if (lit > count) {
+            lit = count;
+        }
+    }
+    fill_solid(g_leds, MAX_LED_COUNT, CRGB::Black);
+    for (uint8_t i = 0; i < lit; ++i) {
+        g_leds[i] = color;
+        if (i + 1u < lit) {
+            g_leds[i].nscale8_video(200);
+        }
+    }
+}
+
+void init_status_leds() {
+#if !CBPLC_ENABLE_STATUS_LEDS
+    g_led_state.initialized = false;
+    g_led_state.preset = LedPreset::Booting;
+    return;
+#endif
+    pinMode(LED_DATA_PIN, OUTPUT);
+    FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(g_leds, MAX_LED_COUNT);
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000);
+    fill_solid(g_leds, MAX_LED_COUNT, CRGB::Black);
+    FastLED.show();
+    g_led_state.initialized = true;
+    g_led_state.preset = LedPreset::Booting;
+}
+
+void service_status_leds(uint32_t now_ms) {
+#if !CBPLC_ENABLE_STATUS_LEDS
+    (void)now_ms;
+    return;
+#endif
+    if (!g_led_state.initialized) {
+        return;
+    }
+    switch (effective_led_preset()) {
+        case LedPreset::Booting:
+            anim_chase(CRGB::Cyan, 2u, 900u, 90u, now_ms);
+            break;
+        case LedPreset::Available:
+            anim_solid(CRGB::Green);
+            break;
+        case LedPreset::Preparing:
+            anim_solid(CRGB::Blue);
+            break;
+        case LedPreset::Charging:
+            anim_battery_fill(CRGB::Blue, 1400u, 300u, now_ms);
+            break;
+        case LedPreset::Finishing:
+            anim_theater_chase(CRGB::Gold, 3u, 120u, now_ms);
+            break;
+        case LedPreset::Faulted:
+            anim_blink(CRGB::OrangeRed, 350u, 350u, now_ms);
+            break;
+        case LedPreset::Emergency:
+            anim_double_flash(CRGB::Red, 120u, 150u, 700u, now_ms);
+            break;
+    }
+    FastLED.show();
+}
 SemaphoreHandle_t g_module_mutex = nullptr;
 SemaphoreHandle_t g_relay_mutex = nullptr;
 bool g_module_ready = false;
@@ -1838,6 +2080,7 @@ bool controller_auth_granted(uint32_t now_ms) {
 }
 
 bool controller_allows_slac_start(uint32_t now_ms) {
+    if (g_emergency_stop_active) return false;
     if (!mode_requires_controller_contract()) return true;
     if (mode_controller_has_final_decision()) {
         if (!g_ctrl.slac_armed) return false;
@@ -1852,6 +2095,7 @@ bool controller_allows_slac_start(uint32_t now_ms) {
 }
 
 bool controller_allows_energy(uint32_t now_ms) {
+    if (g_emergency_stop_active) return false;
     if (!mode_requires_controller_contract()) return true;
     if (mode_controller_routes_power_externally_over_uart()) {
         const bool granted = g_ctrl.auth_state == ControllerAuthState::Granted;
@@ -2595,12 +2839,14 @@ bool relay1_init() {
     const auto p2 = static_cast<PCA95x5::Port::Port>(RELAY2_EXP_PIN);
     const auto p3 = static_cast<PCA95x5::Port::Port>(RELAY3_EXP_PIN);
     const auto sw4 = static_cast<PCA95x5::Port::Port>(SW4_EXP_PIN);
+    const auto emergency = static_cast<PCA95x5::Port::Port>(EMERGENCY_EXP_PIN);
 
     const bool off_level = RELAY_ACTIVE_HIGH ? false : true;
     (void)g_relay_expander.direction(p1, PCA95x5::Direction::OUT);
     (void)g_relay_expander.direction(p2, PCA95x5::Direction::OUT);
     (void)g_relay_expander.direction(p3, PCA95x5::Direction::OUT);
     (void)g_relay_expander.direction(sw4, PCA95x5::Direction::IN);
+    (void)g_relay_expander.direction(emergency, PCA95x5::Direction::IN);
 
     (void)g_relay_expander.write(p1, off_level ? PCA95x5::Level::H : PCA95x5::Level::L);
     (void)g_relay_expander.write(p2, off_level ? PCA95x5::Level::H : PCA95x5::Level::L);
@@ -2610,7 +2856,7 @@ bool relay1_init() {
     g_relay3_closed = false;
     g_relay_ready = true;
     unlock_relay();
-    Serial.printf("[RELAY] ready addr=0x%02X pin=P00/P01/P02, SW4=P06\n", static_cast<unsigned>(RELAY_I2C_ADDR));
+    Serial.printf("[RELAY] ready addr=0x%02X pin=P00/P01/P02, SW4=P06, EM=P10\n", static_cast<unsigned>(RELAY_I2C_ADDR));
     return true;
 }
 
@@ -2651,10 +2897,59 @@ bool read_sw4_pressed() {
     if (!g_relay_ready && !relay1_init()) return false;
     if (!lock_relay(20)) return false;
     const auto sw4 = static_cast<PCA95x5::Port::Port>(SW4_EXP_PIN);
-    (void)g_relay_expander.direction(sw4, PCA95x5::Direction::IN);
     const auto lv = g_relay_expander.read(sw4);
     unlock_relay();
     return lv == PCA95x5::Level::L;
+}
+
+bool read_emergency_pressed() {
+    if (!g_relay_ready && !relay1_init()) return false;
+    if (!lock_relay(20)) return false;
+    const auto emergency = static_cast<PCA95x5::Port::Port>(EMERGENCY_EXP_PIN);
+    const auto lv = g_relay_expander.read(emergency);
+    unlock_relay();
+    return lv == PCA95x5::Level::L;
+}
+
+void serial_tx_emergency_event(bool active) {
+    if (!mode_uart_status_stream_active()) return;
+    Serial.printf("[SERCTRL] EVT EMERGENCY plc_id=%u connector_id=%u active=%d\n",
+                  static_cast<unsigned>(g_runtime_cfg.plc_id),
+                  static_cast<unsigned>(g_runtime_cfg.connector_id),
+                  active ? 1 : 0);
+}
+
+void service_emergency_stop(uint32_t now_ms) {
+    static bool sampled_state = false;
+    static bool debounced_state = false;
+    static uint32_t last_change_ms = 0u;
+    static uint32_t last_poll_ms = 0u;
+
+    if (last_poll_ms != 0u && (now_ms - last_poll_ms) < EMERGENCY_POLL_MS) {
+        return;
+    }
+    last_poll_ms = now_ms;
+    const bool raw_state = read_emergency_pressed();
+    if (raw_state != sampled_state) {
+        sampled_state = raw_state;
+        last_change_ms = now_ms;
+    }
+    if ((now_ms - last_change_ms) < EMERGENCY_DEBOUNCE_MS || debounced_state == sampled_state) {
+        return;
+    }
+
+    debounced_state = sampled_state;
+    g_emergency_stop_active = debounced_state;
+    if (g_emergency_stop_active) {
+        g_ctrl.auth_state = ControllerAuthState::Denied;
+        g_ctrl.auth_expiry_ms = 0u;
+        g_ctrl.slac_armed = false;
+        g_ctrl.slac_start_latched = false;
+        g_ctrl.slac_arm_expiry_ms = 0u;
+        controller_force_safe_stop("EmergencyStop");
+    }
+    Serial.printf("[EMERGENCY] state=%s\n", g_emergency_stop_active ? "PRESSED" : "RELEASED");
+    serial_tx_emergency_event(g_emergency_stop_active);
 }
 
 void normalize_runtime_config(RuntimeConfig* cfg) {
@@ -2676,6 +2971,7 @@ void normalize_runtime_config(RuntimeConfig* cfg) {
         std::max<uint32_t>(500u, std::min<uint32_t>(cfg->controller_auth_ttl_ms, 30000u));
     cfg->controller_slac_arm_timeout_ms =
         std::max<uint32_t>(1000u, std::min<uint32_t>(cfg->controller_slac_arm_timeout_ms, 60000u));
+    cfg->led_count = std::max<uint8_t>(1u, std::min<uint8_t>(cfg->led_count, MAX_LED_COUNT));
 }
 
 bool migrate_runtime_config_v4(const RuntimeConfigV4& legacy, RuntimeConfig* out) {
@@ -2694,6 +2990,28 @@ bool migrate_runtime_config_v4(const RuntimeConfigV4& legacy, RuntimeConfig* out
     migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
     migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
     migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    normalize_runtime_config(&migrated);
+    *out = migrated;
+    return true;
+}
+
+bool migrate_runtime_config_v5(const RuntimeConfigV5& legacy, RuntimeConfig* out) {
+    if (!out) return false;
+    if (legacy.magic != CFG_MAGIC || legacy.version != 5u) {
+        return false;
+    }
+    RuntimeConfig migrated{};
+    migrated.mode = legacy.mode;
+    migrated.slac_requires_controller_start = legacy.slac_requires_controller_start;
+    migrated.plc_id = legacy.plc_id;
+    migrated.connector_id = legacy.connector_id;
+    migrated.controller_id = legacy.controller_id;
+    migrated.local_module_address = legacy.local_module_address;
+    migrated.can_node_id = legacy.can_node_id;
+    migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
+    migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
+    migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    migrated.led_count = DEFAULT_LED_COUNT;
     normalize_runtime_config(&migrated);
     *out = migrated;
     return true;
@@ -2723,7 +3041,7 @@ bool migrate_runtime_config_v3(const RuntimeConfigV3& legacy, RuntimeConfig* out
 }
 
 void print_runtime_config() {
-    Serial.printf("[CFG] mode=%u(%s) slac_ctrl=%d plc_id=%u can_node_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u owner_id=0x%04X hb_to=%lu auth_ttl=%lu slac_arm_to=%lu\n",
+    Serial.printf("[CFG] mode=%u(%s) slac_ctrl=%d plc_id=%u can_node_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u owner_id=0x%04X hb_to=%lu auth_ttl=%lu slac_arm_to=%lu led_count=%u\n",
                   static_cast<unsigned>(g_runtime_cfg.mode),
                   runtime_mode_name(),
                   g_runtime_cfg.slac_requires_controller_start ? 1 : 0,
@@ -2736,7 +3054,8 @@ void print_runtime_config() {
                   static_cast<unsigned>(runtime_module_manager_owner_id()),
                   static_cast<unsigned long>(g_runtime_cfg.controller_heartbeat_timeout_ms),
                   static_cast<unsigned long>(g_runtime_cfg.controller_auth_ttl_ms),
-                  static_cast<unsigned long>(g_runtime_cfg.controller_slac_arm_timeout_ms));
+                  static_cast<unsigned long>(g_runtime_cfg.controller_slac_arm_timeout_ms),
+                  static_cast<unsigned>(g_runtime_cfg.led_count));
 }
 
 bool load_runtime_config_from_nvs() {
@@ -2761,19 +3080,26 @@ bool load_runtime_config_from_nvs() {
     if (stored == sizeof(nvs_cfg)) {
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &nvs_cfg, sizeof(nvs_cfg));
         loaded = (got == sizeof(nvs_cfg));
+    } else if (stored == sizeof(RuntimeConfigV5)) {
+        RuntimeConfigV5 legacy{};
+        const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
+        loaded = (got == sizeof(legacy)) && migrate_runtime_config_v5(legacy, &nvs_cfg);
+        if (loaded) {
+            Serial.println("[CFG] migrated legacy v5 config to v6");
+        }
     } else if (stored == sizeof(RuntimeConfigV4)) {
         RuntimeConfigV4 legacy{};
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
         loaded = (got == sizeof(legacy)) && migrate_runtime_config_v4(legacy, &nvs_cfg);
         if (loaded) {
-            Serial.println("[CFG] migrated legacy v4 config to v5");
+            Serial.println("[CFG] migrated legacy v4 config to v6");
         }
     } else if (stored == sizeof(RuntimeConfigV3)) {
         RuntimeConfigV3 legacy{};
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
         loaded = (got == sizeof(legacy)) && migrate_runtime_config_v3(legacy, &nvs_cfg);
         if (loaded) {
-            Serial.println("[CFG] migrated legacy v3 config to v5");
+            Serial.println("[CFG] migrated legacy v3 config to v6");
         }
     }
     g_cfg_prefs.end();
@@ -2856,6 +3182,7 @@ void launch_sw4_setup_portal_if_requested() {
         html += "Heartbeat timeout ms <input name='hb_ms' value='" + String(g_runtime_cfg.controller_heartbeat_timeout_ms) + "'/><br/>";
         html += "Auth TTL ms <input name='auth_ms' value='" + String(g_runtime_cfg.controller_auth_ttl_ms) + "'/><br/>";
         html += "SLAC arm timeout ms <input name='slac_arm_ms' value='" + String(g_runtime_cfg.controller_slac_arm_timeout_ms) + "'/><br/>";
+        html += "LED count (1-32) <input name='led_count' value='" + String(g_runtime_cfg.led_count) + "'/><br/>";
         html += "<button type='submit'>Save & Reboot</button></form></body></html>";
         server.send(200, "text/html", html);
     });
@@ -2876,6 +3203,7 @@ void launch_sw4_setup_portal_if_requested() {
         if (server.hasArg("hb_ms")) next.controller_heartbeat_timeout_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("hb_ms").toInt()));
         if (server.hasArg("auth_ms")) next.controller_auth_ttl_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("auth_ms").toInt()));
         if (server.hasArg("slac_arm_ms")) next.controller_slac_arm_timeout_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("slac_arm_ms").toInt()));
+        if (server.hasArg("led_count")) next.led_count = static_cast<uint8_t>(std::max<long>(0, server.arg("led_count").toInt()));
         normalize_runtime_config(&next);
         g_runtime_cfg = next;
         const bool ok = save_runtime_config_to_nvs();
@@ -3910,6 +4238,10 @@ void controller_handle_aux_relay(const CtrlRxFrame& f) {
     const uint8_t hold_100ms = f.data[5];
     const uint32_t hold_ms = static_cast<uint32_t>(hold_100ms) * 100u;
     bool ok = true;
+    if (g_emergency_stop_active && ((en_mask & st_mask) != 0u)) {
+        send_ctrl_ack(0x17u, seq, ACK_BAD_STATE, en_mask, st_mask);
+        return;
+    }
 
     // Match the Basic relay contract and natural bit order:
     // bit0 -> Relay1, bit1 -> Relay2, bit2 -> Relay3.
@@ -4376,6 +4708,7 @@ void serial_ctrl_print_help() {
     Serial.println("  CTRL RELAY <enable_mask> <state_mask> [hold_ms]");
     Serial.println("  CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]");
     Serial.println("  CTRL STOP <soft|hard|clear> [timeout_ms]");
+    Serial.println("  CTRL LED <booting|available|preparing|charging|finishing|faulted|emergency>");
     Serial.println("  CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]");
     Serial.println("  CTRL OWNERSHIP <connector_id> <module_addr>");
     Serial.println("  CTRL SAVE");
@@ -4517,6 +4850,23 @@ void serial_ctrl_handle_line(String line) {
                       static_cast<unsigned>(action), static_cast<unsigned long>(timeout_ms));
         return;
     }
+    if (op == "LED") {
+        if (t.size() < 3) {
+            Serial.println("[SERCTRL] LED <booting|available|preparing|charging|finishing|faulted|emergency>");
+            return;
+        }
+        LedPreset preset = g_led_state.preset;
+        if (!parse_led_preset_token(t[2], &preset)) {
+            Serial.println("[SERCTRL] LED invalid preset");
+            return;
+        }
+        g_led_state.preset = preset;
+        g_led_state.last_update_ms = millis();
+        Serial.printf("[SERCTRL] LED preset=%s count=%u\n",
+                      led_preset_name(g_led_state.preset),
+                      static_cast<unsigned>(active_led_count()));
+        return;
+    }
     if (op == "MODE") {
         if (t.size() < 4) {
             Serial.println("[SERCTRL] MODE <mode0|1> <plc_id> [controller_id]");
@@ -4567,7 +4917,7 @@ void serial_ctrl_handle_line(String line) {
         return;
     }
     if (op == "STATUS") {
-        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d\n",
+        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d emergency=%d led=%s led_count=%u\n",
                       static_cast<unsigned>(g_runtime_cfg.mode),
                       runtime_mode_name(),
                       static_cast<unsigned>(g_runtime_cfg.plc_id),
@@ -4593,7 +4943,10 @@ void serial_ctrl_handle_line(String line) {
                       controller_feedback_fresh(millis()) ? 1 : 0,
                       g_ctrl.stop_active ? 1 : 0,
                       g_ctrl.stop_hard ? 1 : 0,
-                      controller_stop_is_complete() ? 1 : 0);
+                      controller_stop_is_complete() ? 1 : 0,
+                      g_emergency_stop_active ? 1 : 0,
+                      led_preset_name(effective_led_preset()),
+                      static_cast<unsigned>(active_led_count()));
         return;
     }
 
@@ -6189,6 +6542,8 @@ void setup() {
     (void)load_runtime_config_from_nvs();
     refresh_runtime_identity_cache();
     print_runtime_config();
+    init_status_leds();
+    service_status_leds(millis());
 
     esp_read_mac(g_local_mac, ESP_MAC_WIFI_STA);
     Serial.printf("[NET] local MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -6198,6 +6553,7 @@ void setup() {
     (void)relay1_set(false, "Boot");
     (void)relay2_set(false, "Boot");
     (void)relay3_set(false, "Boot");
+    g_emergency_stop_active = read_emergency_pressed();
     launch_sw4_setup_portal_if_requested();
 
     Serial.printf("[BOOT] startup log hold %lu ms\n", static_cast<unsigned long>(STARTUP_LOG_DELAY_MS));
@@ -6260,6 +6616,7 @@ void setup() {
 void loop() {
     uint32_t now_ms = millis();
     service_serial_commands();
+    service_emergency_stop(now_ms);
     if (!g_fsm && static_cast<int32_t>(now_ms - g_next_qca_init_ms) >= 0) {
         (void)try_init_qca_and_fsm(now_ms);
     }
@@ -6285,6 +6642,7 @@ void loop() {
         log_memory_runtime("periodic");
         g_next_mem_log_ms = now_ms + MEMORY_LOG_PERIOD_MS;
     }
+    service_status_leds(now_ms);
     const bool hlc_priority = g_session_started || g_hlc_active || cp_connected(g_cp_state);
     delay(hlc_priority ? 1 : 5);
 }
