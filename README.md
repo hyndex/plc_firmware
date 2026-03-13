@@ -16,6 +16,8 @@ This README describes the current firmware behavior end to end.
   Current UART bridge contract and controller-facing events
 - `docs/controller_uart_router_mode.md`
   Short controller-mode reference
+- `docs/external_controller_slac_handling.md`
+  Detailed mode1 SLAC lifecycle, bench flow, retry policy, and cautions
 - `docs/mode2_controller_can_uart.md`
   Legacy-mode archival note
 
@@ -33,6 +35,12 @@ The firmware has two effective runtime modes:
 
 - `mode=0` `standalone`
 - `mode=1` `external_controller`
+
+Important persistence rule:
+
+- flashing a different `platformio.ini` environment does not by itself guarantee the runtime mode changed
+- persisted NVS config is loaded on boot and can override the flashed defaults
+- after changing mode or ownership over UART, use `CTRL SAVE` to persist it and `CTRL RESET` or a reboot to start from a clean state
 
 Legacy inputs such as `2`, `3`, `controller`, `managed`, `controller_managed`,
 `controller_supported`, `uart`, and `uart_router` are still accepted for config
@@ -70,6 +78,9 @@ End-to-end path:
 - `CP -> SLAC -> HLC on PLC`
 - `EV demand/status -> [SERCTRL] UART events`
 - `controller feedback/relay commands -> CTRL ... UART commands`
+
+For the detailed controller-side SLAC contract, retry policy, and bench usage,
+see `docs/external_controller_slac_handling.md`.
 
 Important relay rule in `mode=1`:
 

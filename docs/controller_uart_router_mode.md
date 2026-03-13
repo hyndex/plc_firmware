@@ -8,6 +8,9 @@ Current controller-managed operation is the runtime mode reported as:
 Legacy aliases such as `mode=2`, `mode=3`, `uart_router`, `controller_managed`, and
 `controller_supported` are normalized into this same runtime mode by the firmware.
 
+For the detailed SLAC lifecycle, flash-and-save procedure, harness usage, and
+warnings, read `docs/external_controller_slac_handling.md`.
+
 ## Architecture
 
 In `external_controller` mode the split is:
@@ -86,6 +89,8 @@ The controller should primarily consume:
 - The PLC still answers ISO 15118 / DIN requests locally.
 - EV-facing present voltage/current and readiness come from `CTRL FEEDBACK`.
 - The PLC does not compute or command module setpoints in this mode.
+- refresh a waiting borrower session with `CTRL SLAC start`, not `CTRL SLAC arm`
+- do not immediately `disarm`, `abort`, or `reset` on the first SLAC match failure; let the PLC hold/retry path run first
 
 ## UART Integrity
 

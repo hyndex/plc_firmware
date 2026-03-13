@@ -1,9 +1,12 @@
 # CB PLC Firmware Control Plane Guide
 
-Updated: 2026-03-13
+Updated: 2026-03-14
 
 This document is the implementation-accurate controller contract for the current
 firmware in `src/main.cpp`.
+
+For operator-oriented SLAC handling, flash procedure, retry policy, and bench
+usage, also read `docs/external_controller_slac_handling.md`.
 
 ## 1. Scope
 
@@ -80,7 +83,14 @@ frame format and passes it through the common validation/handler path.
 ### `CTRL SLAC <disarm|arm|start|abort> [arm_ms]`
 
 - controls whether PWM / SLAC start is permitted
-- `start` latches immediate start permission
+- `arm` grants a lease but clears the start latch
+- `start` grants a lease and latches immediate start permission
+- `disarm` and `abort` clear the SLAC contract and safe-stop an active session when required
+
+Operational rule:
+
+- for a waiting borrower session, refresh with `CTRL SLAC start`, not `CTRL SLAC arm`
+- avoid immediate `disarm` or `abort` on the first failed match attempt; let the PLC hold/retry path run first
 
 ### `CTRL RELAY <enable_mask> <state_mask> [hold_ms]`
 
@@ -113,11 +123,13 @@ frame format and passes it through the common validation/handler path.
 
 - updates in-memory mode and addressing
 - does not persist until `CTRL SAVE`
+- flashing a different build target does not override an already-saved NVS mode until reboot with the new saved config
 
 ### `CTRL OWNERSHIP <connector_id> <module_addr>`
 
 - updates in-memory connector/module identity
 - does not persist until `CTRL SAVE`
+- bench default donor identity is now `connector_id=2`, `module_addr=2`
 
 ### `CTRL SAVE`
 
@@ -193,6 +205,12 @@ latest EV-requested stage plus requested voltage/current.
 5. Each EV demand update is exported in `[SERCTRL] EVT BMS`.
 6. Controller responds with `CTRL FEEDBACK` and explicit `CTRL RELAY`.
 7. PLC answers the EV using controller-fed feedback and executes relay commands.
+
+Current intended retry behavior in `mode=1`:
+
+- keep heartbeat/auth/SLAC contract alive
+- let the PLC use the same hold and optional E/F retry shape as standalone
+- avoid Python-side or controller-side immediate resets on a single failed match
 
 ## 8. Removed Legacy Interfaces
 
