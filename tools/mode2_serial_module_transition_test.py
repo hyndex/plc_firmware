@@ -10,11 +10,11 @@ Architecture under test:
   - Controller -> PLC over UART for relay control/status only.
   - Controller -> Modules over CAN directly using the Maxwell V1.50 protocol.
   - PLC1 Relay1 is the main load contactor.
-  - PLC2 Relay2 is the donor bus contactor for module addr=3/group=2.
+  - PLC2 Relay2 is the donor bus contactor for module addr=2/group=2.
 
 Test sequence:
   1. Put both PLCs into mode 1 and verify `can_stack=0 module_mgr=0`.
-  2. Discover modules 0x01/group1 and 0x03/group2 directly on CAN.
+  2. Discover modules 0x01/group1 and 0x02/group2 directly on CAN.
   3. Soft-reset both modules into known-good defaults.
   4. Close PLC1 Relay1 and run the home module at 500 V for the home window.
   5. Precharge the donor module in isolation to the same voltage.
@@ -369,6 +369,8 @@ class DirectMaxwellCan:
         self.log_fp = None
         self.started: set[tuple[int, int]] = set()
         self.last_safety_signature: dict[tuple[int, int], tuple[int, int]] = {}
+        self.last_on_attempt_at: dict[tuple[int, int], float] = {}
+        self.last_input_mode: dict[tuple[int, int], int] = {}
 
     def open(self) -> None:
         ensure_parent(self.log_file)
@@ -425,7 +427,7 @@ class DirectMaxwellCan:
         home_group: int,
         donor_addr: int,
         donor_group: int,
-    ) -> tuple[Optional[mxr.ModuleInfo], Optional[mxr.ModuleInfo], list[tuple[int, int]]]:
+    ) -> tuple[Optional[mxr.ModuleInfo], Optional[mxr.ModuleInfo], list[tuple[int, int]], dict[tuple[int, int], mxr.ModuleInfo]]:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
         mods = mxr.scan_modules(
@@ -437,7 +439,7 @@ class DirectMaxwellCan:
             listen_s=0.4,
         )
         found = {(mod.address, mod.group): mod for mod in mods}
-        return found.get((home_addr, home_group)), found.get((donor_addr, donor_group)), sorted(found.keys())
+        return found.get((home_addr, home_group)), found.get((donor_addr, donor_group)), sorted(found.keys()), found
 
     def recover_interface(self) -> bool:
         commands = [
@@ -473,7 +475,23 @@ class DirectMaxwellCan:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
         for attempt in range(2):
-            home, donor, found_keys = self._scan_known_modules(home_addr, home_group, donor_addr, donor_group)
+            home, donor, found_keys, found = self._scan_known_modules(home_addr, home_group, donor_addr, donor_group)
+            if home is None:
+                home_group_matches = [mod for (addr, grp), mod in found.items() if grp == home_group]
+                if len(home_group_matches) == 1:
+                    home = home_group_matches[0]
+                    self._log(
+                        f"SCAN fallback home requested={(home_addr, home_group)} "
+                        f"using={(home.address, home.group)}"
+                    )
+            if donor is None:
+                donor_group_matches = [mod for (addr, grp), mod in found.items() if grp == donor_group]
+                if len(donor_group_matches) == 1:
+                    donor = donor_group_matches[0]
+                    self._log(
+                        f"SCAN fallback donor requested={(donor_addr, donor_group)} "
+                        f"using={(donor.address, donor.group)}"
+                    )
             if home is None:
                 home = self._probe_expected(home_addr, home_group)
             if donor is None:
@@ -512,13 +530,17 @@ class DirectMaxwellCan:
         desired_mode = input_mode if input_mode in {1, 2, 3} else module.input_mode
         if desired_mode not in {1, 2, 3}:
             desired_mode = 3
+        key = (module.address, module.group)
+        self.last_input_mode[key] = desired_mode
+        self.started.discard(key)
         # Clear both absolute and ratio current paths before applying defaults so a prior
         # absolute-current run cannot leak stale setpoints into the next session.
         mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, 0)
         time.sleep(0.02)
         self._log(f"RESET addr={module.address} grp={module.group} input_mode={desired_mode}")
         mxr.soft_reset_defaults(self.sock, module, input_mode=desired_mode)
-        self.last_safety_signature.pop((module.address, module.group), None)
+        self.last_safety_signature.pop(key, None)
+        self.last_on_attempt_at.pop(key, None)
         self.refresh(module, response_window_s=0.4)
 
     def safe_output_request(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> tuple[float, float]:
@@ -599,20 +621,32 @@ class DirectMaxwellCan:
         safe_voltage_v, safe_current_a = self._apply_safety_limits(module, voltage_v, current_a)
         current_raw = int(round(max(0.0, safe_current_a) * self.abs_current_scale))
         key = (module.address, module.group)
+        now = time.monotonic()
         if key not in self.started:
             self._log(
                 f"START addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
             )
+            # Match the proven Maxwell bring-up order from the standalone helper:
+            # ON first, then voltage, then current.
+            time.sleep(0.01)
+            mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00000000)
+            time.sleep(0.01)
             mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, safe_voltage_v)
             time.sleep(0.01)
             mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, current_raw)
-            time.sleep(0.01)
-            mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00000000)
             self.started.add(key)
+            self.last_on_attempt_at[key] = now
             return
         self._log(
             f"SET addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
         )
+        if safe_current_a > 0.05 and module_is_off(module) and (now - self.last_on_attempt_at.get(key, 0.0)) >= 0.25:
+            self._log(
+                f"RE-ON addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
+            )
+            mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00000000)
+            time.sleep(0.01)
+            self.last_on_attempt_at[key] = now
         mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, safe_voltage_v)
         time.sleep(0.005)
         mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, current_raw)
@@ -626,6 +660,7 @@ class DirectMaxwellCan:
         mxr.module_off(self.sock, module)
         self.started.discard((module.address, module.group))
         self.last_safety_signature.pop((module.address, module.group), None)
+        self.last_on_attempt_at.pop((module.address, module.group), None)
 
 
 class ModuleTransitionRunner:
@@ -1299,7 +1334,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--relay-refresh-s", type=float, default=0.6)
     parser.add_argument("--home-addr", type=int, default=1)
     parser.add_argument("--home-group", type=int, default=1)
-    parser.add_argument("--donor-addr", type=int, default=3)
+    parser.add_argument("--donor-addr", type=int, default=2)
     parser.add_argument("--donor-group", type=int, default=2)
     parser.add_argument("--default-rated-current-a", type=float, default=30.0)
     parser.add_argument("--absolute-current-scale", type=float, default=1024.0)

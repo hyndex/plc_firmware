@@ -20,7 +20,7 @@ Architecture under test:
 Sequence:
   1. Put borrower and donor PLCs into `mode=1/external_controller`.
   2. Verify both PLCs report `can_stack=0` and `module_mgr=0`.
-  3. Discover module `1/group1` and donor module `3/group2` on external CAN.
+  3. Discover module `1/group1` and donor module `2/group2` on external CAN.
   4. Soft-reset both modules to known-good defaults.
   5. Drive borrower session over UART: HB, AUTH, SLAC, FEEDBACK, STATUS.
   6. Follow EV-driven `PreCharge -> PowerDelivery -> CurrentDemand`.
@@ -139,6 +139,39 @@ def safe_float(value: object, fallback: float = 0.0) -> float:
     return parsed
 
 
+def session_file_path(path_str: str, session_index: int, session_count: int) -> str:
+    path = Path(path_str)
+    suffix = f"_session{session_index:02d}of{session_count:02d}"
+    return str(path.with_name(f"{path.stem}{suffix}{path.suffix}"))
+
+
+def clone_args_for_session(args: argparse.Namespace, session_index: int) -> argparse.Namespace:
+    session_args = argparse.Namespace(**vars(args))
+    if int(args.session_count) <= 1:
+        return session_args
+    session_args.borrower_log = session_file_path(args.borrower_log, session_index, args.session_count)
+    session_args.donor_log = session_file_path(args.donor_log, session_index, args.session_count)
+    session_args.can_log = session_file_path(args.can_log, session_index, args.session_count)
+    session_args.summary_file = session_file_path(args.summary_file, session_index, args.session_count)
+    session_args.session_index = session_index
+    return session_args
+
+
+def write_series_summary(args: argparse.Namespace, results: list[dict[str, object]]) -> None:
+    payload = {
+        "result": "pass" if all(int(item["rc"]) == 0 for item in results) else "fail",
+        "session_count": int(args.session_count),
+        "session_gap_s": float(args.session_gap_s),
+        "home_duration_s": int(args.home_duration_s),
+        "shared_duration_s": int(args.shared_duration_s),
+        "post_release_duration_s": int(args.post_release_duration_s),
+        "results": results,
+    }
+    ensure_parent(args.summary_file)
+    with open(args.summary_file, "w", encoding="utf-8") as fp:
+        json.dump(payload, fp, indent=2)
+
+
 def clamp_non_negative(value: object, fallback: float = 0.0) -> float:
     return max(0.0, safe_float(value, fallback))
 
@@ -245,18 +278,21 @@ def probe_serial_status(port: str, baud: int, timeout_s: float) -> Optional[Seri
         ser.reset_output_buffer()
         deadline = time.time() + max(0.5, timeout_s)
         next_status = 0.0
+        buffer = ""
         while time.time() < deadline:
             now = time.time()
             if now >= next_status:
                 ser.write(b"CTRL STATUS\n")
                 ser.flush()
                 next_status = now + 0.25
-            raw = ser.readline()
+            raw = ser.read(4096)
             if not raw:
                 continue
-            line = raw.decode(errors="ignore").strip()
-            status = parse_status_line(line)
+            buffer += raw.decode(errors="ignore")
+            status = parse_status_line(buffer)
             if status is None:
+                if len(buffer) > 32768:
+                    buffer = buffer[-16384:]
                 continue
             return SerialProbeResult(path=port, real_path=os.path.realpath(port), status=status)
     except Exception:
@@ -394,6 +430,10 @@ class PlcLiveState:
     slac_matched: bool = False
     slac_fsm: int = 0
     slac_failures: int = 0
+    slac_last_event_ts: Optional[float] = None
+    slac_last_progress_ts: Optional[float] = None
+    slac_last_signature: Optional[tuple[int, int, int, int]] = None
+    slac_session_failure_base: int = 0
     hlc_ready: bool = False
     hlc_active: bool = False
     precharge_seen: bool = False
@@ -626,15 +666,30 @@ class VehicleChargeRunner:
         if slac_evt:
             with lock:
                 slac_session = slac_evt.group(1) == "1"
+                slac_matched = slac_session and (slac_evt.group(2) == "1")
+                slac_fsm = int(slac_evt.group(3))
+                slac_failures = int(slac_evt.group(4))
+                signature = (
+                    1 if slac_session else 0,
+                    1 if slac_matched else 0,
+                    slac_fsm,
+                    slac_failures,
+                )
                 if slac_session and not state.slac_session:
                     state.slac_session_since_ts = now
+                    state.slac_session_failure_base = slac_failures
                 elif not slac_session:
                     state.slac_session_since_ts = None
+                    state.slac_session_failure_base = 0
+                state.slac_last_event_ts = now
+                if state.slac_last_signature != signature:
+                    state.slac_last_progress_ts = now
+                    state.slac_last_signature = signature
                 state.slac_session = slac_session
                 # Treat "session=0 matched=1" as stale status, not a live SLAC match.
-                state.slac_matched = state.slac_session and (slac_evt.group(2) == "1")
-                state.slac_fsm = int(slac_evt.group(3))
-                state.slac_failures = int(slac_evt.group(4))
+                state.slac_matched = slac_matched
+                state.slac_fsm = slac_fsm
+                state.slac_failures = slac_failures
             return
 
         hlc_evt = HLC_EVT_RE.search(line)
@@ -755,8 +810,43 @@ class VehicleChargeRunner:
         raise RuntimeError(f"timeout waiting for {plc_name} ack 0x{cmd_hex:02X}")
 
     def _query_status(self, plc_name: str) -> PlcStatus:
+        queue = self.status_queues[plc_name]
+        while queue:
+            queue.popleft()
         self._send(plc_name, "CTRL STATUS")
         return self._wait_for_status(plc_name)
+
+    def _refresh_borrower_slac_window(self, now: float, start_now: bool = True) -> None:
+        cmd = "start" if start_now else "arm"
+        self._send("borrower", f"CTRL SLAC {cmd} {self.args.arm_ms}")
+        ack = self._wait_for_ack("borrower", ACK_CMD_SLAC)
+        if ack.status != ACK_OK:
+            raise RuntimeError(f"borrower SLAC {cmd} rejected status={ack.status}")
+        self.last_arm = now
+        if start_now:
+            self.last_start = now
+            self.remote_start_sent = True
+
+    def _slac_contract_refresh_interval_s(self) -> float:
+        return max(8.0, min(12.0, float(self.args.arm_ms) / 2000.0))
+
+    def _wait_for_borrower_rearm_window(self, timeout_s: float) -> PlcStatus:
+        deadline = time.time() + max(0.0, timeout_s)
+        last_hb = 0.0
+        status = self._query_status("borrower")
+        while time.time() < deadline:
+            if status.cp in ("A", "B1"):
+                return status
+            now = time.time()
+            if (now - last_hb) * 1000.0 >= self.args.heartbeat_ms:
+                self._send("borrower", f"CTRL HB {self.args.heartbeat_timeout_ms}")
+                ack = self._wait_for_ack("borrower", ACK_CMD_HEARTBEAT)
+                if ack.status != ACK_OK:
+                    raise RuntimeError(f"borrower HB rejected while waiting for rearm window status={ack.status}")
+                last_hb = now
+            time.sleep(0.25)
+            status = self._query_status("borrower")
+        return status
 
     def _poll_status_best_effort(self, plc_name: str) -> None:
         try:
@@ -977,7 +1067,11 @@ class VehicleChargeRunner:
         with self.borrower_lock:
             self.borrower.hlc_ready = False
             self.borrower.hlc_active = False
+            self.borrower.slac_session = False
+            self.borrower.slac_matched = False
             self.borrower.slac_session_since_ts = None
+            self.borrower.slac_session_failure_base = 0
+            self.borrower.slac_failures = 0
             self.borrower.slac_fsm = 0
             self.borrower.precharge_seen = False
             self.borrower.precharge_ready = False
@@ -998,6 +1092,9 @@ class VehicleChargeRunner:
             self.borrower.power_delivery_req_count = 0
             self.borrower.welding_req_count = 0
             self.borrower.session_stop_req_count = 0
+            self.borrower.slac_last_event_ts = None
+            self.borrower.slac_last_progress_ts = None
+            self.borrower.slac_last_signature = None
             self.borrower.last_power_delivery_req_ts = None
             self.borrower.last_welding_req_ts = None
             self.borrower.last_session_stop_req_ts = None
@@ -1264,19 +1361,24 @@ class VehicleChargeRunner:
 
         waiting_for_slac = (not slac_matched) and (not hlc_active)
         at_b1 = cp_phase == "B1"
-        if waiting_for_slac and at_b1 and (now - self.last_arm) >= 4.0:
-            self._send("borrower", f"CTRL SLAC arm {self.args.arm_ms}")
-            self.last_arm = now
-
-        if waiting_for_slac and at_b1 and (not self.remote_start_sent) and b1_since_ts is not None and (now - b1_since_ts) >= 0.6:
-            self._send("borrower", f"CTRL SLAC start {self.args.arm_ms}")
-            self.last_start = now
-            self.remote_start_sent = True
-            print("[CTRL] borrower remote start -> B1 to B2", flush=True)
-        elif waiting_for_slac and at_b1 and (now - self.last_start) >= 4.0:
-            self._send("borrower", f"CTRL SLAC start {self.args.arm_ms}")
-            self.last_start = now
-        elif not at_b1:
+        in_digital_comm_window = cp_phase in ("B2", "C", "D")
+        refresh_interval_s = self._slac_contract_refresh_interval_s()
+        keepalive_due = self.last_start <= 0.0 or (now - self.last_start) >= refresh_interval_s
+        start_window_ready = (
+            waiting_for_slac
+            and at_b1
+            and b1_since_ts is not None
+            and (now - b1_since_ts) >= self.args.b1_start_delay_s
+        )
+        if start_window_ready and ((not self.remote_start_sent) or keepalive_due):
+            first_b1_start = not self.remote_start_sent
+            self._refresh_borrower_slac_window(now, start_now=True)
+            if first_b1_start:
+                print("[CTRL] borrower remote start -> B1 to B2", flush=True)
+        elif waiting_for_slac and in_digital_comm_window and ((not self.remote_start_sent) or keepalive_due):
+            # Refresh the controller contract without forcing a Python-side SLAC restart.
+            self._refresh_borrower_slac_window(now, start_now=True)
+        elif (not waiting_for_slac) or cp_phase == "A":
             self.remote_start_sent = False
 
     def _tick_donor_idle(self, now: float) -> None:
@@ -1466,12 +1568,8 @@ class VehicleChargeRunner:
             self.can.stop_output(self.home_module)
         if self.donor_module:
             self.can.stop_output(self.donor_module)
-        print(f"[RECOVERY] {'hard' if hard else 'soft'} rearm borrower SLAC (count={self.start_recovery_count})", flush=True)
+        print(f"[RECOVERY] {'hard' if hard else 'soft'} recover borrower control path (count={self.start_recovery_count})", flush=True)
         with self.borrower_lock:
-            self.borrower.slac_session = False
-            self.borrower.slac_session_since_ts = None
-            self.borrower.slac_matched = False
-            self.borrower.slac_fsm = 0
             self.borrower.hlc_active = False
             self.borrower.precharge_seen = False
             self.borrower.precharge_ready = False
@@ -1501,109 +1599,32 @@ class VehicleChargeRunner:
         ack = self._wait_for_ack("borrower", ACK_CMD_STOP)
         if ack.status != ACK_OK and ack.status != 4:
             raise RuntimeError(f"borrower STOP clear rejected during recovery status={ack.status}")
-        self._send("borrower", f"CTRL AUTH pending {self.args.auth_ttl_ms}")
-        ack = self._wait_for_ack("borrower", ACK_CMD_AUTH)
-        if ack.status != ACK_OK:
-            raise RuntimeError(f"borrower AUTH pending rejected during recovery status={ack.status}")
-        self._send("borrower", "CTRL SLAC disarm 3000")
-        ack = self._wait_for_ack("borrower", ACK_CMD_SLAC)
-        if ack.status != ACK_OK:
-            raise RuntimeError(f"borrower SLAC disarm rejected during recovery status={ack.status}")
+        if hard:
+            self._send("borrower", f"CTRL AUTH pending {self.args.auth_ttl_ms}")
+            ack = self._wait_for_ack("borrower", ACK_CMD_AUTH)
+            if ack.status != ACK_OK:
+                raise RuntimeError(f"borrower AUTH pending rejected during recovery status={ack.status}")
+            self._send("borrower", "CTRL SLAC disarm 3000")
+            ack = self._wait_for_ack("borrower", ACK_CMD_SLAC)
+            if ack.status != ACK_OK:
+                raise RuntimeError(f"borrower SLAC disarm rejected during recovery status={ack.status}")
         self._send("borrower", "CTRL FEEDBACK 1 0 0 0 0 0 0")
         ack = self._wait_for_ack("borrower", ACK_CMD_FEEDBACK)
         if ack.status != ACK_OK:
             raise RuntimeError(f"borrower FEEDBACK reset rejected during recovery status={ack.status}")
-        self._send("borrower", "CTRL STATUS")
-
-    def _light_rekick_waiting_for_session(self, now: float) -> None:
-        self.light_slac_rekick_count += 1
-        self.last_light_slac_rekick_at = now
-        self.remote_start_sent = False
-        self.last_arm = 0.0
-        self.last_start = 0.0
-        self.auth_fallback_noted = False
-        print(f"[RECOVERY] light SLAC re-kick borrower (count={self.light_slac_rekick_count})", flush=True)
-        with self.borrower_lock:
-            self.borrower.slac_session = False
-            self.borrower.slac_session_since_ts = None
-            self.borrower.slac_matched = False
-            self.borrower.slac_fsm = 0
-        self._send("borrower", f"CTRL AUTH pending {self.args.auth_ttl_ms}")
-        ack = self._wait_for_ack("borrower", ACK_CMD_AUTH)
-        if ack.status != ACK_OK:
-            raise RuntimeError(f"borrower AUTH pending rejected during light re-kick status={ack.status}")
-        self.last_borrower_auth = now
-        self._send("borrower", "CTRL SLAC disarm 3000")
-        ack = self._wait_for_ack("borrower", ACK_CMD_SLAC)
-        if ack.status != ACK_OK:
-            raise RuntimeError(f"borrower SLAC disarm rejected during light re-kick status={ack.status}")
-        self._send("borrower", "CTRL STATUS")
+        borrower_status = (
+            self._wait_for_borrower_rearm_window(self.args.hard_recovery_b1_wait_s)
+            if hard
+            else self._query_status("borrower")
+        )
+        if borrower_status.cp != "A" and (not hard or borrower_status.cp != "B1"):
+            self._refresh_borrower_slac_window(now, start_now=True)
         self.last_borrower_status = now
 
     def _should_use_hard_wait_recovery(self, start_wall: float, now: float) -> bool:
         if self.start_recovery_count >= self.args.soft_wait_recovery_limit:
             return True
         return (now - start_wall) >= self.args.hard_wait_recovery_after_s
-
-    def _slac_needs_light_rekick(self, now: float) -> tuple[bool, str]:
-        with self.borrower_lock:
-            cp_connected = self.borrower.cp_connected
-            cp_phase = self.borrower.cp_phase
-            slac_session = self.borrower.slac_session
-            slac_session_since_ts = self.borrower.slac_session_since_ts
-            slac_matched = self.borrower.slac_matched
-            slac_fsm = self.borrower.slac_fsm
-            slac_failures = self.borrower.slac_failures
-            hlc_active = self.borrower.hlc_active
-            precharge_seen = self.borrower.precharge_seen
-        if self.current_demand_started_at is not None or self.phase != "wait_for_session":
-            return False, ""
-        if not cp_connected or cp_phase not in ("B2", "C", "D"):
-            return False, ""
-        if (not slac_session) or slac_matched or hlc_active or precharge_seen:
-            return False, ""
-        if slac_session_since_ts is None:
-            return False, ""
-        stalled_for_s = max(0.0, now - slac_session_since_ts)
-        if stalled_for_s < self.args.slac_light_rekick_after_s:
-            return False, ""
-        if self.last_light_slac_rekick_at > 0.0 and (now - self.last_light_slac_rekick_at) < 4.0:
-            return False, ""
-        return (
-            True,
-            f"SLAC still unmatched: cp={cp_phase} fsm={slac_fsm} failures={slac_failures} "
-            f"session_age={stalled_for_s:.1f}s",
-        )
-
-    def _slac_stalled_waiting_for_session(self, now: float) -> tuple[bool, str]:
-        with self.borrower_lock:
-            cp_connected = self.borrower.cp_connected
-            cp_phase = self.borrower.cp_phase
-            slac_session = self.borrower.slac_session
-            slac_session_since_ts = self.borrower.slac_session_since_ts
-            slac_matched = self.borrower.slac_matched
-            slac_fsm = self.borrower.slac_fsm
-            slac_failures = self.borrower.slac_failures
-            hlc_active = self.borrower.hlc_active
-            precharge_seen = self.borrower.precharge_seen
-        if self.current_demand_started_at is not None or self.phase != "wait_for_session":
-            return False, ""
-        if not cp_connected or cp_phase not in ("B2", "C", "D"):
-            return False, ""
-        if (not slac_session) or slac_matched or hlc_active or precharge_seen:
-            return False, ""
-        if (now - self.last_start_recovery_at) < self.args.start_recovery_s:
-            return False, ""
-        if slac_session_since_ts is None:
-            return False, ""
-        stalled_for_s = max(0.0, now - slac_session_since_ts)
-        if stalled_for_s < self.args.slac_stall_recovery_s:
-            return False, ""
-        return (
-            True,
-            f"SLAC stalled before HLC: cp={cp_phase} fsm={slac_fsm} failures={slac_failures} "
-            f"unmatched_for={stalled_for_s:.1f}s",
-        )
 
     def _service_cycle(self, stage: str, target_v: float, requested_i: float) -> None:
         now = time.time()
@@ -1643,6 +1664,53 @@ class VehicleChargeRunner:
             return False
         donor_v = self._module_live_voltage(self.donor_module) or 0.0
         return donor_v > 10.0 and abs(donor_v - target_v) <= self.args.match_tolerance_v
+
+    def _recover_donor_precharge(self, target_v: float, donor_current_a: float, requested_i: float, attempt: int) -> None:
+        if not self.donor_module:
+            return
+        print(f"[RECOVERY] donor isolated precharge stuck OFF; soft reset donor module (count={attempt})", flush=True)
+        self.notes.append(
+            f"donor isolated precharge stayed OFF; soft resetting donor module (attempt {attempt}/{self.args.attach_soft_reset_limit})"
+        )
+        self.can.soft_reset(self.donor_module, input_mode=self.args.input_mode)
+        self.plan_active["donor"] = False
+        self.last_output_command["donor"] = None
+        self.last_set_refresh["donor"] = 0.0
+        self.last_telemetry_poll = 0.0
+        self.current_plan["donor"] = ControlPlan(True, target_v, donor_current_a)
+        self._service_cycle("current_demand", target_v, requested_i)
+
+    def _wait_for_donor_precharge_match(self, target_v: float, donor_current_a: float, requested_i: float) -> None:
+        deadline = time.time() + self.args.attach_timeout_s
+        donor_off_since: Optional[float] = None
+        soft_reset_count = 0
+        while time.time() < deadline:
+            if self._vehicle_stop_pending():
+                raise VehicleInitiatedStop(self.vehicle_stop_reason or "vehicle initiated stop")
+            if self._donor_voltage_matched(target_v):
+                return
+            self._service_cycle("current_demand", target_v, requested_i)
+            if not self.donor_module:
+                time.sleep(0.02)
+                continue
+            donor_v = self._module_live_voltage(self.donor_module) or 0.0
+            donor_stuck_off = module_is_off(self.donor_module) and donor_v < self.args.attach_recovery_voltage_floor_v
+            now = time.time()
+            if donor_stuck_off:
+                if donor_off_since is None:
+                    donor_off_since = now
+                if (
+                    self.args.attach_soft_reset_limit > 0
+                    and soft_reset_count < self.args.attach_soft_reset_limit
+                    and (now - donor_off_since) >= self.args.attach_recovery_off_s
+                ):
+                    soft_reset_count += 1
+                    self._recover_donor_precharge(target_v, donor_current_a, requested_i, soft_reset_count)
+                    donor_off_since = None
+            else:
+                donor_off_since = None
+            time.sleep(0.02)
+        raise RuntimeError("donor module failed isolated voltage match before attach")
 
     def _bus_continuity_threshold(self, baseline_v: float, max_dip_v: float) -> float:
         if baseline_v > 10.0:
@@ -1727,14 +1795,7 @@ class VehicleChargeRunner:
         self.current_plan["donor"] = ControlPlan(True, target_v, donor_bootstrap_i)
         self.desired_relays[("borrower", self.args.borrower_power_relay)] = True
         self.desired_relays[("donor", self.args.donor_bridge_relay)] = False
-        self._wait_until(
-            self.args.attach_timeout_s,
-            lambda: self._donor_voltage_matched(target_v),
-            "donor module failed isolated voltage match before attach",
-            "current_demand",
-            target_v,
-            requested_i,
-        )
+        self._wait_for_donor_precharge_match(target_v, donor_bootstrap_i, requested_i)
 
         self.desired_relays[("donor", self.args.donor_bridge_relay)] = True
         self._wait_until(
@@ -2036,7 +2097,7 @@ class VehicleChargeRunner:
         self.last_output_command["home"] = None
         self.last_output_command["donor"] = None
 
-    def _execute_stop_sequence(self) -> None:
+    def _execute_stop_sequence(self, require_protocol_stop: bool = True) -> None:
         if self.stop_requested:
             return
         vehicle_initiated = self._vehicle_stop_pending()
@@ -2082,7 +2143,12 @@ class VehicleChargeRunner:
         if not stop_verified:
             raise RuntimeError("stop verification timeout: relays/modules did not reach OFF state")
         if not protocol_stop_ok:
-            raise RuntimeError("protocol stop timeout; forced stop used")
+            note = "protocol stop timeout; forced stop used"
+            if note not in self.notes:
+                self.notes.append(note)
+            if require_protocol_stop or vehicle_initiated:
+                raise RuntimeError(note)
+            print(f"[NOTE] {note}", flush=True)
 
     def _write_summary(self, result: str) -> None:
         payload = {
@@ -2252,7 +2318,7 @@ class VehicleChargeRunner:
                 if self.current_demand_started_at is not None:
                     charge_elapsed = now - self.current_demand_started_at
                     if charge_elapsed >= total_charge_s:
-                        self._execute_stop_sequence()
+                        self._execute_stop_sequence(require_protocol_stop=False)
                         result = "pass" if not self.failures else "fail"
                         break
 
@@ -2270,49 +2336,6 @@ class VehicleChargeRunner:
 
                 if self.current_demand_started_at is None and (now - start_wall) >= self.args.session_start_timeout_s:
                     raise RuntimeError("session never reached CurrentDemand")
-
-                with self.borrower_lock:
-                    borrower_cp_connected = self.borrower.cp_connected
-                    borrower_cp_phase = self.borrower.cp_phase
-                    borrower_hlc_active = self.borrower.hlc_active
-                    borrower_precharge_seen = self.borrower.precharge_seen
-                    borrower_slac_session = self.borrower.slac_session
-                if (
-                    self.current_demand_started_at is None
-                    and self.phase == "wait_for_session"
-                    and not stage
-                    and borrower_cp_connected
-                    and borrower_cp_phase == "B1"
-                    and (not borrower_hlc_active)
-                    and (not borrower_precharge_seen)
-                    and (not borrower_slac_session)
-                    and (now - start_wall) >= self.args.hard_wait_recovery_after_s
-                ):
-                    self._recover_start_path(now, hard=self._should_use_hard_wait_recovery(start_wall, now))
-                    continue
-
-                slac_light_rekick, slac_light_note = self._slac_needs_light_rekick(now)
-                if slac_light_rekick:
-                    if self.light_slac_rekick_count < self.args.slac_light_rekick_limit:
-                        self.notes.append(slac_light_note)
-                        print(f"[NOTE] {slac_light_note}", flush=True)
-                        self._light_rekick_waiting_for_session(now)
-                    else:
-                        note = (
-                            f"{slac_light_note}; escalating after "
-                            f"{self.light_slac_rekick_count} light re-kicks"
-                        )
-                        self.notes.append(note)
-                        print(f"[NOTE] {note}", flush=True)
-                        self._recover_start_path(now, hard=self._should_use_hard_wait_recovery(start_wall, now))
-                    continue
-
-                slac_stalled, slac_stall_note = self._slac_stalled_waiting_for_session(now)
-                if slac_stalled:
-                    self.notes.append(slac_stall_note)
-                    print(f"[NOTE] {slac_stall_note}", flush=True)
-                    self._recover_start_path(now, hard=self._should_use_hard_wait_recovery(start_wall, now))
-                    continue
 
                 if stage == "precharge":
                     self._set_phase("precharge")
@@ -2379,7 +2402,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Live vehicle external-controller charge test with direct Maxwell CAN"
     )
-    parser.add_argument("--session-profile", choices=("standard", "soak15m"), default="standard")
+    parser.add_argument(
+        "--session-profile",
+        choices=("standard", "soak15m", "align3x3m", "align5x5m"),
+        default="standard",
+    )
     parser.add_argument("--borrower-port", default="auto")
     parser.add_argument("--donor-port", default="auto")
     parser.add_argument("--baud", type=int, default=115200)
@@ -2391,7 +2418,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--donor-bridge-relay", type=int, default=2)
     parser.add_argument("--home-addr", type=int, default=1)
     parser.add_argument("--home-group", type=int, default=1)
-    parser.add_argument("--donor-addr", type=int, default=3)
+    parser.add_argument("--donor-addr", type=int, default=2)
     parser.add_argument("--donor-group", type=int, default=2)
     parser.add_argument("--input-mode", type=parse_input_mode_arg, default=None)
     parser.add_argument("--target-voltage-v", type=float, default=500.0)
@@ -2404,8 +2431,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--home-duration-s", type=int, default=40)
     parser.add_argument("--shared-duration-s", type=int, default=40)
     parser.add_argument("--post-release-duration-s", type=int, default=40)
+    parser.add_argument("--session-count", type=int, default=1)
+    parser.add_argument("--session-gap-s", type=float, default=0.0)
     parser.add_argument("--session-start-timeout-s", type=float, default=120.0)
     parser.add_argument("--max-total-s", type=float, default=240.0)
+    parser.add_argument("--b1-start-delay-s", type=float, default=0.6)
+    parser.add_argument("--hard-recovery-b1-wait-s", type=float, default=6.0)
     parser.add_argument("--discovery-timeout-s", type=float, default=1.5)
     parser.add_argument("--attach-timeout-s", type=float, default=25.0)
     parser.add_argument("--release-timeout-s", type=float, default=25.0)
@@ -2422,10 +2453,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--heartbeat-timeout-ms", type=int, default=3000)
     parser.add_argument("--auth-ttl-ms", type=int, default=6000)
     parser.add_argument("--auth-promote-after-slac-s", type=float, default=2.5)
-    parser.add_argument("--arm-ms", type=int, default=12000)
+    parser.add_argument("--arm-ms", type=int, default=25000)
     parser.add_argument("--request-fresh-s", type=float, default=8.0)
+    parser.add_argument("--slac-event-silence-after-s", type=float, default=8.0)
     parser.add_argument("--slac-light-rekick-after-s", type=float, default=11.5)
     parser.add_argument("--slac-light-rekick-limit", type=int, default=6)
+    parser.add_argument("--slac-retry-budget-before-recovery", type=int, default=8)
+    parser.add_argument("--slac-retry-budget-min-session-s", type=float, default=10.0)
     parser.add_argument("--start-recovery-s", type=float, default=12.0)
     parser.add_argument("--slac-stall-recovery-s", type=float, default=18.0)
     parser.add_argument("--soft-wait-recovery-limit", type=int, default=3)
@@ -2447,6 +2481,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--attach-settle-s", type=float, default=1.0)
     parser.add_argument("--attach-min-donor-current-a", type=float, default=2.0)
     parser.add_argument("--attach-max-bus-dip-v", type=float, default=30.0)
+    parser.add_argument("--attach-recovery-off-s", type=float, default=3.0)
+    parser.add_argument("--attach-recovery-voltage-floor-v", type=float, default=25.0)
+    parser.add_argument("--attach-soft-reset-limit", type=int, default=1)
     parser.add_argument("--early-attach-delay-s", type=float, default=0.35)
     parser.add_argument("--early-attach-voltage-ratio", type=float, default=0.85)
     parser.add_argument("--early-attach-current-ratio", type=float, default=0.85)
@@ -2509,16 +2546,88 @@ def parse_args() -> argparse.Namespace:
         args.max_total_s = max(float(args.max_total_s), 1500.0)
         args.relay_hold_ms = max(int(args.relay_hold_ms), 5000)
         args.relay_refresh_s = min(float(args.relay_refresh_s), 1.0)
+    elif args.session_profile == "align3x3m":
+        args.home_duration_s = 60
+        args.shared_duration_s = 60
+        args.post_release_duration_s = 60
+        args.session_count = max(int(args.session_count), 3)
+        args.session_gap_s = max(float(args.session_gap_s), 60.0)
+        args.session_start_timeout_s = max(float(args.session_start_timeout_s), 240.0)
+        args.max_total_s = max(float(args.max_total_s), 420.0)
+        args.arm_ms = max(int(args.arm_ms), 45000)
+        args.b1_start_delay_s = max(float(args.b1_start_delay_s), 4.0)
+        args.hard_recovery_b1_wait_s = max(float(args.hard_recovery_b1_wait_s), 8.0)
+        args.slac_event_silence_after_s = max(float(args.slac_event_silence_after_s), 8.0)
+        args.slac_light_rekick_after_s = max(float(args.slac_light_rekick_after_s), 18.0)
+        args.slac_stall_recovery_s = max(float(args.slac_stall_recovery_s), 35.0)
+        args.hard_wait_recovery_after_s = max(float(args.hard_wait_recovery_after_s), 120.0)
+    elif args.session_profile == "align5x5m":
+        args.home_duration_s = 100
+        args.shared_duration_s = 100
+        args.post_release_duration_s = 100
+        args.session_count = max(int(args.session_count), 5)
+        args.session_gap_s = max(float(args.session_gap_s), 60.0)
+        args.session_start_timeout_s = max(float(args.session_start_timeout_s), 360.0)
+        args.max_total_s = max(float(args.max_total_s), 720.0)
+        args.arm_ms = max(int(args.arm_ms), 45000)
+        args.b1_start_delay_s = max(float(args.b1_start_delay_s), 4.0)
+        args.hard_recovery_b1_wait_s = max(float(args.hard_recovery_b1_wait_s), 8.0)
+        args.slac_event_silence_after_s = max(float(args.slac_event_silence_after_s), 8.0)
+        args.slac_light_rekick_after_s = max(float(args.slac_light_rekick_after_s), 18.0)
+        args.slac_stall_recovery_s = max(float(args.slac_stall_recovery_s), 35.0)
+        args.hard_wait_recovery_after_s = max(float(args.hard_wait_recovery_after_s), 150.0)
+    args.session_count = max(1, int(args.session_count))
+    args.session_gap_s = max(0.0, float(args.session_gap_s))
     args.heartbeat_timeout_ms = max(3000, int(args.heartbeat_timeout_ms), int(args.heartbeat_ms) * 8)
     args.auth_ttl_ms = max(6000, int(args.auth_ttl_ms), int(args.heartbeat_timeout_ms) + 2000)
     return args
 
 
+def run_session_series(args: argparse.Namespace) -> int:
+    results: list[dict[str, object]] = []
+    overall_rc = 0
+    for session_index in range(1, args.session_count + 1):
+        session_args = clone_args_for_session(args, session_index)
+        total_charge_s = (
+            int(session_args.home_duration_s)
+            + int(session_args.shared_duration_s)
+            + int(session_args.post_release_duration_s)
+        )
+        print(
+            f"[SERIES] session {session_index}/{args.session_count} "
+            f"charge_window={total_charge_s}s gap_after={args.session_gap_s:.0f}s",
+            flush=True,
+        )
+        runner = VehicleChargeRunner(session_args)
+        rc = runner.run()
+        results.append(
+            {
+                "session_index": session_index,
+                "rc": rc,
+                "borrower_log": session_args.borrower_log,
+                "donor_log": session_args.donor_log,
+                "can_log": session_args.can_log,
+                "summary_file": session_args.summary_file,
+            }
+        )
+        if rc != 0:
+            overall_rc = 1
+        if session_index < args.session_count and args.session_gap_s > 0.0:
+            print(
+                f"[SERIES] cooldown {args.session_gap_s:.0f}s before session {session_index + 1}",
+                flush=True,
+            )
+            time.sleep(args.session_gap_s)
+    if args.session_count > 1:
+        write_series_summary(args, results)
+        print(f"SERIES_SUMMARY_FILE_DONE={args.summary_file}", flush=True)
+    return overall_rc
+
+
 def main() -> int:
     args = parse_args()
     resolve_uart_ports(args)
-    runner = VehicleChargeRunner(args)
-    return runner.run()
+    return run_session_series(args)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,8 @@
 #include <freertos/task.h>
 #include <WiFi.h>
 #include <esp_heap_caps.h>
+#include <esp_timer.h>
+#include <soc/soc_memory_types.h>
 
 #ifndef CBPLC_ENABLE_STATUS_LEDS
 #define CBPLC_ENABLE_STATUS_LEDS 1
@@ -249,6 +251,9 @@ constexpr uint32_t RFID_MISSING_LOG_MS = 30000u;
 constexpr size_t RFID_MAX_UID_BYTES = 10u;
 constexpr uint32_t EMERGENCY_POLL_MS = 25u;
 constexpr uint32_t EMERGENCY_DEBOUNCE_MS = 50u;
+constexpr uint32_t LED_REFRESH_MS = 40u;
+constexpr uint32_t RUNTIME_STATS_PERIOD_MS = 15000u;
+constexpr size_t PSRAM_BULK_ALLOC_THRESHOLD_BYTES = 4096u;
 struct RfidPinMap {
     const char* name;
     int ss_pin;
@@ -272,7 +277,7 @@ constexpr uint16_t CFG_VERSION = 6u;
 #endif
 
 #ifndef CBPLC_DEFAULT_SLAC_REQUIRES_CONTROLLER_START
-#define CBPLC_DEFAULT_SLAC_REQUIRES_CONTROLLER_START 1
+#define CBPLC_DEFAULT_SLAC_REQUIRES_CONTROLLER_START 0
 #endif
 
 #ifndef CBPLC_DEFAULT_PLC_ID
@@ -417,6 +422,10 @@ bool read_emergency_pressed();
 void service_emergency_stop(uint32_t now_ms);
 void init_status_leds();
 void service_status_leds(uint32_t now_ms);
+LedPreset effective_led_preset(uint32_t now_ms = 0u);
+void enable_psram_malloc_policy();
+void log_runtime_stats(const char* reason);
+void service_runtime_stats(uint32_t now_ms);
 
 class Mcp2515Transport : public cbmodules::CanTransport {
 public:
@@ -1258,6 +1267,7 @@ struct ControllerManagedFeedbackState {
 struct LedRuntimeState {
     bool initialized{false};
     LedPreset preset{LedPreset::Booting};
+    LedPreset rendered{LedPreset::Booting};
     uint32_t last_update_ms{0};
 };
 
@@ -1350,17 +1360,26 @@ uint32_t g_next_hlc_wait_log_ms = 0;
 QueueHandle_t g_hlc_client_queue = nullptr;
 TaskHandle_t g_hlc_worker_task = nullptr;
 TaskHandle_t g_loop_task = nullptr;
-uint32_t g_next_mem_log_ms = 0;
+uint32_t g_next_runtime_stats_ms = 0;
+uint64_t g_runtime_stats_window_start_us = 0u;
+uint64_t g_loop_busy_us = 0u;
+uint64_t g_hlc_busy_us = 0u;
 CRGB g_leds[MAX_LED_COUNT];
 struct netif g_plc_netif{};
 bool g_plc_netif_ready = false;
 char g_plc_ifname[JPV2G_IFACE_NAME_MAX] = {0};
 uint32_t g_next_lwip_drop_log_ms = 0;
-struct LwipTxFrame {
+struct LwipTxSlot {
     uint16_t len;
     uint8_t data[ETH_FRAME_LEN];
 };
 QueueHandle_t g_lwip_tx_queue = nullptr;
+QueueHandle_t g_lwip_tx_free_queue = nullptr;
+StaticQueue_t g_lwip_tx_ready_queue_struct{};
+StaticQueue_t g_lwip_tx_free_queue_struct{};
+std::array<uint8_t, LWIP_TX_QUEUE_DEPTH> g_lwip_tx_ready_queue_storage{};
+std::array<uint8_t, LWIP_TX_QUEUE_DEPTH> g_lwip_tx_free_queue_storage{};
+LwipTxSlot* g_lwip_tx_slots = nullptr;
 uint32_t g_next_lwip_tx_drop_log_ms = 0;
 Mcp2515Transport g_can;
 cbmodules::ModuleManager g_module_mgr{};
@@ -1415,10 +1434,6 @@ bool parse_led_preset_token(String token, LedPreset* out) {
         *out = preset;
     }
     return true;
-}
-
-LedPreset effective_led_preset() {
-    return g_emergency_stop_active ? LedPreset::Emergency : g_led_state.preset;
 }
 
 void led_fill_active(const CRGB& color) {
@@ -1503,6 +1518,7 @@ void init_status_leds() {
 #if !CBPLC_ENABLE_STATUS_LEDS
     g_led_state.initialized = false;
     g_led_state.preset = LedPreset::Booting;
+    g_led_state.rendered = LedPreset::Booting;
     return;
 #endif
     pinMode(LED_DATA_PIN, OUTPUT);
@@ -1513,6 +1529,8 @@ void init_status_leds() {
     FastLED.show();
     g_led_state.initialized = true;
     g_led_state.preset = LedPreset::Booting;
+    g_led_state.rendered = LedPreset::Booting;
+    g_led_state.last_update_ms = millis();
 }
 
 void service_status_leds(uint32_t now_ms) {
@@ -1523,7 +1541,21 @@ void service_status_leds(uint32_t now_ms) {
     if (!g_led_state.initialized) {
         return;
     }
-    switch (effective_led_preset()) {
+    const LedPreset preset = effective_led_preset(now_ms);
+    const bool animated = preset == LedPreset::Booting || preset == LedPreset::Charging ||
+                          preset == LedPreset::Finishing || preset == LedPreset::Faulted ||
+                          preset == LedPreset::Emergency;
+    const bool preset_changed = preset != g_led_state.rendered;
+    if (!preset_changed) {
+        if (!animated) {
+            return;
+        }
+        if (g_led_state.last_update_ms != 0u &&
+            static_cast<int32_t>(now_ms - g_led_state.last_update_ms) < static_cast<int32_t>(LED_REFRESH_MS)) {
+            return;
+        }
+    }
+    switch (preset) {
         case LedPreset::Booting:
             anim_chase(CRGB::Cyan, 2u, 900u, 90u, now_ms);
             break;
@@ -1547,6 +1579,8 @@ void service_status_leds(uint32_t now_ms) {
             break;
     }
     FastLED.show();
+    g_led_state.rendered = preset;
+    g_led_state.last_update_ms = now_ms;
 }
 SemaphoreHandle_t g_module_mutex = nullptr;
 SemaphoreHandle_t g_relay_mutex = nullptr;
@@ -1578,62 +1612,137 @@ bool g_last_bms_delivery_ready = false;
 uint32_t g_last_bms_update_ms = 0;
 bool g_last_bms_dirty = true;
 
-constexpr uint32_t MEMORY_LOG_PERIOD_MS = 30000u;
+int16_t g_last_ev_soc_pct = -1;
+uint32_t g_last_module_runtime_log_ms = 0;
 
-size_t stack_free_bytes(TaskHandle_t handle) {
+size_t task_stack_free_bytes(TaskHandle_t handle) {
     if (!handle) {
         return 0u;
     }
-    return static_cast<size_t>(uxTaskGetStackHighWaterMark(handle)) * sizeof(StackType_t);
+    return static_cast<size_t>(uxTaskGetStackHighWaterMark(handle));
 }
 
-void log_memory_runtime(const char* reason) {
+struct HeapSnapshot {
+    size_t free_bytes{0u};
+    size_t min_free_bytes{0u};
+    size_t largest_free_block{0u};
+    size_t allocated_blocks{0u};
+};
+
+HeapSnapshot capture_heap_snapshot(uint32_t caps) {
+    HeapSnapshot snap{};
+    multi_heap_info_t info{};
+    heap_caps_get_info(&info, caps);
+    snap.free_bytes = info.total_free_bytes;
+    snap.min_free_bytes = info.minimum_free_bytes;
+    snap.largest_free_block = info.largest_free_block;
+    snap.allocated_blocks = info.allocated_blocks;
+    return snap;
+}
+
+unsigned heap_fragmentation_pct(const HeapSnapshot& snap) {
+    if (snap.free_bytes == 0u || snap.largest_free_block >= snap.free_bytes) {
+        return 0u;
+    }
+    const size_t fragmented = snap.free_bytes - snap.largest_free_block;
+    return static_cast<unsigned>((fragmented * 100u) / snap.free_bytes);
+}
+
+unsigned runtime_pct_tenths(uint64_t busy_us, uint64_t window_us) {
+    if (busy_us == 0u || window_us == 0u) {
+        return 0u;
+    }
+    return static_cast<unsigned>((busy_us * 1000u) / window_us);
+}
+
+void enable_psram_malloc_policy() {
+    if (!psramFound()) {
+        Serial.println("[MEM] PSRAM not detected; large allocations stay internal");
+        return;
+    }
+    heap_caps_malloc_extmem_enable(PSRAM_BULK_ALLOC_THRESHOLD_BYTES);
+    Serial.printf("[MEM] PSRAM bulk threshold=%u bytes\n",
+                  static_cast<unsigned>(PSRAM_BULK_ALLOC_THRESHOLD_BYTES));
+}
+
+void* alloc_bulk_storage(size_t size, const char* tag) {
+    void* ptr = heap_caps_malloc_prefer(size,
+                                        2,
+                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT,
+                                        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!ptr) {
+        Serial.printf("[MEM] bulk alloc failed tag=%s size=%u\n",
+                      tag ? tag : "-",
+                      static_cast<unsigned>(size));
+        return nullptr;
+    }
+    memset(ptr, 0, size);
+    Serial.printf("[MEM] bulk alloc tag=%s size=%u loc=%s\n",
+                  tag ? tag : "-",
+                  static_cast<unsigned>(size),
+                  esp_ptr_external_ram(ptr) ? "psram" : "internal");
+    return ptr;
+}
+
+void log_runtime_stats(const char* reason) {
+    const HeapSnapshot internal_heap = capture_heap_snapshot(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     const bool has_psram = psramFound();
-    const size_t heap_free = ESP.getFreeHeap();
-    const size_t heap_min = ESP.getMinFreeHeap();
-    const size_t heap_largest = ESP.getMaxAllocHeap();
-    const size_t internal_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    const size_t internal_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    const size_t internal_largest =
-        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    const size_t psram_free = has_psram ? ESP.getFreePsram() : 0u;
-    const size_t psram_min = has_psram ? ESP.getMinFreePsram() : 0u;
-    const size_t psram_largest =
-        has_psram ? heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) : 0u;
-    const size_t idle0_stack_free =
-        stack_free_bytes(xTaskGetIdleTaskHandleForCPU(0));
+    const HeapSnapshot psram_heap =
+        has_psram ? capture_heap_snapshot(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : HeapSnapshot{};
+
+    const bool scheduler_started = xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED;
+    TaskHandle_t idle0_handle = scheduler_started ? xTaskGetIdleTaskHandleForCPU(0) : nullptr;
 #ifndef CONFIG_FREERTOS_UNICORE
-    const size_t idle1_stack_free =
-        stack_free_bytes(xTaskGetIdleTaskHandleForCPU(1));
+    TaskHandle_t idle1_handle = scheduler_started ? xTaskGetIdleTaskHandleForCPU(1) : nullptr;
 #else
-    const size_t idle1_stack_free = 0u;
+    TaskHandle_t idle1_handle = nullptr;
 #endif
+    const uint64_t now_us = esp_timer_get_time();
+    const uint64_t window_us =
+        (scheduler_started && g_runtime_stats_window_start_us > 0u && now_us > g_runtime_stats_window_start_us)
+            ? (now_us - g_runtime_stats_window_start_us)
+            : 0u;
 
     Serial.printf(
-        "[MEM] {\"reason\":\"%s\",\"heapFree\":%u,\"heapMin\":%u,\"heapLargest\":%u,"
-        "\"internalFree\":%u,\"internalMin\":%u,\"internalLargest\":%u,"
-        "\"psramFound\":%d,\"psramFree\":%u,\"psramMin\":%u,\"psramLargest\":%u,"
+        "[MEM] {\"reason\":\"%s\",\"intFree\":%u,\"intMin\":%u,\"intLargest\":%u,\"intFragPct\":%u,"
+        "\"intBlocks\":%u,\"psFree\":%u,\"psMin\":%u,\"psLargest\":%u,\"psFragPct\":%u,\"psBlocks\":%u,"
         "\"loopStackFree\":%u,\"hlcStackFree\":%u,\"idle0StackFree\":%u,\"idle1StackFree\":%u,"
-        "\"arduinoCore\":%d}\n",
+        "\"windowMs\":%u,\"loopBusyPct10\":%u,\"hlcBusyPct10\":%u}\n",
         reason ? reason : "-",
-        static_cast<unsigned>(heap_free),
-        static_cast<unsigned>(heap_min),
-        static_cast<unsigned>(heap_largest),
-        static_cast<unsigned>(internal_free),
-        static_cast<unsigned>(internal_min),
-        static_cast<unsigned>(internal_largest),
-        has_psram ? 1 : 0,
-        static_cast<unsigned>(psram_free),
-        static_cast<unsigned>(psram_min),
-        static_cast<unsigned>(psram_largest),
-        static_cast<unsigned>(stack_free_bytes(g_loop_task)),
-        static_cast<unsigned>(stack_free_bytes(g_hlc_worker_task)),
-        static_cast<unsigned>(idle0_stack_free),
-        static_cast<unsigned>(idle1_stack_free),
-        static_cast<int>(ARDUINO_RUNNING_CORE));
+        static_cast<unsigned>(internal_heap.free_bytes),
+        static_cast<unsigned>(internal_heap.min_free_bytes),
+        static_cast<unsigned>(internal_heap.largest_free_block),
+        heap_fragmentation_pct(internal_heap),
+        static_cast<unsigned>(internal_heap.allocated_blocks),
+        static_cast<unsigned>(psram_heap.free_bytes),
+        static_cast<unsigned>(psram_heap.min_free_bytes),
+        static_cast<unsigned>(psram_heap.largest_free_block),
+        heap_fragmentation_pct(psram_heap),
+        static_cast<unsigned>(psram_heap.allocated_blocks),
+        static_cast<unsigned>(scheduler_started ? task_stack_free_bytes(g_loop_task) : 0u),
+        static_cast<unsigned>(scheduler_started ? task_stack_free_bytes(g_hlc_worker_task) : 0u),
+        static_cast<unsigned>(scheduler_started ? task_stack_free_bytes(idle0_handle) : 0u),
+        static_cast<unsigned>(scheduler_started ? task_stack_free_bytes(idle1_handle) : 0u),
+        static_cast<unsigned>(window_us / 1000u),
+        runtime_pct_tenths(g_loop_busy_us, window_us),
+        runtime_pct_tenths(g_hlc_busy_us, window_us));
 }
-int16_t g_last_ev_soc_pct = -1;
-uint32_t g_last_module_runtime_log_ms = 0;
+
+void service_runtime_stats(uint32_t now_ms) {
+    if (g_next_runtime_stats_ms == 0u) {
+        g_next_runtime_stats_ms = now_ms + RUNTIME_STATS_PERIOD_MS;
+        g_runtime_stats_window_start_us = esp_timer_get_time();
+        return;
+    }
+    if (static_cast<int32_t>(now_ms - g_next_runtime_stats_ms) < 0) {
+        return;
+    }
+    log_runtime_stats("periodic");
+    g_next_runtime_stats_ms = now_ms + RUNTIME_STATS_PERIOD_MS;
+    g_runtime_stats_window_start_us = esp_timer_get_time();
+    g_loop_busy_us = 0u;
+    g_hlc_busy_us = 0u;
+}
 
 portMUX_TYPE g_ctrl_rx_mux = portMUX_INITIALIZER_UNLOCKED;
 struct CtrlRxFrame {
@@ -2084,6 +2193,8 @@ bool controller_allows_slac_start(uint32_t now_ms) {
     if (!mode_requires_controller_contract()) return true;
     if (mode_controller_has_final_decision()) {
         if (!g_ctrl.slac_armed) return false;
+        if (g_ctrl.slac_arm_expiry_ms == 0u) return false;
+        if (static_cast<int32_t>(now_ms - g_ctrl.slac_arm_expiry_ms) > 0) return false;
         if (!g_runtime_cfg.slac_requires_controller_start) return true;
         return g_ctrl.slac_start_latched;
     }
@@ -2286,6 +2397,80 @@ void unlock_modules() {
 float sane_non_negative(float v) {
     if (!std::isfinite(v)) return 0.0f;
     return std::max(0.0f, v);
+}
+
+bool standalone_module_fault_active() {
+    if (!mode_uses_plc_module_manager() || !g_module_ready) {
+        return false;
+    }
+    const auto states = g_module_mgr.module_states();
+    for (const auto& s : states) {
+        if (s.lifecycle == cbmodules::ModuleLifecycle::Faulted ||
+            s.lifecycle == cbmodules::ModuleLifecycle::Quarantined ||
+            s.telemetry.faulted) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool standalone_energy_path_active() {
+    return g_relay1_closed || g_module_output_enabled;
+}
+
+bool standalone_disconnect_hold_active(uint32_t now_ms) {
+    if (g_hlc_disconnect_hold_until_ms == 0u) {
+        return false;
+    }
+    return static_cast<int32_t>(now_ms - g_hlc_disconnect_hold_until_ms) < 0;
+}
+
+LedPreset standalone_led_preset(uint32_t now_ms) {
+    if (standalone_module_fault_active()) {
+        return LedPreset::Faulted;
+    }
+
+    const bool cp_is_connected = cp_connected(g_cp_state);
+    const bool energy_path_active = standalone_energy_path_active();
+    const bool charging_active =
+        energy_path_active &&
+        (g_hlc_ctx.power_delivery_enabled || sane_non_negative(g_last_measured_i) >= 1.0f ||
+         (sane_non_negative(g_last_measured_v) >= 50.0f && sane_non_negative(g_last_measured_i) >= 0.2f));
+    if (charging_active) {
+        return LedPreset::Charging;
+    }
+
+    const bool finishing =
+        g_hlc_ctx.stop_requested || standalone_disconnect_hold_active(now_ms) ||
+        ((g_hlc_ctx.precharge_seen || energy_path_active || g_hlc_active) && !cp_is_connected);
+    if (finishing) {
+        return LedPreset::Finishing;
+    }
+
+    const bool preparing =
+        cp_is_connected || g_session_started || g_session_matched || g_hlc_ready || g_hlc_active ||
+        g_hlc_ctx.precharge_seen || g_hlc_ctx.power_delivery_enabled || energy_path_active;
+    if (preparing) {
+        return LedPreset::Preparing;
+    }
+
+    if (now_ms < 3000u) {
+        return LedPreset::Booting;
+    }
+    return LedPreset::Available;
+}
+
+LedPreset effective_led_preset(uint32_t now_ms) {
+    if (g_emergency_stop_active) {
+        return LedPreset::Emergency;
+    }
+    if (now_ms == 0u) {
+        now_ms = millis();
+    }
+    if (!mode_controller_has_final_decision()) {
+        return standalone_led_preset(now_ms);
+    }
+    return g_led_state.preset;
 }
 
 float clamp_current_for_assignment_limit(float voltage_v, float current_a) {
@@ -3157,6 +3342,7 @@ void launch_sw4_setup_portal_if_requested() {
         WiFi.mode(WIFI_OFF);
         return;
     }
+    log_runtime_stats("wifi_ap_start");
 
     IPAddress ip = WiFi.softAPIP();
     Serial.printf("[CFG] setup portal AP=%s ip=%s (120s timeout)\n", ssid.c_str(), ip.toString().c_str());
@@ -3318,6 +3504,9 @@ bool init_module_manager() {
                   upsert_ok ? 1 : 0,
                   alloc_ok ? 1 : 0,
                   g_module_ready ? 1 : 0);
+    if (g_module_ready) {
+        log_runtime_stats("module_mgr_ready");
+    }
     return g_module_ready;
 }
 
@@ -4372,12 +4561,44 @@ void controller_service_watchdogs(uint32_t now_ms) {
     }
     if (mode_requires_controller_contract()) {
         if (mode_controller_has_final_decision()) {
-            if (!controller_heartbeat_alive(now_ms) && g_ctrl.heartbeat_seen) {
+            const bool hb_alive = controller_heartbeat_alive(now_ms);
+            if (!hb_alive && g_ctrl.heartbeat_seen) {
                 if (g_ctrl.hb_lost_since_ms == 0u) {
                     g_ctrl.hb_lost_since_ms = now_ms;
                 }
             } else {
                 g_ctrl.hb_lost_since_ms = 0u;
+            }
+            if (g_ctrl.hb_lost_since_ms != 0u) {
+                const uint32_t lost_ms =
+                    (now_ms >= g_ctrl.hb_lost_since_ms) ? (now_ms - g_ctrl.hb_lost_since_ms) : 0u;
+                const bool energy_path_active = g_module_output_enabled || g_relay1_closed;
+                if ((energy_path_active && lost_ms >= CONTROLLER_HB_SOFT_STOP_GRACE_MS) ||
+                    ((g_session_started || g_hlc_active) && lost_ms >= CONTROLLER_HB_HARD_STOP_GRACE_MS)) {
+                    controller_force_safe_stop("CtrlHeartbeatTimeout");
+                    g_ctrl.auth_state = ControllerAuthState::Unknown;
+                } else if ((!g_session_started && !g_hlc_active) &&
+                           lost_ms >= CONTROLLER_HB_SOFT_STOP_GRACE_MS &&
+                           (g_ctrl.slac_armed || g_ctrl.slac_start_latched || g_ctrl.slac_arm_expiry_ms != 0u)) {
+                    Serial.printf("[CTRL] clearing stale SLAC contract after heartbeat loss %lu ms\n",
+                                  static_cast<unsigned long>(lost_ms));
+                    g_ctrl.slac_armed = false;
+                    g_ctrl.slac_start_latched = false;
+                    g_ctrl.slac_arm_expiry_ms = 0u;
+                    stop_session(now_ms);
+                }
+            }
+            if (g_ctrl.slac_arm_expiry_ms != 0u &&
+                static_cast<int32_t>(now_ms - g_ctrl.slac_arm_expiry_ms) > 0) {
+                if (g_ctrl.slac_armed || g_ctrl.slac_start_latched) {
+                    Serial.println("[CTRL] clearing expired SLAC contract in external_controller");
+                }
+                g_ctrl.slac_armed = false;
+                g_ctrl.slac_start_latched = false;
+                g_ctrl.slac_arm_expiry_ms = 0u;
+                if (!g_session_started && !g_hlc_active) {
+                    stop_session(now_ms);
+                }
             }
             return;
         }
@@ -4978,6 +5199,7 @@ void ensure_lwip_socket_stack_ready() {
     WiFi.setSleep(false);
     initialized = true;
     Serial.println("[NET] lwIP socket stack initialized (WiFi STA mode)");
+    log_runtime_stats("lwip_socket_stack_ready");
 }
 
 void build_link_local_from_mac(const uint8_t mac[6], uint8_t out_ip[16]) {
@@ -4995,20 +5217,47 @@ void build_link_local_from_mac(const uint8_t mac[6], uint8_t out_ip[16]) {
 }
 
 bool ensure_lwip_tx_queue_ready() {
-    if (g_lwip_tx_queue) {
+    if (g_lwip_tx_queue && g_lwip_tx_free_queue && g_lwip_tx_slots) {
         return true;
     }
-    g_lwip_tx_queue = xQueueCreate(LWIP_TX_QUEUE_DEPTH, sizeof(LwipTxFrame));
+
+    if (!g_lwip_tx_slots) {
+        g_lwip_tx_slots = static_cast<LwipTxSlot*>(alloc_bulk_storage(sizeof(LwipTxSlot) * LWIP_TX_QUEUE_DEPTH,
+                                                                      "lwip_tx_slots"));
+        if (!g_lwip_tx_slots) {
+            return false;
+        }
+    }
+
     if (!g_lwip_tx_queue) {
+        g_lwip_tx_queue = xQueueCreateStatic(LWIP_TX_QUEUE_DEPTH,
+                                             sizeof(uint8_t),
+                                             g_lwip_tx_ready_queue_storage.data(),
+                                             &g_lwip_tx_ready_queue_struct);
+    }
+    if (!g_lwip_tx_free_queue) {
+        g_lwip_tx_free_queue = xQueueCreateStatic(LWIP_TX_QUEUE_DEPTH,
+                                                  sizeof(uint8_t),
+                                                  g_lwip_tx_free_queue_storage.data(),
+                                                  &g_lwip_tx_free_queue_struct);
+    }
+    if (!g_lwip_tx_queue || !g_lwip_tx_free_queue) {
         Serial.println("[NET] lwIP TX queue create failed");
         return false;
     }
+
+    xQueueReset(g_lwip_tx_queue);
+    xQueueReset(g_lwip_tx_free_queue);
+    for (uint8_t slot = 0u; slot < LWIP_TX_QUEUE_DEPTH; ++slot) {
+        (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
+    }
+    log_runtime_stats("lwip_tx_pool_ready");
     return true;
 }
 
 err_t plc_netif_linkoutput(struct netif* netif, struct pbuf* p) {
     (void)netif;
-    if (!p || !g_lwip_tx_queue) {
+    if (!p || !g_lwip_tx_queue || !g_lwip_tx_free_queue || !g_lwip_tx_slots) {
         return ERR_IF;
     }
 
@@ -5017,12 +5266,26 @@ err_t plc_netif_linkoutput(struct netif* netif, struct pbuf* p) {
         return ERR_IF;
     }
 
-    LwipTxFrame frame{};
-    frame.len = total;
-    if (pbuf_copy_partial(p, frame.data, total, 0) != total) {
+    uint8_t slot = 0u;
+    if (xQueueReceive(g_lwip_tx_free_queue, &slot, 0) != pdTRUE) {
+        const uint32_t now = millis();
+        if (g_next_lwip_tx_drop_log_ms == 0 || static_cast<int32_t>(now - g_next_lwip_tx_drop_log_ms) >= 0) {
+            Serial.println("[NET] lwIP TX pool exhausted, dropping frame");
+            g_next_lwip_tx_drop_log_ms = now + 2000;
+        }
+        return ERR_MEM;
+    }
+    if (slot >= LWIP_TX_QUEUE_DEPTH) {
         return ERR_BUF;
     }
-    if (xQueueSend(g_lwip_tx_queue, &frame, 0) != pdTRUE) {
+    LwipTxSlot& frame = g_lwip_tx_slots[slot];
+    frame.len = total;
+    if (pbuf_copy_partial(p, frame.data, total, 0) != total) {
+        (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
+        return ERR_BUF;
+    }
+    if (xQueueSend(g_lwip_tx_queue, &slot, 0) != pdTRUE) {
+        (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
         const uint32_t now = millis();
         if (g_next_lwip_tx_drop_log_ms == 0 || static_cast<int32_t>(now - g_next_lwip_tx_drop_log_ms) >= 0) {
             Serial.println("[NET] lwIP TX queue full, dropping frame");
@@ -5096,6 +5359,7 @@ bool init_plc_lwip_netif() {
              g_plc_netif.name[0], g_plc_netif.name[1], static_cast<unsigned>(g_plc_netif.num));
     g_plc_netif_ready = true;
     Serial.printf("[NET] PLC lwIP netif ready: %s\n", g_plc_ifname);
+    log_runtime_stats("lwip_netif_ready");
     return true;
 }
 
@@ -5131,14 +5395,20 @@ void lwip_ingress_ethernet_frame(const uint8_t* frame, uint16_t len) {
 }
 
 void service_lwip_tx_queue_once() {
-    if (!g_lwip_tx_queue || !g_transport || !g_transport->is_ready()) {
+    if (!g_lwip_tx_queue || !g_lwip_tx_free_queue || !g_lwip_tx_slots || !g_transport || !g_transport->is_ready()) {
         return;
     }
-    LwipTxFrame frame{};
+    uint8_t slot = 0u;
     uint8_t drained = 0u;
     while (drained < LWIP_TX_MAX_FRAMES_PER_LOOP &&
-           xQueueReceive(g_lwip_tx_queue, &frame, 0) == pdTRUE) {
+           xQueueReceive(g_lwip_tx_queue, &slot, 0) == pdTRUE) {
+        if (slot >= LWIP_TX_QUEUE_DEPTH) {
+            drained++;
+            continue;
+        }
+        LwipTxSlot& frame = g_lwip_tx_slots[slot];
         if (frame.len == 0 || frame.len > ETH_FRAME_LEN) {
+            (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
             drained++;
             continue;
         }
@@ -5150,6 +5420,7 @@ void service_lwip_tx_queue_once() {
                 g_next_lwip_tx_drop_log_ms = now + 2000;
             }
         }
+        (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
         drained++;
     }
     if (uxQueueMessagesWaiting(g_lwip_tx_queue) > 0u) {
@@ -5594,7 +5865,6 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         present_i = 0.0f;
     }
     const bool response_ready = delivery_active && target_applied && g_relay1_closed &&
-                                (fresh_after_target || !current_requested) &&
                                 (telemetry_valid || present_v > 0.1f || present_i > 0.05f);
     update_last_bms_request(requested_v, requested_i, 2u, response_ready, true);
 
@@ -5962,7 +6232,12 @@ void hlc_worker_task_main(void* arg) {
         hlc_reset_session_state(&g_hlc_ctx);
         Serial.println("[HLC] EVCC connected, processing session");
         g_hlc_active_client_fd = client_fd;
+        const int64_t session_start_us = esp_timer_get_time();
         const int rc = jpv2g_secc_handle_client_detect(&g_secc, client_fd, HLC_FIRST_PACKET_TIMEOUT_MS, HLC_IDLE_TIMEOUT_MS);
+        const int64_t session_busy_us = esp_timer_get_time() - session_start_us;
+        if (session_busy_us > 0) {
+            g_hlc_busy_us += static_cast<uint64_t>(session_busy_us);
+        }
         if (g_hlc_active_client_fd == client_fd) {
             g_hlc_active_client_fd = -1;
         }
@@ -6024,6 +6299,7 @@ bool ensure_hlc_worker_ready() {
             return false;
         }
         Serial.printf("[HLC] worker task started stack_bytes=%lu\n", static_cast<unsigned long>(HLC_TASK_STACK_WORDS));
+        log_runtime_stats("hlc_worker_ready");
     }
     return true;
 }
@@ -6129,6 +6405,7 @@ bool init_hlc_stack() {
     g_hlc_ready = true;
     g_next_hlc_wait_log_ms = millis();
     Serial.println("[HLC] stack ready (SDP+TCP on 15118)");
+    log_runtime_stats("hlc_stack_ready");
     return true;
 }
 
@@ -6271,11 +6548,6 @@ void stop_session(uint32_t now_ms) {
 }
 
 void enter_hold_with_optional_ef_pulse(uint32_t now_ms, const char* reason) {
-    if (mode_controller_has_final_decision()) {
-        stop_session(now_ms);
-        Serial.printf("[SLAC] hold suppressed in %s (%s)\n", runtime_mode_name(), reason ? reason : "-");
-        return;
-    }
     if (g_slac_failures_this_cp < 0xFF) {
         g_slac_failures_this_cp++;
     }
@@ -6286,7 +6558,10 @@ void enter_hold_with_optional_ef_pulse(uint32_t now_ms, const char* reason) {
     }
     g_slac_hold_until_ms = now_ms + SLAC_HOLD_MS;
     stop_session(now_ms);
-    Serial.printf("[SLAC] enter hold (%s) %lu ms\n", reason ? reason : "-", static_cast<unsigned long>(SLAC_HOLD_MS));
+    Serial.printf("[SLAC] enter hold in %s (%s) %lu ms\n",
+                  runtime_mode_name(),
+                  reason ? reason : "-",
+                  static_cast<unsigned long>(SLAC_HOLD_MS));
 }
 
 bool try_init_qca_and_fsm(uint32_t now_ms) {
@@ -6329,6 +6604,7 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
     g_fsm->set_plc_peer_mac(plc_peer_mac);
     g_next_qca_init_ms = 0;
     Serial.println("[APP] ready, waiting for CP B/C/D");
+    log_runtime_stats("qca_ready");
     return true;
 }
 
@@ -6438,7 +6714,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
         slac_start_ok) {
         start_session(now_ms);
-        if (mode_requires_controller_contract()) {
+        if (mode_requires_controller_contract() && !mode_controller_has_final_decision()) {
             g_ctrl.slac_start_latched = false;
         }
     } else if (mode_requires_controller_contract() && !g_session_started &&
@@ -6535,6 +6811,9 @@ void setup() {
     Serial.begin(115200);
     delay(200);
     g_loop_task = xTaskGetCurrentTaskHandle();
+    enable_psram_malloc_policy();
+    g_serial_cmd_buf.reserve(256u);
+    log_runtime_stats("boot");
 
     Serial.println();
     Serial.println("cbslac + jpv2g ESP32-S3 SLAC/HLC (to PreCharge)");
@@ -6542,6 +6821,7 @@ void setup() {
     (void)load_runtime_config_from_nvs();
     refresh_runtime_identity_cache();
     print_runtime_config();
+    log_runtime_stats("config_loaded");
     init_status_leds();
     service_status_leds(millis());
 
@@ -6609,12 +6889,11 @@ void setup() {
     }
 
     (void)try_init_qca_and_fsm(millis());
-    log_memory_runtime("boot");
-    g_next_mem_log_ms = millis() + MEMORY_LOG_PERIOD_MS;
 }
 
 void loop() {
     uint32_t now_ms = millis();
+    const int64_t loop_start_us = esp_timer_get_time();
     service_serial_commands();
     service_emergency_stop(now_ms);
     if (!g_fsm && static_cast<int32_t>(now_ms - g_next_qca_init_ms) >= 0) {
@@ -6638,11 +6917,12 @@ void loop() {
         rfid_poll(now_ms);
     }
     service_lwip_tx_queue_once();
-    if (static_cast<int32_t>(now_ms - g_next_mem_log_ms) >= 0) {
-        log_memory_runtime("periodic");
-        g_next_mem_log_ms = now_ms + MEMORY_LOG_PERIOD_MS;
-    }
     service_status_leds(now_ms);
+    const int64_t loop_busy_us = esp_timer_get_time() - loop_start_us;
+    if (loop_busy_us > 0) {
+        g_loop_busy_us += static_cast<uint64_t>(loop_busy_us);
+    }
+    service_runtime_stats(now_ms);
     const bool hlc_priority = g_session_started || g_hlc_active || cp_connected(g_cp_state);
     delay(hlc_priority ? 1 : 5);
 }
