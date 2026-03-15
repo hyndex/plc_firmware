@@ -1,0 +1,83 @@
+{
+  "base": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083407",
+  "sessions": [
+    {
+      "session_index": 1,
+      "returncode": 1,
+      "runtime_s": 10.533,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083407_session01.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083407_session01_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083407_session01_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083407_session01_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-15T08:34:07.906 phase=stopping"
+        ],
+        "notes": [
+          "cleanup failed: serial port not open"
+        ],
+        "failures": [
+          "[Errno 11] Could not exclusively lock port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00: [Errno 11] Resource temporarily unavailable"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": -1,
+          "mode_name": "",
+          "can_stack": -1,
+          "module_mgr": -1,
+          "cp_phase": "U",
+          "cp_connected": false,
+          "cp_duty_pct": null,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 0,
+          "slac_failures": 0,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": null
+        },
+        "module": {
+          "address": null,
+          "group": null,
+          "rated_current_a": null,
+          "status": null,
+          "voltage_v": null,
+          "current_a": null,
+          "off": null
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "[Errno 11] Could not exclusively lock port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00: [Errno 11] Resource temporarily unavailable"
+      ],
+      "events": [
+        "2026-03-15T08:34:07.906 phase=stopping"
+      ],
+      "controller_slac_start_count": 0,
+      "plc_session_start_count": 0,
+      "slac_progress_timeout_count": 0,
+      "ef_pulse_count": 0,
+      "slac_terminal_failure_count": 0,
+      "matched": false,
+      "precharge_seen": false,
+      "current_demand_ready_seen": false
+    }
+  ]
+}

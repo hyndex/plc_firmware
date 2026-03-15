@@ -1,0 +1,63 @@
+{
+  "generated_at": "2026-03-14T18:36:23.992",
+  "port": "/dev/ttyACM0",
+  "auth_mode": "mac_id",
+  "controller_id": 1,
+  "session_count": 1,
+  "session_gap_s": 5.0,
+  "arm_ms": 45000,
+  "b1_start_delay_s": 4.0,
+  "session_start_timeout_s": 60.0,
+  "aggregate": {
+    "attempted_sessions": 1,
+    "successful_sessions": 1,
+    "failed_sessions": 0,
+    "avg_b2_to_match_s": 17.017,
+    "median_b2_to_match_s": 17.017,
+    "best_b2_to_match_s": 17.017,
+    "worst_b2_to_match_s": 17.017,
+    "avg_b2_to_hlc_ready_s": 17.019,
+    "avg_b2_to_hlc_active_s": 20.144,
+    "median_b2_to_hlc_active_s": 20.144,
+    "best_b2_to_hlc_active_s": 20.144,
+    "worst_b2_to_hlc_active_s": 20.144,
+    "total_attempts": 2,
+    "total_retries": 1,
+    "total_soft_recoveries": 0,
+    "total_hard_recoveries": 0
+  },
+  "sessions": [
+    {
+      "session_index": 1,
+      "result": "pass",
+      "failure": "",
+      "start_wall_ts": 1773493559.7017078,
+      "b2_ts": 1773493562.8946967,
+      "slac_session_ts": 1773493562.8956563,
+      "slac_match_ts": 1773493579.912113,
+      "hlc_ready_ts": 1773493579.914178,
+      "hlc_active_ts": 1773493583.0386505,
+      "identity_ts": 1773493579.8466146,
+      "auth_grant_ts": 1773493565.4037092,
+      "identity_source": "EVMAC",
+      "identity_value": "00018733A9C0",
+      "attempts": 2,
+      "retries": 1,
+      "slac_start_cmds": 2,
+      "slac_failures_baseline": 0,
+      "slac_failures_max": 1,
+      "slac_failure_delta": 1,
+      "recoveries_soft": 0,
+      "recoveries_hard": 0,
+      "auth_pending_cmds": 11,
+      "auth_grant_cmds": 14,
+      "auth_promotions": 1,
+      "notes": [
+        "promoted auth to grant after 2.5s of SLAC without identity"
+      ],
+      "b2_to_match_s": 17.01741623878479,
+      "b2_to_hlc_ready_s": 17.01948118209839,
+      "b2_to_hlc_active_s": 20.143953800201416
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_plc1_live_20260312_204425.log",
+  "duration_s": 150.0,
+  "counts": {
+    "pd_ready": 2,
+    "cd_json": 2,
+    "cd_ready": 0,
+    "cd_not_ready": 2,
+    "client_done": 2
+  }
+}

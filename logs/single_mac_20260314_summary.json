@@ -1,0 +1,100 @@
+{
+  "result": "fail",
+  "session_count": 10,
+  "session_gap_s": 5.0,
+  "home_duration_s": 60,
+  "shared_duration_s": 0,
+  "post_release_duration_s": 0,
+  "results": [
+    {
+      "session_index": 1,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session01of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session01of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session01of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 2,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session02of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session02of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session02of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 3,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session03of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session03of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session03of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 4,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session04of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session04of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session04of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 5,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session05of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session05of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session05of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 6,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session06of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session06of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session06of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 7,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session07of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session07of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session07of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 8,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session08of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session08of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session08of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 9,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session09of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session09of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session09of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    },
+    {
+      "session_index": 10,
+      "rc": 1,
+      "borrower_log": "../plc_firmware/logs/single_mac_20260314_borrower_session10of10.log",
+      "can_log": "../plc_firmware/logs/single_mac_20260314_can_session10of10.log",
+      "summary_file": "../plc_firmware/logs/single_mac_20260314_summary_session10of10.json",
+      "auth_mode": "mac_id",
+      "single_module_only": true
+    }
+  ]
+}

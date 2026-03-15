@@ -1,0 +1,849 @@
+[HOST] serial-open
+> CTRL MODE 1 1 1
+[SERCTRL] MODE mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 can_stack=0 module_mgr=0 (use CTRL SAVE then reboot)
+[SERCTRL] EVT CP cp=B1 duty=100 connected=1 hb=0 auth=0 allow_slac=0 allow_energy=0 armed=0 start=0
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=0 hb=0 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[CTRL] waiting SLAC start auth (hb=0 armed=0 start=0)
+> CTRL STOP clear 3000
+[SERCTRL] STOP action=3 timeout_ms=3000
+[SERCTRL] ACK cmd=0x18 seq=8 status=0 detail0=3 detail1=1
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=0 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL AUTH deny 3000
+[SERCTRL] AUTH state=0 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=126 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B1 duty=100 connected=1 hb=0 auth=0 allow_slac=0 allow_energy=0 armed=0 start=0
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=0 hb=0 precharge_seen=0 precharge_ready=0 fb_valid=0 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=0 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL SLAC disarm 3000
+[SERCTRL] SLAC cmd=0 arm_ms=3000
+[CTRLRX] SLAC disarm seq=48
+[SERCTRL] ACK cmd=0x12 seq=48 status=0 detail0=0 detail1=0
+[MEM] {"reason":"periodic","intFree":175632,"intMin":170956,"intLargest":163828,"intFragPct":6,"intBlocks":274,"psFree":2042371,"psMin":2042371,"psLargest":2031604,"psFragPct":0,"psBlocks":16,"loopStackFree":8824,"hlcStackFree":4932,"idle0StackFree":232,"idle1StackFree":320,"windowMs":15056,"loopBusyPct10":986,"hlcBusyPct10":0}
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=0 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL RELAY 1 0 0
+[SERCTRL] RELAY en=0x01 st=0x00 hold_ms=0
+[SERCTRL] ACK cmd=0x17 seq=48 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B1 duty=100 connected=1 hb=0 auth=0 allow_slac=0 allow_energy=0 armed=0 start=0
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=0 hb=0 precharge_seen=0 precharge_ready=0 fb_valid=0 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=0 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B1 duty=100 hb=0 auth=0 allow_slac=0 allow_energy=0 armed=0 start=0 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=0 stop_active=0 stop_hard=0 stop_done=1 emergency=0 led=booting led_count=10
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=0 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL SLAC start 45000
+> CTRL STATUS
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=150 status=0 detail0=0 detail1=0
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] SLAC cmd=2 arm_ms=45000
+[SERCTRL] ACK cmd=0x11 seq=127 status=0 detail0=2 detail1=0
+[CTRLRX] SLAC start seq=49 expiry_ms=233863
+[CTRLRX] SLAC start timing rx=208363 now=208364 delta=1
+[SERCTRL] ACK cmd=0x12 seq=49 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=B1 duty=100 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=0 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[CP] duty -> 5% (phase=B2 state=B hold=0 ef=0 conn_hold=0 ctrl_pwm=1)
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=0 stop_active=0 stop_hard=0 stop_done=1 emergency=0 led=booting led_count=10
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=7 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SLAC] session start
+[FSM] Reset -> Idle
+[FSM] EnterBCD
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=8 status=0 detail0=1 detail1=0
+[FSM] Idle -> WaitForMatchingStart
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=9 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=151 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=128 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=10 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=11 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL STATUS
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=152 status=0 detail0=0 detail1=0
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=129 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=12 status=0 detail0=1 detail1=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=13 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=153 status=0 detail0=0 detail1=0
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=130 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=14 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=15 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=16 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL STATUS
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=154 status=0 detail0=0 detail1=0
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=131 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=17 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=18 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=155 status=0 detail0=0 detail1=0
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=132 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[CP] state B -> C (2046 mV)
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=19 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=20 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=C duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+> CTRL STATUS
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=156 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=133 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=C duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=C duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+[SERCTRL] ACK cmd=0x1A seq=21 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=22 status=0 detail0=1 detail1=0
+[CP] state C -> B (2179 mV)
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=23 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=157 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=134 status=0 detail0=2 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=24 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=25 status=0 detail0=1 detail1=0
+> CTRL STATUS
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=158 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=135 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=26 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=27 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=28 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=159 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=136 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=29 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=30 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=160 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=137 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=31 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=32 status=0 detail0=1 detail1=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=161 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x11 seq=138 status=0 detail0=2 detail1=0
+[SERCTRL] ACK cmd=0x1A seq=33 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=34 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=35 status=0 detail0=1 detail1=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=162 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SLAC] progress timeout state=WaitForMatchingStart elapsed_ms=12062
+[CP] E/F pulse for 4000 ms
+[SLAC] enter hold in external_controller (matching timeout) 3000 ms
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=139 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[CP] duty -> 0% (phase=B state=B hold=1 ef=1 conn_hold=0 ctrl_pwm=1)
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=36 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B duty=0 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=2
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=37 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=163 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B duty=0 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=2
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=140 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=38 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B duty=0 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=2
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=39 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+[MEM] {"reason":"periodic","intFree":175632,"intMin":170956,"intLargest":163828,"intFragPct":6,"intBlocks":274,"psFree":2042371,"psMin":2042371,"psLargest":2031604,"psFragPct":0,"psBlocks":16,"loopStackFree":8824,"hlcStackFree":4932,"idle0StackFree":232,"idle1StackFree":320,"windowMs":15019,"loopBusyPct10":987,"hlcBusyPct10":0}
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B duty=0 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=1 emergency=0 led=booting led_count=10
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT CP cp=B duty=0 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=2
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=164 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=141 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=40 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=41 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B duty=0 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=2
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[CP] state B -> F (110 mV)
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=42 status=0 detail0=1 detail1=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=165 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=F duty=0 connected=0 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=142 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=43 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=F duty=0 connected=0 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=44 status=0 detail0=1 detail1=0
+> CTRL STATUS
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=F duty=0 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=1 emergency=0 led=booting led_count=10
+[CP] duty -> 100% (phase=F state=F hold=0 ef=0 conn_hold=0 ctrl_pwm=1)
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] EVT CP cp=F duty=100 connected=0 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[CP] duty -> 5% (phase=F state=F hold=0 ef=0 conn_hold=1 ctrl_pwm=1)
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=166 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=143 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=45 status=0 detail0=1 detail1=0
+[CP] state F -> B (2180 mV)
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=2 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SLAC] session start
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=46 status=0 detail0=1 detail1=0
+[FSM] Reset -> Idle
+[FSM] EnterBCD
+[FSM] Idle -> WaitForMatchingStart
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=167 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=144 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=47 status=0 detail0=1 detail1=0
+[FSM] WaitForMatchingStart -> Matching
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=48 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=49 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=168 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=145 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=50 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=51 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=169 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=146 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=52 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=53 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=170 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=147 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=54 status=0 detail0=1 detail1=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=55 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=56 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=171 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=148 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=57 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=58 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=172 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=149 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=59 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=60 status=0 detail0=1 detail1=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=173 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x11 seq=150 status=0 detail0=2 detail1=0
+[SERCTRL] ACK cmd=0x1A seq=61 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=62 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=63 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=174 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=151 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=64 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=65 status=0 detail0=1 detail1=0
+[CTRL] clearing expired SLAC contract in external_controller
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=175 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=152 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=66 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=67 status=0 detail0=1 detail1=0
+> CTRL STATUS
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=176 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=153 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=68 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=69 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=70 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=177 status=0 detail0=0 detail1=0
+[SERCTRL] ACK cmd=0x11 seq=154 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=71 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=72 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL STATUS
+[SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=0 module_mgr=0 cp=B2 duty=5 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0 relay1=0 relay2=0 relay3=0 alloc_sz=0 ctrl_fb=1 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=booting led_count=10
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=178 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=3 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=155 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=73 status=0 detail0=1 detail1=0
+[SLAC] progress timeout state=Matching elapsed_ms=12034
+[SLAC] enter hold in external_controller (matching timeout) 3000 ms
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[CP] duty -> 100% (phase=B1 state=B hold=1 ef=0 conn_hold=0 ctrl_pwm=0)
+[CTRL] waiting SLAC start auth (hb=1 armed=0 start=0)
+[MEM] {"reason":"periodic","intFree":175632,"intMin":170956,"intLargest":163828,"intFragPct":6,"intBlocks":274,"psFree":2042371,"psMin":2042371,"psLargest":2031604,"psFragPct":0,"psBlocks":16,"loopStackFree":8824,"hlcStackFree":4932,"idle0StackFree":232,"idle1StackFree":320,"windowMs":15071,"loopBusyPct10":982,"hlcBusyPct10":0}
+[SERCTRL] EVT CP cp=B1 duty=100 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=1 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=74 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] HB timeout_ms=3000
+[SERCTRL] ACK cmd=0x10 seq=179 status=0 detail0=0 detail1=0
+[SERCTRL] EVT CP cp=B1 duty=100 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=1 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] AUTH state=2 ttl_ms=3000
+[SERCTRL] ACK cmd=0x11 seq=156 status=0 detail0=2 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=75 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=76 status=0 detail0=1 detail1=0
+[SERCTRL] EVT CP cp=B1 duty=100 connected=1 hb=1 auth=2 allow_slac=0 allow_energy=1 armed=0 start=0
+[SERCTRL] EVT SLAC session=0 matched=0 fsm=1 failures=1
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=0 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=1 meter_wh=0 soc=255
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0

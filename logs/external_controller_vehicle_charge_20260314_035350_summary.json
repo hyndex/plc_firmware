@@ -1,0 +1,34 @@
+{
+  "result": "fail",
+  "session_count": 3,
+  "session_gap_s": 60.0,
+  "home_duration_s": 60,
+  "shared_duration_s": 60,
+  "post_release_duration_s": 60,
+  "results": [
+    {
+      "session_index": 1,
+      "rc": 0,
+      "borrower_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_borrower_session01of03.log",
+      "donor_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_donor_session01of03.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_can_session01of03.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_summary_session01of03.json"
+    },
+    {
+      "session_index": 2,
+      "rc": 1,
+      "borrower_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_borrower_session02of03.log",
+      "donor_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_donor_session02of03.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_can_session02of03.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_summary_session02of03.json"
+    },
+    {
+      "session_index": 3,
+      "rc": 1,
+      "borrower_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_borrower_session03of03.log",
+      "donor_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_donor_session03of03.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_can_session03of03.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_vehicle_charge_20260314_035350_summary_session03of03.json"
+    }
+  ]
+}

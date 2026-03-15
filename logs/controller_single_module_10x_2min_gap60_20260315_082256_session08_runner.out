@@ -1,0 +1,11 @@
+CMD=python3 tools/external_controller_single_module_charge_test.py --current-demand-hold-s 120 --session-start-timeout-s 120 --plc-log /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_2min_gap60_20260315_082256_session08.log --can-log /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_2min_gap60_20260315_082256_session08_can.log --summary-file /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_2min_gap60_20260315_082256_session08_summary.json
+Traceback (most recent call last):
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 1141, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 1135, in main
+    resolve_plc_port(args)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 278, in resolve_plc_port
+    raise RuntimeError(f"failed to resolve controller PLC port from discovery results: {details}")
+RuntimeError: failed to resolve controller PLC port from discovery results: /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00:plc_id=2,connector=2,module=0x02/g2

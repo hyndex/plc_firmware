@@ -1,0 +1,62 @@
+> CTRL MODE 1 1 1
+> CTRL STOP clear 3000
+STL TATU oe1etra_onrle)pcid= onco_d1cnrle_d1mduead=x1lclgp1mdl_dPC_X_1cnsak0mouemr0c=Cdt= h1at= lo_lc1alweeg= re=1sat1ea11rly= ea30alcs= tlf= tpatv= tphr= tpdn= mrec= ldbotn e_on=0
+> CTRL AUTH deny 3000
+> CTRL SLAC disarm 3000
+[C tt  >B(22m)
+SRT]ETMS te0Ne vddieyed= re_v0 re_=0f_ad0fray=pe_=.peet=. ri=vl_i0pri=
+> CTRL RELAY 1 0 0
+> CTRL STATUS
+ECRL Btmotm=40ECR]AKcd01 e=4 tts0dti00dti10[SECR]ETC pB uy10cnetd1h= uh0alwsa= lo_nry0amd0sat0[SECR]ETSA eso= ace= s= alrs0[SECR]ETHCray0atv= uh0h= rcag_en0pehrerad= bvld1f_ed= bv499f_=.
+CT]ETSSINssin0mthd0rly= ea20rly= tpatve0so_ad=so_oe1mtrw= o=5
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL SLAC start 45000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+Nne)vld0dleyray0tre_=. agti00f_ai= bray= rsn_=9. rsnti00cr_i= o_i= w_i=
+[CP] duty -> 5% (phase=B2 state=B hold=0 ef=0 conn_hold=0 ctrl_pwm=1)
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=254 status=0 detail0=1 detail1=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=255 status=0 detail0=1 detail1=0
+[SERCTRL] RELAY en=0x01 st=0x00 hold_ms=0
+[RELAY] Relay1 -> OPEN (CtrlRelay1)
+[SERCTRL] ACK cmd=0x17 seq=46 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+ERTL V Pc=2dt= once= b1at=2alwsa= lo_nrg= re=1sart1[SERCTRL] V LCssin0mthd0fm7fiue=
+TL V L ed= cie0at= b1pehrese= rcareray0f_ai= bray0fv00f_=.
+RTL V ESO eso= ace= ea10rly=0r o_tv= so_ad0so_oe1mtrw= o=5
+[SLAC] session start
+[FSM] Reset -> Idle
+[FSM] EnterBCD
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=0 status=0 detail0=1 detail1=0
+[FSM] Idle -> WaitForMatchingStart
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x1A seq=1 status=0 detail0=1 detail1=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+ECR]FEBC ai= ed= rsn_=. rsn_=. urlm0vl_im0prlm0so_oiy0[SERCTRL] AKcm=xAsq2sau= eal=1dti10
+ECR]ET M tg=(oe ai= eieyray0tre_=. agti00f_ai= b_ed= rsn_=. reeti00cr_im0vl_i= w_i=
+[SERCTRL] EVT CP cp=B2 duty=5 connected=1 hb=1 auth=2 allow_slac=1 allow_energy=1 armed=1 start=1
+[SERCTRL] EVT SLAC session=1 matched=0 fsm=2 failures=0
+[SERCTRL] EVT HLC ready=0 active=0 auth=2 hb=1 precharge_seen=0 precharge_ready=0 fb_valid=1 fb_ready=0 fb_v=0.0 fb_i=0.0
+[SERCTRL] EVT SESSION session=1 matched=0 relay1=0 relay2=0 relay3=0 stop_active=0 stop_hard=0 stop_done=0 meter_wh=0 soc=255
+> CTRL HB 3000
+> CTRL AUTH grant 3000
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+ERTL UH tt= t_s30
+[SERCTRL] FEEDBACK valid=1 ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0 stop_notify=0
+[SERCTRL] ACK cmd=0x11 seq=124 status=0 detail0=2 detail1=0
+[SERCTRL] ACK cmd=0x1A seq=3 status=0 detail0=1 detail1=0
+[SERCTRL] EVT BMS stage=0(None) valid=0 delivery_ready=0 target_v=0.0 target_i=0.0 fb_valid=1 fb_ready=0 present_v=0.0 present_i=0.0 curr_lim=0 volt_lim=0 pwr_lim=0
+> CTRL FEEDBACK 1 0 0 0 0 0 0
+Traceback (most recent call last):
+  File "<stdin>", line 54, in <module>
+  File "/usr/lib/python3/dist-packages/serial/serialposix.py", line 595, in read
+    raise SerialException(
+        'device reports readiness to read but returned no data '
+        '(device disconnected or multiple access on port?)')
+serial.serialutil.SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)

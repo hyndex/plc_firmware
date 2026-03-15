@@ -1,0 +1,13 @@
+{
+  "log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_plc1_live_20260312_203726.log",
+  "duration_s": 210.1,
+  "counts": {
+    "precharge": 184,
+    "power_delivery": 10,
+    "current_demand": 10,
+    "client_done": 2,
+    "pd_ready": 2,
+    "cd_ready": 0,
+    "cd_not_ready": 2
+  }
+}
