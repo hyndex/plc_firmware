@@ -60,6 +60,8 @@ ACK_CMD_HEARTBEAT = 0x10
 ACK_CMD_AUTH = 0x11
 ACK_CMD_SLAC = 0x12
 ACK_CMD_FEEDBACK = 0x1A
+DEFAULT_ESP_RESET_PULSE_S = 0.2
+DEFAULT_ESP_RESET_WAIT_S = 14.0
 
 
 STATUS_RE = re.compile(
@@ -673,6 +675,47 @@ def probe_serial_status(port: str, baud: int, timeout_s: float) -> Optional[PlcS
     return None
 
 
+def reset_plc_over_serial(port: str, baud: int, reset_log_file: str, pulse_s: float, wait_s: float) -> None:
+    ensure_parent(reset_log_file)
+    kwargs = {
+        "port": port,
+        "baudrate": baud,
+        "timeout": 0.2,
+        "write_timeout": 0.5,
+    }
+    chunks = [
+        f"{ts()} [HOST] reset port={port} baud={baud} pulse_s={max(0.05, pulse_s):.3f} wait_s={max(1.0, wait_s):.1f}\n"
+    ]
+    ser = None
+    try:
+        try:
+            ser = serial.Serial(exclusive=True, **kwargs)
+        except TypeError:
+            ser = serial.Serial(**kwargs)
+        ser.setDTR(False)
+        ser.setRTS(True)
+        time.sleep(max(0.05, pulse_s))
+        ser.setDTR(True)
+        ser.setRTS(False)
+        deadline = time.time() + max(1.0, wait_s)
+        while time.time() < deadline:
+            try:
+                raw = ser.read(4096)
+            except Exception as exc:
+                chunks.append(f"{ts()} [HOST] reset read failed: {exc}\n")
+                break
+            if raw:
+                chunks.append(raw.decode("utf-8", errors="ignore"))
+    finally:
+        if ser is not None:
+            try:
+                ser.close()
+            except Exception:
+                pass
+    with open(reset_log_file, "w", encoding="utf-8") as fp:
+        fp.write("".join(chunks))
+
+
 def resolve_plc_port(args: argparse.Namespace) -> None:
     if args.plc_port and args.plc_port.lower() != "auto":
         if not os.path.exists(args.plc_port):
@@ -837,6 +880,23 @@ class SingleModuleChargeRunner:
         self.current_demand_ready_since: Optional[float] = None
         self.vehicle_stop_requested = False
         self.vehicle_stop_reason = ""
+
+    def _reset_plc_if_requested(self) -> None:
+        if not self.args.esp_reset_before_start:
+            return
+        reset_log = self.args.plc_log + ".reset.log"
+        print(
+            f"[RESET] rebooting PLC on {self.args.plc_port} wait_s={self.args.esp_reset_wait_s:.1f}",
+            flush=True,
+        )
+        reset_plc_over_serial(
+            self.args.plc_port,
+            self.args.baud,
+            reset_log,
+            self.args.esp_reset_pulse_s,
+            self.args.esp_reset_wait_s,
+        )
+        print(f"[RESET] boot log captured in {reset_log}", flush=True)
 
     def _set_phase(self, name: str) -> None:
         self.phase = name
@@ -1442,6 +1502,7 @@ class SingleModuleChargeRunner:
     def run(self) -> int:
         result = "fail"
         try:
+            self._reset_plc_if_requested()
             self.link.open()
             self.can.open()
             print(f"PLC_LOG={self.args.plc_log}", flush=True)
@@ -1523,6 +1584,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input-mode", type=int, choices=(1, 2, 3), default=None)
     parser.add_argument("--can-iface", default="can0")
     parser.add_argument("--discovery-timeout-s", type=float, default=1.5)
+    parser.add_argument("--esp-reset-before-start", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--esp-reset-pulse-s", type=float, default=DEFAULT_ESP_RESET_PULSE_S)
+    parser.add_argument("--esp-reset-wait-s", type=float, default=DEFAULT_ESP_RESET_WAIT_S)
     parser.add_argument("--target-voltage-v", type=float, default=500.0)
     parser.add_argument("--precharge-current-a", type=float, default=2.0)
     parser.add_argument("--voltage-hold-current-a", type=float, default=2.0)

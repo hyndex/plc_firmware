@@ -197,9 +197,16 @@ constexpr uint16_t SPI_REG_BFR_SIZE = 0x0100;
 constexpr uint16_t SPI_REG_WRBUF_SPC_AVA = 0x0200;
 constexpr uint16_t SPI_REG_RDBUF_BYTE_AVA = 0x0300;
 constexpr uint16_t SPI_REG_SPI_CONFIG = 0x0400;
+constexpr uint16_t SPI_REG_INTR_CAUSE = 0x0C00;
+constexpr uint16_t SPI_REG_INTR_ENABLE = 0x0D00;
 constexpr uint16_t SPI_REG_SIGNATURE = 0x1A00;
 
 constexpr uint16_t SPI_INT_CPU_ON = (1u << 6);
+constexpr uint16_t SPI_INT_WRBUF_ERR = (1u << 2);
+constexpr uint16_t SPI_INT_RDBUF_ERR = (1u << 1);
+constexpr uint16_t SPI_INT_PKT_AVLBL = (1u << 0);
+constexpr uint16_t QCA_INT_ENABLE_MASK =
+    static_cast<uint16_t>(SPI_INT_CPU_ON | SPI_INT_WRBUF_ERR | SPI_INT_RDBUF_ERR | SPI_INT_PKT_AVLBL);
 constexpr uint16_t QCASPI_GOOD_SIGNATURE = 0xAA55;
 
 constexpr uint16_t QCA7K_BUFFER_SIZE = 3163;
@@ -207,6 +214,13 @@ constexpr size_t RX_STREAM_CAPACITY = 4096;
 constexpr size_t RX_CHUNK_CAPACITY = 4096;
 constexpr size_t RX_QUEUE_CAPACITY = 32;
 constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 16u;
+constexpr uint32_t QCA_POLL_FALLBACK_MS = 5u;
+
+volatile bool g_qca_irq_pending = false;
+
+void IRAM_ATTR qca_irq_handler() {
+    g_qca_irq_pending = true;
+}
 
 constexpr uint16_t PLC_PEER_MAC_DEFAULT[3] = {0x00B0, 0x5200, 0x0001};
 constexpr char ISO_EVSE_ID[] = "IN*JPE*E000100010001";
@@ -634,6 +648,9 @@ public:
     }
 
     ~Qca7000Transport() override {
+        if (interrupt_attached) {
+            detachInterrupt(digitalPinToInterrupt(PIN_QCA700X_INT));
+        }
         if (spi_mutex) {
             vSemaphoreDelete(spi_mutex);
             spi_mutex = nullptr;
@@ -672,12 +689,24 @@ public:
             return false;
         }
 
+        if (interrupt_attached) {
+            detachInterrupt(digitalPinToInterrupt(PIN_QCA700X_INT));
+        }
+        attachInterrupt(digitalPinToInterrupt(PIN_QCA700X_INT), qca_irq_handler, RISING);
+        interrupt_attached = true;
+        startup_pending = false;
+        enable_interrupts();
+        g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
         ready = true;
         last_error.clear();
         return true;
     }
 
     void modem_reset() {
+        clear_rx_state();
+        startup_pending = true;
+        interrupts_armed = false;
+        g_qca_irq_pending = false;
         uint16_t reg = read_register16(SPI_REG_SPI_CONFIG);
         reg = static_cast<uint16_t>(reg | SPI_INT_CPU_ON);
         write_register16(SPI_REG_SPI_CONFIG, reg);
@@ -691,7 +720,15 @@ public:
         if (!ready) {
             return;
         }
-        poll_ingress();
+        const uint32_t now_ms = millis();
+        const bool line_high = digitalRead(PIN_QCA700X_INT) == HIGH;
+        const bool fallback_poll = (last_poll_ms == 0u) || static_cast<int32_t>(now_ms - last_poll_ms) >=
+                                                           static_cast<int32_t>(QCA_POLL_FALLBACK_MS);
+        if (!g_qca_irq_pending && !line_high && !fallback_poll) {
+            return;
+        }
+        last_poll_ms = now_ms;
+        poll_ingress(g_qca_irq_pending || line_high || fallback_poll);
     }
 
     IOResult read(uint8_t* buffer, int timeout_ms) override {
@@ -709,7 +746,7 @@ public:
                 return IOResult::Ok;
             }
 
-            poll_ingress();
+            poll_ingress(true);
 
             if (timeout_ms >= 0 && (uint32_t)(millis() - start_ms) >= static_cast<uint32_t>(timeout_ms)) {
                 return IOResult::Timeout;
@@ -725,6 +762,9 @@ public:
         }
         if (size == 0 || size > ETH_FRAME_LEN) {
             last_error = "invalid frame size";
+            return IOResult::Failure;
+        }
+        if (!ensure_startup_ready(500, 5)) {
             return IOResult::Failure;
         }
 
@@ -806,6 +846,38 @@ private:
         return false;
     }
 
+    bool ensure_startup_ready(uint32_t timeout_ms, uint32_t poll_delay_ms) {
+        if (!ready) {
+            last_error = "transport not ready";
+            return false;
+        }
+        if (!startup_pending) {
+            if (!interrupts_armed) {
+                enable_interrupts();
+            }
+            return true;
+        }
+
+        uint16_t sig = 0;
+        if (!probe_signature(sig, timeout_ms, poll_delay_ms)) {
+            char buf[96];
+            snprintf(buf, sizeof(buf), "QCA7000 startup timeout (sig=0x%04X)", sig);
+            last_error = buf;
+            return false;
+        }
+
+        startup_pending = false;
+        enable_interrupts();
+        g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
+        last_error.clear();
+        return true;
+    }
+
+    void enable_interrupts() {
+        write_register16(SPI_REG_INTR_ENABLE, QCA_INT_ENABLE_MASK);
+        interrupts_armed = true;
+    }
+
     uint16_t read_register16(uint16_t reg) {
         const uint16_t tx = static_cast<uint16_t>(QCA7K_SPI_READ | QCA7K_SPI_INTERNAL | reg);
         uint16_t rx = 0;
@@ -836,11 +908,90 @@ private:
         unlock_spi();
     }
 
+    void clear_rx_state() {
+        rx_stream_len = 0;
+        q_head = 0;
+        q_tail = 0;
+        q_count = 0;
+        invalid_frame_streak = 0;
+        invalid_frame_since_ms = 0;
+        last_poll_ms = 0;
+    }
+
+    bool looks_like_spi_glitch(uint16_t value) const {
+        return value == 0x5555 || value == 0xAAAA || value == 0xFFFF;
+    }
+
+    bool valid_rx_len(uint16_t value) const {
+        return value != 0 && value <= QCA7K_BUFFER_SIZE && value <= RX_CHUNK_CAPACITY;
+    }
+
     uint16_t read_burst(uint8_t* dst) {
-        uint16_t available = read_register16(SPI_REG_RDBUF_BYTE_AVA);
-        if (available == 0 || available > QCA7K_BUFFER_SIZE || available > RX_CHUNK_CAPACITY) {
+        if (!ensure_startup_ready(300, 5)) {
             return 0;
         }
+
+        uint16_t available = read_register16(SPI_REG_RDBUF_BYTE_AVA);
+        if (!valid_rx_len(available)) {
+            const uint16_t retry1 = read_register16(SPI_REG_RDBUF_BYTE_AVA);
+            const uint16_t retry2 = read_register16(SPI_REG_RDBUF_BYTE_AVA);
+            if (valid_rx_len(retry1)) {
+                available = retry1;
+            } else if (valid_rx_len(retry2)) {
+                available = retry2;
+            } else {
+                const bool glitch_pair =
+                    (looks_like_spi_glitch(available) && looks_like_spi_glitch(retry1)) ||
+                    (looks_like_spi_glitch(available) && looks_like_spi_glitch(retry2)) ||
+                    (looks_like_spi_glitch(retry1) && looks_like_spi_glitch(retry2));
+                if (glitch_pair) {
+                    if (glitch_streak < 0xFF) {
+                        glitch_streak++;
+                    }
+                    const uint32_t now_ms = millis();
+                    if (glitch_streak == 1u || (glitch_streak % 8u) == 0u ||
+                        last_glitch_log_ms == 0u ||
+                        static_cast<int32_t>(now_ms - last_glitch_log_ms) >= 500) {
+                        Serial.printf("[QCA] rdbuf glitch v0=0x%04X v1=0x%04X v2=0x%04X streak=%u\n",
+                                      available, retry1, retry2, glitch_streak);
+                        last_glitch_log_ms = now_ms;
+                    }
+                    if (glitch_streak >= 64u &&
+                        static_cast<int32_t>(now_ms - last_reset_ms) >= 3000) {
+                        Serial.printf("[QCA] persistent rdbuf glitch, resetting modem\n");
+                        last_reset_ms = now_ms;
+                        glitch_streak = 0;
+                        oversize_streak = 0;
+                        modem_reset();
+                    }
+                } else if (available > RX_CHUNK_CAPACITY || retry1 > RX_CHUNK_CAPACITY || retry2 > RX_CHUNK_CAPACITY ||
+                           available > QCA7K_BUFFER_SIZE || retry1 > QCA7K_BUFFER_SIZE || retry2 > QCA7K_BUFFER_SIZE) {
+                    if (oversize_streak < 0xFF) {
+                        oversize_streak++;
+                    }
+                    const uint32_t now_ms = millis();
+                    if (oversize_streak == 1u || (oversize_streak % 8u) == 0u ||
+                        last_oversize_log_ms == 0u ||
+                        static_cast<int32_t>(now_ms - last_oversize_log_ms) >= 500) {
+                        Serial.printf("[QCA] drop oversize burst v0=%u v1=%u v2=%u streak=%u\n",
+                                      available, retry1, retry2, oversize_streak);
+                        last_oversize_log_ms = now_ms;
+                    }
+                    if (oversize_streak >= 16u &&
+                        static_cast<int32_t>(now_ms - last_reset_ms) >= 1000) {
+                        Serial.printf("[QCA] persistent oversize burst, resetting modem\n");
+                        last_reset_ms = now_ms;
+                        glitch_streak = 0;
+                        oversize_streak = 0;
+                        modem_reset();
+                    }
+                }
+                return 0;
+            }
+        }
+
+        glitch_streak = 0;
+        oversize_streak = 0;
 
         if (!lock_spi(50)) {
             return 0;
@@ -909,12 +1060,46 @@ private:
         lwip_ingress_ethernet_frame(frame, len);
     }
 
+    void note_invalid_frame(const uint8_t* frame, size_t pos, size_t total_avail, uint16_t fl) {
+        const uint32_t now_ms = millis();
+        if (invalid_frame_streak == 0u) {
+            invalid_frame_since_ms = now_ms;
+        }
+        if (invalid_frame_streak < 0xFF) {
+            invalid_frame_streak++;
+        }
+        if (invalid_frame_streak == 1u || (invalid_frame_streak % 4u) == 0u) {
+            const uint32_t len_field = static_cast<uint32_t>(frame[0]) |
+                                       (static_cast<uint32_t>(frame[1]) << 8u) |
+                                       (static_cast<uint32_t>(frame[2]) << 16u) |
+                                       (static_cast<uint32_t>(frame[3]) << 24u);
+            Serial.printf("[QCA] invalid RX frame fl=%u avail=%u pos=%u lenField=%lu streak=%u\n",
+                          fl,
+                          static_cast<unsigned>(total_avail),
+                          static_cast<unsigned>(pos),
+                          static_cast<unsigned long>(len_field),
+                          invalid_frame_streak);
+        }
+        if (invalid_frame_streak >= 10u && invalid_frame_since_ms != 0u &&
+            static_cast<int32_t>(now_ms - invalid_frame_since_ms) >= 400) {
+            Serial.printf("[QCA] invalid RX framing persisted, resetting modem\n");
+            invalid_frame_streak = 0;
+            invalid_frame_since_ms = 0;
+            last_reset_ms = now_ms;
+            modem_reset();
+        }
+    }
+
     void process_rx_stream(uint16_t chunk_len) {
         if (chunk_len == 0) {
             return;
         }
 
         if (rx_stream_len + chunk_len > RX_STREAM_CAPACITY) {
+            note_invalid_frame(rx_chunk.data(), 0, chunk_len, 0);
+            if (startup_pending) {
+                return;
+            }
             rx_stream_len = 0;
         }
         if (chunk_len > RX_STREAM_CAPACITY) {
@@ -927,30 +1112,68 @@ private:
         while ((rx_stream_len - pos) >= 14u) {
             uint8_t* frame = rx_stream.data() + pos;
             const bool sof_ok = (frame[4] == 0xAA && frame[5] == 0xAA && frame[6] == 0xAA && frame[7] == 0xAA);
-            if (!sof_ok) {
-                pos++;
-                continue;
-            }
-
             const uint16_t fl = static_cast<uint16_t>(frame[8] | (frame[9] << 8));
             const size_t total = static_cast<size_t>(fl) + 14u;
-            if (fl < 60u || fl > ETH_FRAME_LEN || total > RX_STREAM_CAPACITY) {
+            const size_t avail = rx_stream_len - pos;
+            const bool len_ok = (fl >= 60u) && (fl <= ETH_FRAME_LEN) && (total <= RX_STREAM_CAPACITY);
+            const bool partial_frame = sof_ok && len_ok && (avail < total);
+            if (partial_frame) {
+                break;
+            }
+            if (!sof_ok || !len_ok) {
+                note_invalid_frame(frame, pos, avail, fl);
+                if (startup_pending) {
+                    return;
+                }
+                bool resynced = false;
+                for (size_t scan = pos + 4u; scan + 3u < rx_stream_len; ++scan) {
+                    if (rx_stream[scan] == 0xAA && rx_stream[scan + 1u] == 0xAA &&
+                        rx_stream[scan + 2u] == 0xAA && rx_stream[scan + 3u] == 0xAA) {
+                        const size_t candidate = scan - 4u;
+                        if (candidate > pos) {
+                            pos = candidate;
+                            resynced = true;
+                            break;
+                        }
+                    }
+                }
+                if (resynced) {
+                    continue;
+                }
                 pos++;
                 continue;
             }
-
-            const size_t avail = rx_stream_len - pos;
             if (avail < total) {
                 break;
             }
 
             if (frame[total - 2u] == 0x55 && frame[total - 1u] == 0x55) {
                 dispatch_eth_frame(frame + 12u, fl);
+                invalid_frame_streak = 0;
+                invalid_frame_since_ms = 0;
                 pos += total;
                 continue;
             }
 
-            pos++;
+            note_invalid_frame(frame, pos, avail, fl);
+            if (startup_pending) {
+                return;
+            }
+            bool resynced = false;
+            for (size_t scan = pos + 4u; scan + 3u < rx_stream_len; ++scan) {
+                if (rx_stream[scan] == 0xAA && rx_stream[scan + 1u] == 0xAA &&
+                    rx_stream[scan + 2u] == 0xAA && rx_stream[scan + 3u] == 0xAA) {
+                    const size_t candidate = scan - 4u;
+                    if (candidate > pos) {
+                        pos = candidate;
+                        resynced = true;
+                        break;
+                    }
+                }
+            }
+            if (!resynced) {
+                pos++;
+            }
         }
 
         if (pos > 0) {
@@ -961,17 +1184,81 @@ private:
         }
     }
 
-    void poll_ingress() {
-        const uint16_t chunk_len = read_burst(rx_chunk.data());
-        if (chunk_len == 0) {
+    bool service_interrupt_line(bool fallback_poll) {
+        if (!ensure_startup_ready(300, 5)) {
+            return false;
+        }
+
+        const bool line_high = digitalRead(PIN_QCA700X_INT) == HIGH;
+        if (!g_qca_irq_pending && !line_high) {
+            return fallback_poll;
+        }
+
+        uint16_t intr_cause = 0;
+        if (!lock_spi(50)) {
+            return fallback_poll || line_high;
+        }
+        spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_INTR_ENABLE));
+        spi.transfer16(0x0000);
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_READ | QCA7K_SPI_INTERNAL | SPI_REG_INTR_CAUSE));
+        intr_cause = spi.transfer16(0x0000);
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_INTR_CAUSE));
+        spi.transfer16(intr_cause);
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+        spi.endTransaction();
+        unlock_spi();
+
+        g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
+
+        if (intr_cause & SPI_INT_CPU_ON) {
+            startup_pending = true;
+            interrupts_armed = false;
+            if (!ensure_startup_ready(500, 5)) {
+                return false;
+            }
+        } else {
+            enable_interrupts();
+        }
+
+        if (intr_cause & (SPI_INT_RDBUF_ERR | SPI_INT_WRBUF_ERR)) {
+            Serial.printf("[QCA] interrupt error cause=0x%04X, resetting modem\n", intr_cause);
+            modem_reset();
+            return false;
+        }
+
+        return fallback_poll || (intr_cause & SPI_INT_PKT_AVLBL) != 0 || digitalRead(PIN_QCA700X_INT) == HIGH;
+    }
+
+    void poll_ingress(bool fallback_poll) {
+        if (!service_interrupt_line(fallback_poll)) {
             return;
         }
-        process_rx_stream(chunk_len);
+        for (uint8_t burst = 0; burst < 8u; ++burst) {
+            const uint16_t chunk_len = read_burst(rx_chunk.data());
+            if (chunk_len == 0) {
+                break;
+            }
+            process_rx_stream(chunk_len);
+            if (startup_pending) {
+                break;
+            }
+        }
     }
 
     SPIClass spi;
     SemaphoreHandle_t spi_mutex{nullptr};
     bool ready{false};
+    bool startup_pending{true};
+    bool interrupts_armed{false};
+    bool interrupt_attached{false};
     std::string last_error;
 
     std::array<uint8_t, RX_STREAM_CAPACITY> rx_stream{};
@@ -984,6 +1271,14 @@ private:
     size_t q_count{0};
     uint32_t rx_queue_drop_count{0};
     uint32_t last_rx_queue_drop_log_ms{0};
+    uint8_t oversize_streak{0};
+    uint8_t glitch_streak{0};
+    uint8_t invalid_frame_streak{0};
+    uint32_t invalid_frame_since_ms{0};
+    uint32_t last_glitch_log_ms{0};
+    uint32_t last_oversize_log_ms{0};
+    uint32_t last_reset_ms{0};
+    uint32_t last_poll_ms{0};
 
     bool lock_spi(uint32_t timeout_ms) {
         if (!spi_mutex) {
@@ -1171,10 +1466,21 @@ int read_cp_mv_robust() {
 std::shared_ptr<Qca7000Transport> g_transport;
 slac::Channel g_channel;
 std::unique_ptr<slac::evse::EvseFsm> g_fsm;
+std::array<uint8_t, slac::defs::NMK_LEN> g_runtime_slac_nmk{};
+bool g_runtime_slac_nmk_valid = false;
 uint8_t g_local_mac[ETH_ALEN]{};
 uint8_t g_last_seen_ev_mac[ETH_ALEN]{};
 bool g_last_seen_ev_mac_valid = false;
 int g_last_cp_mv = 0;
+
+void ensure_runtime_slac_nmk() {
+    if (g_runtime_slac_nmk_valid) {
+        return;
+    }
+    esp_fill_random(g_runtime_slac_nmk.data(), g_runtime_slac_nmk.size());
+    g_runtime_slac_nmk_valid = true;
+    Serial.println("[SLAC] runtime NMK seeded");
+}
 
 struct RuntimeConfig {
     uint32_t magic{CFG_MAGIC};
@@ -6680,6 +6986,8 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
     g_fsm = std::make_unique<slac::evse::EvseFsm>(g_channel, [](const std::string& msg) {
         Serial.printf("[FSM] %s\n", msg.c_str());
     });
+    ensure_runtime_slac_nmk();
+    g_fsm->set_nmk(g_runtime_slac_nmk.data());
 
     const uint8_t plc_peer_mac[ETH_ALEN] = {
         static_cast<uint8_t>((PLC_PEER_MAC_DEFAULT[0] >> 8) & 0xFF),
