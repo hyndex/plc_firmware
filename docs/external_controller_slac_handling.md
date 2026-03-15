@@ -1,45 +1,65 @@
 # External Controller SLAC Handling Guide
 
-Updated: 2026-03-14
+Updated: 2026-03-15
 
-This document describes the current SLAC handling model for:
+This document is the current reference for:
 
 - `mode=0` `standalone`
 - `mode=1` `external_controller`
-- `tools/mode2_uart_vehicle_charge_test.py`
+- [`tools/external_controller_single_module_charge_test.py`](/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py)
 
-The current intent is simple: in `mode=1`, SLAC failure and retry behavior should
-track the standalone firmware path as closely as possible. The controller should
-keep the contract alive and feed EV-facing data, but it should not fight the PLC's
-own retry loop with unnecessary disarms, aborts, or resets.
+The current design goal is:
 
-## 1. Terms and Visible States
+- keep standalone as the reference SLAC behavior
+- in `mode=1`, let the PLC own SLAC retry and recovery after one controller `start`
+- keep the controller responsible for heartbeat, auth, relay commands, module CAN control, and EV-facing feedback
+- avoid controller-side reset churn while the PLC and EV are still in their normal retry loop
 
-Controller-side status lines expose CP phases like this:
+## 1. Runtime Modes and Bench Tools
+
+The firmware now has 2 effective runtime behaviors:
+
+- `mode=0` `standalone`
+- `mode=1` `external_controller`
+
+Legacy aliases such as `mode=2`, `mode=3`, `uart_router`, and older
+controller-managed names normalize into the same `mode=1 external_controller`
+runtime path.
+
+Current bench scripts:
+
+- [`tools/external_controller_single_module_charge_test.py`](/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py)
+  - recommended for pure controller-mode SLAC / HLC / charging validation
+  - single PLC, single module, single relay, no donor/share path
+
+## 2. Terms and Visible States
+
+The controller-side event stream exposes CP phases like this:
 
 - `A`
-  - no EV connected
+  - unplugged
 - `B1`
-  - EV connected, but not yet in the digital-communication window
-  - typical live status: `cp=B1 duty=100`
+  - EV connected, but digital communication not yet enabled
+  - typical line: `cp=B1 duty=100`
 - `B2`
-  - digital communication enabled
-  - typical live status: `cp=B2 duty=5`
-  - this is where SLAC matching and HLC setup should progress
+  - digital communication window
+  - typical line: `cp=B2 duty=5`
+  - SLAC and HLC startup should happen here
 - `C`
   - charging path active
 - `D`
-  - ventilation-required state if ever used by the EV
+  - ventilation-required state if the EV ever uses it
 - `E/F`
-  - fault/no-PWM pulse behavior
-  - the current retry path can intentionally issue an `E/F`-style pulse after repeated SLAC failures
+  - fault / no-PWM pulse state
+  - the PLC may intentionally pulse into this area during stronger SLAC recovery
 
-For this bench, the important distinction is:
+For this bench:
 
-- `B1` is the quiet connected window
-- `B2` is the active digital-communication window
+- `B1` is the quiet attach window
+- `B2` is the digital-communication window
+- `C` means the EV has accepted charging
 
-## 2. Ownership Split
+## 3. Ownership Split
 
 ### `mode=0` `standalone`
 
@@ -49,9 +69,9 @@ The PLC owns the full charging path:
 - SLAC
 - HLC
 - authorization
-- module control
-- EV-facing present voltage/current
 - relay execution
+- module manager / local module control
+- EV-facing present voltage / current
 
 End-to-end path:
 
@@ -60,33 +80,38 @@ End-to-end path:
 ### `mode=1` `external_controller`
 
 The PLC still owns EV protocol handling, but the controller owns the power path
-decisions:
+decisions.
 
-- PLC owns:
-  - CP / PWM
-  - SLAC FSM
-  - HLC SECC lifecycle
-  - EV request decoding
-  - relay execution
-- Controller owns:
-  - authorization policy
-  - SLAC gating contract
-  - EV-facing feedback values
-  - relay decisions
-  - module CAN / module power targets
+PLC owns:
+
+- CP / PWM
+- SLAC FSM
+- HLC SECC lifecycle
+- EV request decoding
+- UART event stream / ACK surface
+
+Controller owns:
+
+- heartbeat / liveness contract
+- authorization policy
+- initial "start digital communication" permission
+- relay decisions
+- EV-facing feedback values
+- module CAN control and power targets
 
 End-to-end path:
 
 - `CP -> SLAC -> HLC on PLC`
 - `EV demand/status -> [SERCTRL] UART events`
-- `controller feedback/relay commands -> CTRL ...`
+- `controller feedback + relay commands -> CTRL ...`
+- `controller -> modules over external CAN`
 
-Important rule:
+Important rule in `mode=1`:
 
-- in `mode=1`, the PLC does not autonomously change relays because of HLC, CP, or SLAC transitions
-- `CTRL STOP` changes PLC session-stop policy, but relay state still belongs to `CTRL RELAY`
+- the PLC does not autonomously drive the module-manager path
+- `CTRL STOP` affects PLC-side stop policy, but relay state still belongs to `CTRL RELAY`
 
-## 3. Flashing and Making the Mode Effective
+## 4. Flashing and Making the Mode Effective
 
 ### Flash targets
 
@@ -104,60 +129,58 @@ pio run -e standalone-plc1 -t upload --upload-port /dev/ttyACM0
 pio run -e standalone-plc2 -t upload --upload-port /dev/ttyACM1
 ```
 
-### Critical persistence rule
+### Persistence rule
 
-Flashing alone does not guarantee the running mode changed.
+Flashing alone does not guarantee the runtime mode changed.
 
-The firmware loads persisted runtime config from NVS on boot. That means:
+The firmware loads runtime config from NVS on boot. That means:
 
-- build defaults in `platformio.ini` are boot defaults only
+- `platformio.ini` defaults are boot defaults only
 - saved NVS config wins after reboot
-- after changing mode or ownership from UART, use `CTRL SAVE` if you want the change to persist across reboot
-- use `CTRL RESET` or power-cycle to start from a clean runtime state after reconfiguration
+- after changing mode or ownership through UART, use `CTRL SAVE` if the change should persist
+- use `CTRL RESET` or power-cycle after reconfiguration if you want a clean runtime restart
 
-### Mode 1 bench setup used on this bench
+### Mode 1 bench setup used here
 
-Borrower (`plc1`):
+Borrower / PLC1:
 
 ```text
-CTRL MODE mode1 1 1
+CTRL MODE 1 1 1
 CTRL OWNERSHIP 1 1
 CTRL SAVE
 CTRL RESET
 ```
 
-Donor (`plc2`):
+Donor / PLC2:
 
 ```text
-CTRL MODE mode1 2 1
+CTRL MODE 1 2 1
 CTRL OWNERSHIP 2 2
 CTRL SAVE
 CTRL RESET
 ```
-
-The donor ownership changed from `addr=3/group=2` to `addr=2/group=2`.
 
 ### Mode 0 bench setup
 
-Borrower (`plc1`):
+Borrower / PLC1:
 
 ```text
-CTRL MODE mode0 1 1
+CTRL MODE 0 1 1
 CTRL OWNERSHIP 1 1
 CTRL SAVE
 CTRL RESET
 ```
 
-Donor (`plc2`):
+Donor / PLC2:
 
 ```text
-CTRL MODE mode0 2 1
+CTRL MODE 0 2 1
 CTRL OWNERSHIP 2 2
 CTRL SAVE
 CTRL RESET
 ```
 
-### Confirm status after reboot
+### Confirm status
 
 Use:
 
@@ -165,26 +188,26 @@ Use:
 CTRL STATUS
 ```
 
-Mode 1 should look similar to:
+Mode 1 should report something similar to:
 
 ```text
 [SERCTRL] STATUS mode=1(external_controller) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 cp=B1 duty=100 ...
-[SERCTRL] STATUS mode=1(external_controller) plc_id=2 connector_id=2 controller_id=1 module_addr=0x02 local_group=2 cp=A duty=100 ...
 ```
 
-## 4. Standalone SLAC Failure Handling
+## 5. Standalone Reference Behavior
 
-Standalone is the reference behavior.
+Standalone is still the reference path.
 
 When CP is stable and connected, standalone:
 
 - waits for a stable connected CP window
+- enables PWM
+- waits for a stable `B2` digital-communication window
 - starts SLAC on its own
-- drives PWM to the digital-communication window
 - starts HLC after SLAC match
 
-On failure, standalone does not immediately hard-reset the session from outside.
-Instead it uses an internal retry policy:
+On failure, standalone does not rely on an outside controller reset loop.
+It uses internal retry behavior:
 
 - SLAC progress timeout: `12 s`
 - hold after failure: `3 s`
@@ -193,115 +216,163 @@ Instead it uses an internal retry policy:
 
 In effect:
 
-- first failed match: hold and retry
+- first failed match: hold, then retry
 - repeated failed matches: hold, then E/F pulse, then retry
 
-## 5. Mode 1 Golden Path
+## 6. Current Mode 1 SLAC Lifecycle
 
-Mode 1 should now follow the same retry shape as standalone, but with a controller
-contract layered on top.
+The important firmware change on 2026-03-15 is that `mode=1` now uses the same
+practical SLAC retry shape as standalone after one controller `start`.
 
-### Step 1: establish controller liveness
+### 6.1 What changed in firmware
 
-Keep the heartbeat alive:
+The firmware now keeps a PLC-owned SLAC contract internally:
+
+- `CTRL SLAC start` latches `slac_plc_owned=1`
+- that PLC-owned contract survives the PLC's own retry pulses and hold windows
+- the contract is no longer expected to be refreshed periodically by the controller
+- SLAC start in controller mode is gated by stable B2/PWM timing, matching standalone more closely
+
+The controller-owned / PLC-owned split is now:
+
+- controller says: "digital communication is allowed, start now"
+- PLC says: "I will keep retrying SLAC with the standalone recovery path until I match or the contract is explicitly cleared"
+
+### 6.2 What the controller does now
+
+For one EV attach:
+
+1. keep heartbeat alive
+2. keep auth alive
+3. wait for a clean attach window around `B1` / `B2`
+4. send one `CTRL SLAC start 45000`
+5. do not keep re-sending `CTRL SLAC start`
+6. let the PLC retry naturally
+
+### 6.3 What the PLC does now
+
+Once the controller issued one valid `CTRL SLAC start`, the PLC:
+
+- enables PWM / digital communication when the stable CP window is ready
+- starts SLAC
+- if matching stalls for `12 s`, enters hold
+- if the SLAC FSM reaches `MatchingFailed` or `NoSlacPerformed`, enters hold
+- after repeated failures in the same attach, issues the `4 s` E/F pulse
+- restarts naturally if CP is still connected and the PLC-owned contract still exists
+
+This is the same recovery shape used by standalone:
+
+- progress timeout -> hold
+- repeated failures -> hold + E/F pulse
+- retry without controller reset churn
+
+### 6.4 When the PLC-owned contract clears
+
+The latched controller contract is cleared when:
+
+- the EV really unplugs back to `A`
+- the controller explicitly sends `CTRL SLAC disarm`
+- the controller explicitly sends `CTRL SLAC abort`
+- stop / safe-stop handling clears the session contract
+- heartbeat-loss cleanup decides the waiting contract is stale
+
+Important nuance:
+
+- PLC retry pulses and temporary `B2 -> B1 -> F -> B2` recovery transitions do not by themselves require a new controller `start`
+- a real unplug to `A` does require a new `CTRL SLAC start` on the next attach
+
+## 7. `CTRL SLAC` Command Semantics
+
+Use the commands like this:
+
+- `CTRL SLAC arm <ms>`
+  - lease only
+  - clears the `start` latch
+  - leaves `slac_plc_owned=0`
+  - use only when you want permission without immediate start
+- `CTRL SLAC start <ms>`
+  - arms the contract
+  - latches immediate start permission
+  - sets the PLC-owned retry path
+  - this is the normal borrower command
+  - one `start` per EV attach is the intended policy
+- `CTRL SLAC disarm <ms>`
+  - clears the contract
+  - stops waiting sessions cleanly
+- `CTRL SLAC abort <ms>`
+  - explicit abort path
+  - also clears the active contract
+
+Operational guidance:
+
+- use `start`, not `arm`, for the borrower
+- do not alternate `start -> arm -> start` during a normal attach
+- donor should normally remain `AUTH deny` and `SLAC disarm` in controller-mode charge tests
+
+## 8. Controller Golden Path
+
+Recommended controller sequence:
+
+### Step 1: establish liveness
 
 ```text
 CTRL HB 3000
 ```
 
-The harness currently drives heartbeat about every `800 ms`.
+The current Python harness drives heartbeat about every `800 ms`.
 
-### Step 2: establish authorization policy
+### Step 2: establish auth
 
-While waiting for the session to identify itself, keep auth alive:
-
-```text
-CTRL AUTH pending 6000
-```
-
-Promote to grant when charging is allowed:
+While waiting:
 
 ```text
 CTRL AUTH grant 6000
 ```
 
-### Step 3: wait for the EV to land in `B1`
+### Step 3: wait for attach
 
-Do not force digital communication while the cable is not yet stable. The clean
-entry window is:
+Clean start window:
 
 - EV connected
-- `cp=B1`
-- `duty=100`
+- `cp=B1` or early `B2`
+- no controller-side reset churn
 
-### Step 4: start SLAC with `start`, not just `arm`
-
-Use:
+### Step 4: start digital communication once
 
 ```text
 CTRL SLAC start 45000
 ```
 
-This does two things:
+### Step 5: let the PLC own retry
 
-- arms the SLAC contract
-- latches immediate start permission
-
-When the contract is valid, the PLC can move from `B1` to `B2` and begin SLAC.
-
-### Step 5: while waiting for a match, keep the contract alive
-
-While the EV is still trying to match:
+Do:
 
 - keep sending `CTRL HB`
-- keep auth alive
-- refresh the SLAC contract with `CTRL SLAC start`, not `CTRL SLAC arm`
+- keep sending `CTRL AUTH grant`
+- wait for `MATCHED`, `PreCharge`, and `CurrentDemand`
 
-Current harness behavior is to refresh every roughly `8-12 s`.
+Do not:
 
-This is the key rule:
+- periodically refresh `CTRL SLAC start`
+- replace `start` with `arm` while the EV is still retrying
+- immediately `disarm`, `abort`, or `reset` after the first failed match
 
-- use `CTRL SLAC start` for keepalive
-- do not refresh a waiting session with `CTRL SLAC arm`
+### Step 6: feed HLC correctly
 
-`arm` clears the `start` latch. If you replace `start` with `arm` while the EV is
-still trying, you can accidentally remove the permission the PLC needs to restart
-cleanly after its internal hold window.
-
-### Step 6: let the PLC retry naturally
-
-If the EV sends multiple SLAC requests, do not force an immediate external reset
-after the first failure.
-
-The intended behavior is:
-
-- EV retries normally
-- PLC enters hold on failed/expired matching
-- PLC optionally applies E/F pulse after repeated failures
-- PLC restarts naturally when:
-  - CP is still connected
-  - the controller contract is still valid
-  - the hold window expired
-
-This avoids fighting the EV's own retry burst.
-
-### Step 7: once matched, feed HLC properly
-
-After match and HLC startup:
+After `MATCHED` / HLC startup:
 
 - watch `[SERCTRL] EVT BMS`
-- watch `[SERCTRL] EVT HLC`
-- send controller-fed values with `CTRL FEEDBACK`
-- drive the power path with explicit `CTRL RELAY`
+- send `CTRL FEEDBACK`
+- drive relay state with `CTRL RELAY`
 
 Example:
 
 ```text
-CTRL FEEDBACK 1 1 500 10 0 0 0 0
+CTRL FEEDBACK 1 1 500 0 0 0 0
 CTRL RELAY 1 1 5000
 ```
 
-### Step 8: stop cleanly
+### Step 7: stop cleanly
 
 Preferred stop sequence:
 
@@ -317,161 +388,188 @@ Important:
 - `CTRL STOP` alone does not open relays
 - relay changes still require `CTRL RELAY`
 
-## 6. Current Mode 1 Failure Handling
-
-After the current firmware alignment, `mode=1` no longer uses a separate
-controller-only in-place SLAC restart path. Instead it follows the standalone
-shape:
-
-- wait for stable CP
-- start session if controller contract allows it
-- if matching stalls for `12 s`, enter hold
-- if the FSM reaches `MatchingFailed` or `NoSlacPerformed`, enter hold
-- after repeated failures in the same CP attach, issue the `4 s` E/F pulse
-- if the controller contract is still valid after hold, restart naturally
-
-This means the correct controller policy is:
-
-- keep the contract alive
-- do not churn `disarm`, `abort`, or `reset`
-- only escalate after the EV retry burst has gone quiet or the session is clearly stuck beyond the normal hold/retry path
-
-## 7. `CTRL SLAC` Command Semantics
-
-Use the commands like this:
-
-- `CTRL SLAC arm <ms>`
-  - arms the lease
-  - clears any previous start latch
-  - use only if you want permission without an immediate start latch
-- `CTRL SLAC start <ms>`
-  - arms the lease
-  - sets the start latch
-  - use this for the real `B1 -> B2` trigger
-  - use this again for waiting-session keepalive
-- `CTRL SLAC disarm <ms>`
-  - clears the contract
-  - safe-stops an active session when needed
-- `CTRL SLAC abort <ms>`
-  - explicit abort path
-  - also clears the contract and stops the active session
-
-Operational guidance:
-
-- `start` is the normal command for the borrower
-- donor should normally stay `AUTH deny` and `SLAC disarm`
-- do not alternate `start -> arm -> start` during one attach unless you are intentionally removing and re-granting permission
-
-## 8. Reading the Event Stream
+## 9. Reading the Event Stream
 
 The controller should primarily watch:
 
 - `[SERCTRL] EVT CP ...`
-  - CP state, PWM duty, and controller gating flags
 - `[SERCTRL] EVT SLAC ...`
-  - SLAC FSM state, failure count, and progress
 - `[SERCTRL] EVT HLC ...`
-  - HLC readiness and feedback visibility
 - `[SERCTRL] EVT BMS ...`
-  - EV-requested stage, target voltage, and target current
 - `[SERCTRL] EVT SESSION ...`
-  - relays, stop state, meter Wh, SOC
 - `[SERCTRL] ACK ...`
-  - command acceptance/rejection
 
 Useful interpretations:
 
 - `cp=B1 duty=100`
-  - connected, quiet start window
+  - quiet attach window
 - `cp=B2 duty=5`
   - digital communication enabled
 - repeated `waiting SLAC start auth`
-  - controller contract is missing or expired
+  - contract is missing or expired
 - `[SLAC] enter hold ...`
-  - expected recovery behavior after match failure or timeout
+  - expected retry behavior
 - `[CP] E/F pulse ...`
   - expected stronger recovery after repeated failures
+- `plc_owned=1`
+  - controller already handed SLAC retry ownership to the PLC
 
-## 9. Python Harness Usage
+## 10. Recommended Python Harness Usage
 
-The current live harness is:
+### 10.1 Preferred controller-mode bring-up / SLAC validation
 
-- `tools/mode2_uart_vehicle_charge_test.py`
-
-Current default bench identities are:
-
-- borrower home module: `addr=1/group=1`
-- donor module: `addr=2/group=2`
-
-### Single session
+Use the simple single-module harness:
 
 ```bash
-python3 tools/mode2_uart_vehicle_charge_test.py
+python3 tools/external_controller_single_module_charge_test.py
 ```
 
-### Three consecutive 3-minute sessions with 1-minute gaps
+What it does:
+
+- PLC1 only
+- connector 1 only
+- module `addr=1/group=1` only
+- `Relay1` only
+- no donor/share orchestration
+- follows the same practical shape as standalone:
+  - `SLAC -> HLC -> PreCharge -> PowerDelivery -> CurrentDemand`
+
+For repeated or batch runs, pin the serial port explicitly and run one instance at
+a time:
 
 ```bash
-python3 tools/mode2_uart_vehicle_charge_test.py --session-profile align3x3m
+python3 tools/external_controller_single_module_charge_test.py \
+  --plc-port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 \
+  --plc-id 1 \
+  --controller-id 1
 ```
 
-This profile currently means:
+Important batch rule:
 
-- `home_duration_s=60`
-- `shared_duration_s=60`
-- `post_release_duration_s=60`
-- `session_count=3`
-- `session_gap_s=60`
-- `session_start_timeout_s>=240`
+- do not run multiple copies concurrently
+- the harness opens the PLC port exclusively
+- concurrent copies or stale background processes will corrupt the dataset
 
-### Five consecutive 5-minute sessions with 1-minute gaps
+## 11. Bench Validation Snapshot
 
-```bash
-python3 tools/mode2_uart_vehicle_charge_test.py --session-profile align5x5m
-```
+### 11.1 Standalone confirmation
 
-This profile currently means:
+Standalone was revalidated after the mode-1 changes and still reaches charging:
 
-- `home_duration_s=100`
-- `shared_duration_s=100`
-- `post_release_duration_s=100`
-- `session_count=5`
-- `session_gap_s=60`
-- `session_start_timeout_s>=360`
+- `CurrentDemand ready=1`
+- about `500 V`
+- `0.00 A` in the no-load simulator case
 
-### What the harness now does
+Reference artifact:
 
-The harness now intentionally avoids fighting the PLC retry path:
+- [`logs/standalone_plc1_confirm2_20260315_080509_summary.json`](/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_plc1_confirm2_20260315_080509_summary.json)
 
-- keeps borrower heartbeat alive
-- keeps borrower auth alive
-- refreshes borrower SLAC with `CTRL SLAC start`
-- does not immediately disarm after one failed match
-- no longer uses the old Python-side `B1 too long -> hard recovery` loop as the default retry mechanism
+### 11.2 Single-run mode-1 confirmation
 
-Do not wrap this script in another shell loop that resets both ESPs between
-sessions unless you are debugging a boot-time issue.
+Mode 1 was then validated with the simple harness:
 
-## 10. Warnings and Cautions
+- one controller `CTRL SLAC start`
+- PLC-owned retry behavior
+- successful `MATCHED -> PreCharge -> CurrentDemand`
 
-- Flashing a controller or standalone build does not guarantee the runtime mode changed. Saved NVS config still wins on boot until you update it with `CTRL SAVE` and restart cleanly.
-- In `mode=1`, relays are controller-owned. `CTRL STOP` does not by itself open the power path.
-- The correct borrower keepalive is `CTRL SLAC start`, not repeated `CTRL SLAC arm`.
-- Do not `CTRL SLAC disarm` or `CTRL RESET` after the first failed match attempt. Let the EV retry and let the PLC hold/E/F recovery path run first.
-- A `B2 -> B1 -> B2` cycle can be part of normal recovery. It is not automatically a reason to hard reset.
-- Donor should stay disarmed in this test flow. Only the borrower should be trying to match.
-- If heartbeat is lost long enough, the PLC clears the stale SLAC contract on its own.
+Representative clean run:
 
-## 11. Current Bench Limitations
+- [`logs/external_controller_single_module_charge_20260315_081616_summary.json`](/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_single_module_charge_20260315_081616_summary.json)
 
-As of 2026-03-14, SLAC start and retry behavior in `mode=1` is materially better,
-but two bench-level cautions remain:
+### 11.3 10-session serial characterization
 
-- protocol stop still often falls back to forced stop
-- the `align3x3m` validation showed donor-side release/status recovery issues after session 2, which is downstream of SLAC matching itself
+Latest clean serial batch:
 
-So the current state is:
+- artifact JSON:
+  - [`logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_aggregate.json`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_aggregate.json)
+- artifact CSV:
+  - [`logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_aggregate.csv`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_aggregate.csv)
 
-- Mode 1 SLAC handling is aligned with standalone retry behavior
-- end-to-end charging can pass
-- remaining instability is now more visible in donor release and stop handling than in initial SLAC start handling
+Batch conditions:
+
+- `10` sessions
+- `120 s` charge hold per session
+- `60 s` gap between sessions
+- sessions run serially, one after another
+
+Results:
+
+- `8/10` full pass
+- `10/10` reached `MATCHED`
+- `10/10` reached `PreCharge`
+- `9/10` reached `CurrentDemand ready`
+- controller `CTRL SLAC start` count was `1` in every session
+- PLC internal SLAC session restarts ranged from `1` to `5` per session
+
+SLAC match time from controller `CTRL SLAC start` to `MATCHED`:
+
+- min: `1.991 s`
+- max: `47.781 s`
+- average: `22.118 s`
+
+`CurrentDemand ready` time:
+
+- pass-session min: `8.215 s`
+- pass-session max: `53.671 s`
+- pass-session average: `28.411 s`
+
+Observed retry totals across the 10 sessions:
+
+- SLAC progress timeouts: `9`
+- E/F pulses: `10`
+- terminal SLAC failures before recovery: `11`
+
+Interpretation:
+
+- PLC-owned SLAC retry is working
+- the controller no longer needs to babysit SLAC restarts
+- most sessions still need some PLC-side retry activity
+- only one session in the batch completed with no retry at all
+
+### 11.4 Failure classification from the 10-session batch
+
+Session 4:
+
+- had a real SLAC timeout and `CM_ATTEN_CHAR` failure
+- recovered to `MATCHED` and `PreCharge`
+- final runner failure was host-side heartbeat ACK timeout `0x10`
+
+References:
+
+- [`session04.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session04.log#L496)
+- [`session04.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session04.log#L669)
+- [`session04.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session04.log#L909)
+- [`session04.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session04.log#L1027)
+- [`session04_runner.out`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session04_runner.out#L16)
+
+Session 5:
+
+- reached `MATCHED`
+- reached `PreCharge`
+- reached stable `CurrentDemand` around `499.9 V / 0.0 A`
+- later lost PLC status / feedback visibility and the runner failed on `timeout waiting for PLC status`
+
+References:
+
+- [`session05.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session05.log#L740)
+- [`session05.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session05.log#L894)
+- [`session05.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session05.log#L1039)
+- [`session05.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session05.log#L3451)
+- [`session05_runner.out`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session05_runner.out#L28)
+
+## 12. Current Conclusions and Cautions
+
+Current state after the latest firmware and harness updates:
+
+- controller mode now follows the standalone retry model much more closely
+- one controller `CTRL SLAC start` per EV attach is enough
+- the PLC owns SLAC retry / hold / E/F recovery after that
+- standalone still works
+- mode 1 now repeatedly reaches `CurrentDemand` in the simple single-module path
+
+Remaining instability is no longer best described as "controller mode cannot do
+SLAC". The remaining issues are:
+
+- long but recoverable SLAC retries on some attaches
+- occasional host/UART supervision failures after or around charge bring-up
+- more complex donor/share behavior in the larger borrower/donor harness

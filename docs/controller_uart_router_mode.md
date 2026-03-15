@@ -89,8 +89,34 @@ The controller should primarily consume:
 - The PLC still answers ISO 15118 / DIN requests locally.
 - EV-facing present voltage/current and readiness come from `CTRL FEEDBACK`.
 - The PLC does not compute or command module setpoints in this mode.
-- refresh a waiting borrower session with `CTRL SLAC start`, not `CTRL SLAC arm`
+- issue one `CTRL SLAC start` per EV attach, then keep only heartbeat/auth alive
+- after that single `start`, the PLC owns SLAC retry / hold / E/F recovery internally
+- controller-mode SLAC start is now gated by stable B2/PWM timing, matching standalone more closely
 - do not immediately `disarm`, `abort`, or `reset` on the first SLAC match failure; let the PLC hold/retry path run first
+
+## Recommended Validation Harness
+
+For pure controller-mode charging validation, use:
+
+```bash
+python3 tools/external_controller_single_module_charge_test.py
+```
+
+That harness:
+
+- uses one PLC and one module only
+- sends one `CTRL SLAC start` per attach
+- lets the PLC own SLAC retry
+- avoids donor/share complexity
+
+For repeated runs, pin the serial path explicitly and do not run concurrent copies:
+
+```bash
+python3 tools/external_controller_single_module_charge_test.py \
+  --plc-port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 \
+  --plc-id 1 \
+  --controller-id 1
+```
 
 ## UART Integrity
 
@@ -112,11 +138,13 @@ Practical guidance:
 - if this is moved to a raw/noisy UART link later, add explicit framing plus checksum
   or CRC on the wire
 
-## Helper Tool
+## Operator Note
 
-Use [uart_router_serial_monitor.py](/home/jpi/Desktop/EVSE/plc_firmware/tools/uart_router_serial_monitor.py)
-for keepalive and event monitoring:
+The repo now keeps one supported controller-mode Python harness:
 
 ```bash
-python3 -u tools/uart_router_serial_monitor.py --port /dev/ttyACM0 --plc-id 1 --controller-id 1
+python3 tools/external_controller_single_module_charge_test.py
 ```
+
+If you need continuous monitoring or relay-only tooling again later, recreate it
+around the current mode-1 contract instead of reviving the removed older scripts.

@@ -1231,6 +1231,7 @@ struct ControllerRuntimeState {
     uint32_t heartbeat_session_marker{0};
     bool slac_armed{false};
     bool slac_start_latched{false};
+    bool slac_plc_owned{false};
     ControllerAuthState auth_state{ControllerAuthState::Unknown};
     uint8_t last_seq_heartbeat{0};
     uint8_t last_seq_auth{0};
@@ -1320,6 +1321,7 @@ char g_cp_state_candidate = 'A';
 uint32_t g_cp_candidate_since_ms = 0;
 uint32_t g_cp_connected_since_ms = 0;
 uint32_t g_cp_last_seen_connected_ms = 0;
+uint32_t g_cp_pwm_ready_since_ms = 0;
 uint32_t g_cp_next_spike_log_ms = 0;
 uint32_t g_hlc_disconnect_hold_until_ms = 0;
 
@@ -2188,11 +2190,21 @@ bool controller_auth_granted(uint32_t now_ms) {
     return static_cast<int32_t>(now_ms - g_ctrl.auth_expiry_ms) <= 0;
 }
 
+void controller_clear_slac_contract() {
+    g_ctrl.slac_armed = false;
+    g_ctrl.slac_start_latched = false;
+    g_ctrl.slac_plc_owned = false;
+    g_ctrl.slac_arm_expiry_ms = 0u;
+}
+
 bool controller_allows_slac_start(uint32_t now_ms) {
     if (g_emergency_stop_active) return false;
     if (!mode_requires_controller_contract()) return true;
     if (mode_controller_has_final_decision()) {
         if (!g_ctrl.slac_armed) return false;
+        if (g_ctrl.slac_plc_owned && g_ctrl.slac_start_latched) {
+            return true;
+        }
         if (g_ctrl.slac_arm_expiry_ms == 0u) return false;
         if (static_cast<int32_t>(now_ms - g_ctrl.slac_arm_expiry_ms) > 0) return false;
         if (!g_runtime_cfg.slac_requires_controller_start) return true;
@@ -3128,9 +3140,7 @@ void service_emergency_stop(uint32_t now_ms) {
     if (g_emergency_stop_active) {
         g_ctrl.auth_state = ControllerAuthState::Denied;
         g_ctrl.auth_expiry_ms = 0u;
-        g_ctrl.slac_armed = false;
-        g_ctrl.slac_start_latched = false;
-        g_ctrl.slac_arm_expiry_ms = 0u;
+        controller_clear_slac_contract();
         controller_force_safe_stop("EmergencyStop");
     }
     Serial.printf("[EMERGENCY] state=%s\n", g_emergency_stop_active ? "PRESSED" : "RELEASED");
@@ -3680,6 +3690,7 @@ std::string module_id_from_addr(uint8_t addr) {
 }
 
 void controller_force_safe_stop(const char* reason) {
+    controller_clear_slac_contract();
     controller_clear_managed_power_cache();
     controller_clear_managed_feedback_cache();
     g_relay1_deadline_ms = 0;
@@ -3695,9 +3706,7 @@ void controller_force_safe_stop(const char* reason) {
 }
 
 void controller_reset_runtime_state() {
-    g_ctrl.slac_armed = false;
-    g_ctrl.slac_start_latched = false;
-    g_ctrl.slac_arm_expiry_ms = 0;
+    controller_clear_slac_contract();
     g_ctrl.auth_state = ControllerAuthState::Denied;
     g_ctrl.auth_expiry_ms = 0;
     g_ctrl.last_energy_allowed_ms = 0;
@@ -3788,9 +3797,7 @@ void controller_begin_stop(uint32_t now_ms, bool hard, uint32_t timeout_ms, uint
 
     g_ctrl.auth_state = ControllerAuthState::Denied;
     g_ctrl.auth_expiry_ms = now_ms + 200u;
-    g_ctrl.slac_armed = false;
-    g_ctrl.slac_start_latched = false;
-    g_ctrl.slac_arm_expiry_ms = 0;
+    controller_clear_slac_contract();
 
     clear_last_bms_request();
     controller_clear_managed_power_cache();
@@ -3811,9 +3818,7 @@ void controller_apply_stop_policy(uint32_t now_ms) {
 
     g_ctrl.auth_state = ControllerAuthState::Denied;
     g_ctrl.auth_expiry_ms = now_ms + 200u;
-    g_ctrl.slac_armed = false;
-    g_ctrl.slac_start_latched = false;
-    g_ctrl.slac_arm_expiry_ms = 0;
+    controller_clear_slac_contract();
 
     clear_last_bms_request();
     controller_clear_managed_power_cache();
@@ -4308,9 +4313,7 @@ void controller_handle_slac(const CtrlRxFrame& f) {
                                              : g_runtime_cfg.controller_slac_arm_timeout_ms;
     if (cmd == CTRL_SLAC_DISARM) {
         const bool active_session = g_session_started || g_session_matched || g_hlc_ready || g_hlc_active;
-        g_ctrl.slac_armed = false;
-        g_ctrl.slac_start_latched = false;
-        g_ctrl.slac_arm_expiry_ms = 0;
+        controller_clear_slac_contract();
         if (active_session || !mode_controller_has_final_decision()) {
             controller_force_safe_stop("CtrlDisarm");
         }
@@ -4327,6 +4330,7 @@ void controller_handle_slac(const CtrlRxFrame& f) {
         }
         g_ctrl.slac_armed = true;
         g_ctrl.slac_start_latched = false;
+        g_ctrl.slac_plc_owned = false;
         g_ctrl.slac_arm_expiry_ms = f.rx_ms + arm_ms;
         const uint32_t now_dbg = millis();
         Serial.printf("[CTRLRX] SLAC arm seq=%u expiry_ms=%lu\n",
@@ -4348,10 +4352,12 @@ void controller_handle_slac(const CtrlRxFrame& f) {
         }
         g_ctrl.slac_armed = true;
         g_ctrl.slac_start_latched = true;
-        g_ctrl.slac_arm_expiry_ms = f.rx_ms + arm_ms;
+        g_ctrl.slac_plc_owned = true;
+        g_ctrl.slac_arm_expiry_ms = 0u;
         const uint32_t now_dbg = millis();
-        Serial.printf("[CTRLRX] SLAC start seq=%u expiry_ms=%lu\n",
+        Serial.printf("[CTRLRX] SLAC start seq=%u plc_owned=%d expiry_ms=%lu\n",
                       static_cast<unsigned>(seq),
+                      g_ctrl.slac_plc_owned ? 1 : 0,
                       static_cast<unsigned long>(g_ctrl.slac_arm_expiry_ms));
         Serial.printf("[CTRLRX] SLAC start timing rx=%lu now=%lu delta=%ld\n",
                       static_cast<unsigned long>(f.rx_ms),
@@ -4362,9 +4368,7 @@ void controller_handle_slac(const CtrlRxFrame& f) {
     }
     if (cmd == CTRL_SLAC_ABORT) {
         const bool active_session = g_session_started || g_session_matched || g_hlc_ready || g_hlc_active;
-        g_ctrl.slac_start_latched = false;
-        g_ctrl.slac_armed = false;
-        g_ctrl.slac_arm_expiry_ms = 0;
+        controller_clear_slac_contract();
         if (active_session || !mode_controller_has_final_decision()) {
             controller_force_safe_stop("CtrlAbort");
         }
@@ -4579,23 +4583,20 @@ void controller_service_watchdogs(uint32_t now_ms) {
                     g_ctrl.auth_state = ControllerAuthState::Unknown;
                 } else if ((!g_session_started && !g_hlc_active) &&
                            lost_ms >= CONTROLLER_HB_SOFT_STOP_GRACE_MS &&
-                           (g_ctrl.slac_armed || g_ctrl.slac_start_latched || g_ctrl.slac_arm_expiry_ms != 0u)) {
+                           (g_ctrl.slac_armed || g_ctrl.slac_start_latched || g_ctrl.slac_plc_owned ||
+                            g_ctrl.slac_arm_expiry_ms != 0u)) {
                     Serial.printf("[CTRL] clearing stale SLAC contract after heartbeat loss %lu ms\n",
                                   static_cast<unsigned long>(lost_ms));
-                    g_ctrl.slac_armed = false;
-                    g_ctrl.slac_start_latched = false;
-                    g_ctrl.slac_arm_expiry_ms = 0u;
+                    controller_clear_slac_contract();
                     stop_session(now_ms);
                 }
             }
-            if (g_ctrl.slac_arm_expiry_ms != 0u &&
+            if (!g_ctrl.slac_plc_owned && g_ctrl.slac_arm_expiry_ms != 0u &&
                 static_cast<int32_t>(now_ms - g_ctrl.slac_arm_expiry_ms) > 0) {
                 if (g_ctrl.slac_armed || g_ctrl.slac_start_latched) {
                     Serial.println("[CTRL] clearing expired SLAC contract in external_controller");
                 }
-                g_ctrl.slac_armed = false;
-                g_ctrl.slac_start_latched = false;
-                g_ctrl.slac_arm_expiry_ms = 0u;
+                controller_clear_slac_contract();
                 if (!g_session_started && !g_hlc_active) {
                     stop_session(now_ms);
                 }
@@ -6498,6 +6499,13 @@ void apply_cp_output(char state, uint32_t now_ms) {
     const bool controller_permits_pwm =
         mode_is_local_autonomous() || g_session_started || g_hlc_active || controller_allows_slac_start(now_ms);
     const bool pwm_ok = pwm_connected && !hold_active && !g_ef_pulse_active && controller_permits_pwm;
+    if (pwm_ok) {
+        if (g_cp_pwm_ready_since_ms == 0u) {
+            g_cp_pwm_ready_since_ms = now_ms;
+        }
+    } else {
+        g_cp_pwm_ready_since_ms = 0u;
+    }
     uint16_t pct = g_ef_pulse_active ? 0u : (pwm_ok ? 5u : 100u);
     if (pct != g_last_cp_duty_pct) {
         Serial.printf("[CP] duty -> %u%% (phase=%s state=%c hold=%d ef=%d conn_hold=%d ctrl_pwm=%d)\n",
@@ -6684,14 +6692,22 @@ void process_cp_and_fsm(uint32_t now_ms) {
         if (connected && !old_connected) {
             g_cp_connected_since_ms = now_ms;
             g_cp_last_seen_connected_ms = now_ms;
+            g_cp_pwm_ready_since_ms = 0u;
             g_slac_failures_this_cp = 0;
             g_slac_hold_until_ms = 0;
         } else if (!connected && old_connected) {
             g_cp_connected_since_ms = 0;
             g_cp_last_seen_connected_ms = 0;
+            g_cp_pwm_ready_since_ms = 0u;
             g_slac_hold_until_ms = 0;
             g_slac_failures_this_cp = 0;
-            g_ctrl.slac_start_latched = false;
+            // In controller mode, preserve a latched "start digital communication"
+            // request across PLC-driven retry pulses (typically F state), but
+            // clear it on a real unplug to A so the next plug-in requires a new
+            // controller start command.
+            if (mode_requires_controller_contract() && raw_cp_state == 'A') {
+                controller_clear_slac_contract();
+            }
             stop_session(now_ms);
             stop_hlc_stack();
             if (!mode_controller_has_final_decision()) {
@@ -6709,8 +6725,13 @@ void process_cp_and_fsm(uint32_t now_ms) {
     }
 
     const bool slac_start_ok = controller_allows_slac_start(now_ms);
-    if (!g_session_started && g_cp_connected_since_ms != 0 &&
-        (now_ms - g_cp_connected_since_ms) >= CP_STABLE_MS &&
+    // Standalone only starts after the EV has already seen stable B2 PWM.
+    // Mirror that in controller mode instead of starting SLAC immediately when
+    // a controller arm/start arrives against an older CP-connected timestamp.
+    const bool pwm_ready = g_cp_pwm_ready_since_ms != 0u &&
+                           static_cast<int32_t>(now_ms - g_cp_pwm_ready_since_ms) >=
+                               static_cast<int32_t>(CP_STABLE_MS);
+    if (!g_session_started && g_cp_connected_since_ms != 0 && pwm_ready &&
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
         slac_start_ok) {
         start_session(now_ms);
