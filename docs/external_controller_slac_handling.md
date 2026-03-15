@@ -209,10 +209,11 @@ When CP is stable and connected, standalone:
 On failure, standalone does not rely on an outside controller reset loop.
 It uses internal retry behavior:
 
-- SLAC progress timeout: `12 s`
-- hold after failure: `3 s`
-- E/F pulse after repeated failures in the same CP attach: after `2` failures
-- E/F pulse duration: `4 s`
+- SLAC progress timeout: `45 s`
+- hold after failure: `10 s`
+- wrapper-only soft retry on very fast early `MatchingFailed`: `2` retries with `1.2 s` hold
+- E/F pulse after repeated failures in the same CP attach: after `3` failures
+- E/F pulse duration: `180 ms`
 
 In effect:
 
@@ -255,9 +256,10 @@ Once the controller issued one valid `CTRL SLAC start`, the PLC:
 
 - enables PWM / digital communication when the stable CP window is ready
 - starts SLAC
-- if matching stalls for `12 s`, enters hold
-- if the SLAC FSM reaches `MatchingFailed` or `NoSlacPerformed`, enters hold
-- after repeated failures in the same attach, issues the `4 s` E/F pulse
+- if matching stalls for `45 s`, enters hold
+- if the SLAC FSM hits a very fast early `MatchingFailed`, retries locally with a short `1.2 s` hold before escalating
+- if the SLAC FSM reaches `MatchingFailed` or `NoSlacPerformed` outside that soft-retry window, enters hold
+- after repeated failures in the same attach, issues the `180 ms` E/F pulse
 - restarts naturally if CP is still connected and the PLC-owned contract still exists
 
 This is the same recovery shape used by standalone:

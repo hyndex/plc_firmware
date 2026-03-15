@@ -166,10 +166,17 @@ constexpr uint32_t CP_STABLE_MS = 300;
 constexpr uint32_t CP_STATE_DEBOUNCE_MS = 80;
 constexpr uint32_t CP_DISCONNECT_DEBOUNCE_MS = 1200;
 constexpr uint32_t CP_CONNECTED_HOLD_MS = 1500;
-constexpr uint32_t SLAC_HOLD_MS = 3000;
-constexpr uint32_t SLAC_PROGRESS_TIMEOUT_MS = 12000;
-constexpr uint32_t CP_EF_PULSE_MS = 4000;
-constexpr uint8_t EF_PULSE_AFTER_FAILURES = 2;
+// Keep the plc_firmware wrapper more tolerant than the shared cbslac core.
+// The inner FSM can wait 40 s for CM_SLAC_PARAM.REQ, so the outer watchdog
+// must not abort a healthy session first.
+constexpr uint32_t SLAC_HOLD_MS = 10000;
+constexpr uint32_t SLAC_PROGRESS_TIMEOUT_MS = 45000;
+constexpr uint32_t SLAC_INIT_PROGRESS_TIMEOUT_MS = 130000;
+constexpr uint32_t SLAC_SOFT_RETRY_HOLD_MS = 1200;
+constexpr uint32_t SLAC_SOFT_RETRY_ELAPSED_MAX_MS = 3000;
+constexpr uint8_t SLAC_SOFT_RETRY_LIMIT = 2;
+constexpr uint32_t CP_EF_PULSE_MS = 180;
+constexpr uint8_t EF_PULSE_AFTER_FAILURES = 3;
 constexpr uint32_t STARTUP_LOG_DELAY_MS = 10000;
 constexpr uint32_t QCA_INIT_RETRY_MS = 1000;
 constexpr int HLC_FIRST_PACKET_TIMEOUT_MS = 20000;
@@ -198,7 +205,8 @@ constexpr uint16_t QCASPI_GOOD_SIGNATURE = 0xAA55;
 constexpr uint16_t QCA7K_BUFFER_SIZE = 3163;
 constexpr size_t RX_STREAM_CAPACITY = 4096;
 constexpr size_t RX_CHUNK_CAPACITY = 4096;
-constexpr size_t RX_QUEUE_CAPACITY = 8;
+constexpr size_t RX_QUEUE_CAPACITY = 32;
+constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 16u;
 
 constexpr uint16_t PLC_PEER_MAC_DEFAULT[3] = {0x00B0, 0x5200, 0x0001};
 constexpr char ISO_EVSE_ID[] = "IN*JPE*E000100010001";
@@ -854,7 +862,21 @@ private:
     }
 
     bool push_frame(const uint8_t* frame, uint16_t len) {
-        if (q_count >= RX_QUEUE_CAPACITY || len > ETH_FRAME_LEN) {
+        if (len > ETH_FRAME_LEN) {
+            return false;
+        }
+        if (q_count >= RX_QUEUE_CAPACITY) {
+            q_head = (q_head + 1u) % RX_QUEUE_CAPACITY;
+            q_count--;
+            rx_queue_drop_count++;
+            const uint32_t now_ms = millis();
+            if (last_rx_queue_drop_log_ms == 0u || static_cast<int32_t>(now_ms - last_rx_queue_drop_log_ms) >= 1000) {
+                Serial.printf("[QCA] HomePlug RX queue overrun drops=%lu\n",
+                              static_cast<unsigned long>(rx_queue_drop_count));
+                last_rx_queue_drop_log_ms = now_ms;
+            }
+        }
+        if (q_count >= RX_QUEUE_CAPACITY) {
             return false;
         }
         auto& slot = frame_queue[q_tail];
@@ -960,6 +982,8 @@ private:
     size_t q_head{0};
     size_t q_tail{0};
     size_t q_count{0};
+    uint32_t rx_queue_drop_count{0};
+    uint32_t last_rx_queue_drop_log_ms{0};
 
     bool lock_spi(uint32_t timeout_ms) {
         if (!spi_mutex) {
@@ -1060,6 +1084,8 @@ const char* evse_state_name(slac::evse::State s) {
         return "Matching";
     case slac::evse::State::Sounding:
         return "Sounding";
+    case slac::evse::State::FinalizeSounding:
+        return "FinalizeSounding";
     case slac::evse::State::DoAttenChar:
         return "DoAttenChar";
     case slac::evse::State::WaitForSlacMatch:
@@ -1332,8 +1358,11 @@ uint32_t g_ef_pulse_until_ms = 0;
 bool g_session_started = false;
 bool g_bcd_entered = false;
 bool g_session_matched = false;
+bool g_fsm_priming = false;
+uint32_t g_slac_pwm_enable_at_ms = 0;
 uint32_t g_session_started_ms = 0;
 uint8_t g_slac_failures_this_cp = 0;
+uint8_t g_slac_soft_retries_this_cp = 0;
 uint32_t g_slac_hold_until_ms = 0;
 slac::evse::State g_last_fsm_state = slac::evse::State::Reset;
 uint32_t g_next_qca_init_ms = 0;
@@ -6496,9 +6525,12 @@ void apply_cp_output(char state, uint32_t now_ms) {
     }
 
     const bool hold_active = static_cast<int32_t>(now_ms - g_slac_hold_until_ms) < 0;
-    const bool controller_permits_pwm =
-        mode_is_local_autonomous() || g_session_started || g_hlc_active || controller_allows_slac_start(now_ms);
-    const bool pwm_ok = pwm_connected && !hold_active && !g_ef_pulse_active && controller_permits_pwm;
+    const bool controller_permits_pwm = mode_requires_controller_contract() ? (g_session_started || g_hlc_active)
+                                                                            : (mode_is_local_autonomous() || g_session_started || g_hlc_active);
+    const bool pwm_enable_delay_elapsed =
+        (g_slac_pwm_enable_at_ms == 0u) || static_cast<int32_t>(now_ms - g_slac_pwm_enable_at_ms) >= 0;
+    const bool slac_ready_for_pwm = !g_fsm_priming && pwm_enable_delay_elapsed;
+    const bool pwm_ok = pwm_connected && !hold_active && !g_ef_pulse_active && controller_permits_pwm && slac_ready_for_pwm;
     if (pwm_ok) {
         if (g_cp_pwm_ready_since_ms == 0u) {
             g_cp_pwm_ready_since_ms = now_ms;
@@ -6515,7 +6547,7 @@ void apply_cp_output(char state, uint32_t now_ms) {
                       hold_active ? 1 : 0,
                       g_ef_pulse_active ? 1 : 0,
                       connected_hold ? 1 : 0,
-                      controller_permits_pwm ? 1 : 0);
+                      (controller_permits_pwm && slac_ready_for_pwm) ? 1 : 0);
         g_last_cp_duty_pct = pct;
     }
     write_ledc_duty(cp_pct_to_duty(g_last_cp_duty_pct));
@@ -6530,6 +6562,8 @@ void start_session(uint32_t now_ms) {
         controller_clear_managed_feedback_cache();
     }
     g_fsm->start(now_ms);
+    g_fsm_priming = false;
+    g_slac_pwm_enable_at_ms = mode_requires_controller_contract() ? (now_ms + CP_STABLE_MS) : 0u;
     g_session_started = true;
     g_session_started_ms = now_ms;
     g_bcd_entered = false;
@@ -6538,7 +6572,22 @@ void start_session(uint32_t now_ms) {
     Serial.println("[SLAC] session start");
 }
 
+void reprime_slac_modem(uint32_t now_ms, const char* reason) {
+    if (!g_transport || !g_fsm) {
+        return;
+    }
+
+    Serial.printf("[SLAC] modem reprime (%s)\n", reason ? reason : "-");
+    g_transport->modem_reset();
+    delay(150);
+    g_fsm->invalidate_key_state();
+    g_fsm->start(now_ms);
+    g_fsm_priming = true;
+    g_last_fsm_state = g_fsm->get_state();
+}
+
 void stop_session(uint32_t now_ms) {
+    const bool should_reprime = g_fsm && g_session_started;
     if (g_fsm && g_session_started) {
         g_fsm->leave_bcd(now_ms);
     }
@@ -6548,14 +6597,45 @@ void stop_session(uint32_t now_ms) {
     }
     g_session_started = false;
     g_session_started_ms = 0;
+    g_slac_pwm_enable_at_ms = 0u;
     g_bcd_entered = false;
     g_session_matched = false;
     g_hlc_disconnect_hold_until_ms = 0;
     g_last_fsm_state = slac::evse::State::Reset;
     g_last_ev_soc_pct = -1;
+    if (should_reprime) {
+        reprime_slac_modem(now_ms, "session stop");
+    }
+}
+
+bool schedule_soft_slac_retry(uint32_t now_ms, const char* reason) {
+    if (!g_session_started || !g_fsm) {
+        return false;
+    }
+    if (g_slac_soft_retries_this_cp >= SLAC_SOFT_RETRY_LIMIT) {
+        return false;
+    }
+    const uint32_t elapsed_ms = (g_session_started_ms <= now_ms) ? (now_ms - g_session_started_ms) : 0u;
+    if (elapsed_ms > SLAC_SOFT_RETRY_ELAPSED_MAX_MS) {
+        return false;
+    }
+
+    g_slac_soft_retries_this_cp++;
+    g_slac_hold_until_ms = now_ms + SLAC_SOFT_RETRY_HOLD_MS;
+    const std::string last_error = g_fsm->get_last_error();
+    stop_session(now_ms);
+    Serial.printf("[SLAC] soft retry %u/%u in %s (%s) %lu ms err=%s\n",
+                  static_cast<unsigned>(g_slac_soft_retries_this_cp),
+                  static_cast<unsigned>(SLAC_SOFT_RETRY_LIMIT),
+                  runtime_mode_name(),
+                  reason ? reason : "-",
+                  static_cast<unsigned long>(SLAC_SOFT_RETRY_HOLD_MS),
+                  last_error.empty() ? "-" : last_error.c_str());
+    return true;
 }
 
 void enter_hold_with_optional_ef_pulse(uint32_t now_ms, const char* reason) {
+    g_slac_soft_retries_this_cp = 0;
     if (g_slac_failures_this_cp < 0xFF) {
         g_slac_failures_this_cp++;
     }
@@ -6610,6 +6690,10 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
         static_cast<uint8_t>((PLC_PEER_MAC_DEFAULT[2] >> 0) & 0xFF),
     };
     g_fsm->set_plc_peer_mac(plc_peer_mac);
+    g_fsm->start(now_ms);
+    g_fsm_priming = true;
+    g_last_fsm_state = g_fsm->get_state();
+    Serial.println("[SLAC] priming modem key setup");
     g_next_qca_init_ms = 0;
     Serial.println("[APP] ready, waiting for CP B/C/D");
     log_runtime_stats("qca_ready");
@@ -6694,6 +6778,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
             g_cp_last_seen_connected_ms = now_ms;
             g_cp_pwm_ready_since_ms = 0u;
             g_slac_failures_this_cp = 0;
+            g_slac_soft_retries_this_cp = 0;
             g_slac_hold_until_ms = 0;
         } else if (!connected && old_connected) {
             g_cp_connected_since_ms = 0;
@@ -6701,6 +6786,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
             g_cp_pwm_ready_since_ms = 0u;
             g_slac_hold_until_ms = 0;
             g_slac_failures_this_cp = 0;
+            g_slac_soft_retries_this_cp = 0;
             // In controller mode, preserve a latched "start digital communication"
             // request across PLC-driven retry pulses (typically F state), but
             // clear it on a real unplug to A so the next plug-in requires a new
@@ -6718,6 +6804,24 @@ void process_cp_and_fsm(uint32_t now_ms) {
         g_last_cp_state = g_cp_state;
     }
 
+    if (g_fsm && g_fsm_priming) {
+        for (int i = 0; i < SLAC_ACTIVE_MAX_FRAMES_PER_LOOP; ++i) {
+            const int timeout_ms = (i == 0) ? 2 : 0;
+            const bool got = g_fsm->poll_channel_once(timeout_ms, now_ms);
+            if (!got) break;
+        }
+        g_fsm->poll(now_ms);
+        const slac::evse::State priming_state = g_fsm->get_state();
+        if (priming_state != g_last_fsm_state) {
+            Serial.printf("[FSM] %s -> %s\n", evse_state_name(g_last_fsm_state), evse_state_name(priming_state));
+            g_last_fsm_state = priming_state;
+        }
+        if (priming_state == slac::evse::State::Idle) {
+            g_fsm_priming = false;
+            Serial.println("[SLAC] modem key primed");
+        }
+    }
+
     apply_cp_output(g_cp_state, now_ms);
 
     if (!connected) {
@@ -6725,15 +6829,13 @@ void process_cp_and_fsm(uint32_t now_ms) {
     }
 
     const bool slac_start_ok = controller_allows_slac_start(now_ms);
-    // Standalone only starts after the EV has already seen stable B2 PWM.
-    // Mirror that in controller mode instead of starting SLAC immediately when
-    // a controller arm/start arrives against an older CP-connected timestamp.
     const bool pwm_ready = g_cp_pwm_ready_since_ms != 0u &&
                            static_cast<int32_t>(now_ms - g_cp_pwm_ready_since_ms) >=
                                static_cast<int32_t>(CP_STABLE_MS);
-    if (!g_session_started && g_cp_connected_since_ms != 0 && pwm_ready &&
+    if (!g_session_started && !g_fsm_priming && g_cp_connected_since_ms != 0 &&
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
-        slac_start_ok) {
+        slac_start_ok &&
+        (mode_requires_controller_contract() || pwm_ready)) {
         start_session(now_ms);
         if (mode_requires_controller_contract() && !mode_controller_has_final_decision()) {
             g_ctrl.slac_start_latched = false;
@@ -6754,7 +6856,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
         return;
     }
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < SLAC_ACTIVE_MAX_FRAMES_PER_LOOP; ++i) {
         const int timeout_ms = (i == 0) ? 2 : 0;
         const bool got = g_fsm->poll_channel_once(timeout_ms, now_ms);
         if (!got) break;
@@ -6777,9 +6879,12 @@ void process_cp_and_fsm(uint32_t now_ms) {
     const bool matching_in_progress =
         s == slac::evse::State::Idle || s == slac::evse::State::WaitForMatchingStart ||
         s == slac::evse::State::Matching || s == slac::evse::State::Sounding ||
+        s == slac::evse::State::FinalizeSounding ||
         s == slac::evse::State::DoAttenChar || s == slac::evse::State::WaitForSlacMatch;
+    const uint32_t progress_timeout_ms =
+        (s == slac::evse::State::WaitForMatchingStart) ? SLAC_INIT_PROGRESS_TIMEOUT_MS : SLAC_PROGRESS_TIMEOUT_MS;
     if (!g_session_matched && g_session_started_ms != 0 && matching_in_progress &&
-        static_cast<int32_t>(now_ms - (g_session_started_ms + SLAC_PROGRESS_TIMEOUT_MS)) > 0) {
+        static_cast<int32_t>(now_ms - (g_session_started_ms + progress_timeout_ms)) > 0) {
         Serial.printf("[SLAC] progress timeout state=%s elapsed_ms=%lu\n",
                       evse_state_name(s),
                       static_cast<unsigned long>(now_ms - g_session_started_ms));
@@ -6800,6 +6905,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
 
     if (s == slac::evse::State::Matched && !g_session_matched) {
         g_session_matched = true;
+        g_slac_soft_retries_this_cp = 0;
         uint8_t ev_mac[ETH_ALEN]{};
         if (g_fsm->get_ev_mac(ev_mac)) {
             Serial.printf("[SLAC] EV_MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -6807,7 +6913,25 @@ void process_cp_and_fsm(uint32_t now_ms) {
             controller_publish_ev_mac_if_changed(ev_mac);
         }
         Serial.println("[SLAC] MATCHED - starting HLC stack");
-    } else if (s == slac::evse::State::MatchingFailed || s == slac::evse::State::NoSlacPerformed) {
+    } else if (s == slac::evse::State::SignalError) {
+        enter_hold_with_optional_ef_pulse(now_ms, "slac init timeout");
+        stop_hlc_stack();
+        if (!mode_controller_has_final_decision()) {
+            request_modules_off("SlacInitTimeout");
+            (void)relay1_set(false, "SlacInitTimeout");
+        }
+        return;
+    } else if (s == slac::evse::State::MatchingFailed) {
+        if (schedule_soft_slac_retry(now_ms, "fsm early matching failure")) {
+            return;
+        }
+        enter_hold_with_optional_ef_pulse(now_ms, "fsm terminal failure");
+        stop_hlc_stack();
+        if (!mode_controller_has_final_decision()) {
+            request_modules_off("SlacFailure");
+            (void)relay1_set(false, "SlacFailure");
+        }
+    } else if (s == slac::evse::State::NoSlacPerformed) {
         enter_hold_with_optional_ef_pulse(now_ms, "fsm terminal failure");
         stop_hlc_stack();
         if (!mode_controller_has_final_decision()) {
