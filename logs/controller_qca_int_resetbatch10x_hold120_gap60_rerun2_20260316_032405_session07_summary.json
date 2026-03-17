@@ -1,0 +1,57 @@
+{
+  "result": "fail",
+  "phase": "stopping",
+  "events": [
+    "2026-03-16T03:47:02.439 phase=bootstrap",
+    "2026-03-16T03:47:05.951 phase=wait_for_session",
+    "2026-03-16T03:49:16.433 phase=stopping"
+  ],
+  "notes": [
+    "hard stop ack missing during cleanup",
+    "cleanup failed: timeout waiting for PLC status"
+  ],
+  "failures": [
+    "timeout waiting for ack 0x1A"
+  ],
+  "current_demand_started_at": 1773613033.57447,
+  "current_demand_ready_since": 1773613033.5744715,
+  "vehicle_stop_requested": false,
+  "vehicle_stop_reason": "",
+  "plc": {
+    "mode_id": 1,
+    "mode_name": "external_controller",
+    "can_stack": 0,
+    "module_mgr": 0,
+    "cp_phase": "C",
+    "cp_connected": true,
+    "cp_duty_pct": 5,
+    "slac_session": true,
+    "slac_matched": true,
+    "slac_fsm": 8,
+    "slac_failures": 0,
+    "hlc_ready": true,
+    "hlc_active": true,
+    "precharge_seen": true,
+    "precharge_ready": true,
+    "session_started": true,
+    "stop_active": false,
+    "stop_hard": false,
+    "stop_done": false,
+    "bms_stage_name": "current_demand",
+    "delivery_ready": true,
+    "target_v": 500.0,
+    "target_i": 45.0,
+    "fb_v": 499.9,
+    "fb_i": 0.0,
+    "relay1": true
+  },
+  "module": {
+    "address": 1,
+    "group": 1,
+    "rated_current_a": 30.0,
+    "status": "status=0x00400000 flags=OFF",
+    "voltage_v": 4.525390625,
+    "current_a": 0.0,
+    "off": true
+  }
+}

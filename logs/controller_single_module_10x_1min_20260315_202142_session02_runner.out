@@ -1,0 +1,26 @@
+CMD=python3 /home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py --plc-port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 --plc-id 1 --controller-id 1 --session-start-timeout-s 60 --current-demand-hold-s 15 --plc-log /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_1min_20260315_202142_session02.log --can-log /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_1min_20260315_202142_session02_can.log --summary-file /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_1min_20260315_202142_session02_summary.json
+STARTED=2026-03-15T20:22:42
+RC=1
+TIMED_OUT=0
+PLC_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_1min_20260315_202142_session02.log
+CAN_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_1min_20260315_202142_session02_can.log
+SUMMARY_FILE=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_1min_20260315_202142_session02_summary.json
+[PHASE] bootstrap
+[BOOT] mode=external_controller plc_id=1 connector_id=1 can_stack=0 module_mgr=0
+[MODULE] addr=1 grp=1 rated=30.0A status=0x00400000 flags=OFF
+[PHASE] wait_for_session
+[CTRL] remote start -> B1 to B2
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=7.4 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=7.1 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=6.7 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=6.4 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=6.1 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=5.8 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=5.6 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=5.4 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=5.2 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=5.1 presentI=0.0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=4.9 presentI=0.0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=4.8 presentI=0.0 ready=0 cp=B2 slac=0 hlc=0
+[FAIL] session never reached sustained CurrentDemand
+[PHASE] stopping

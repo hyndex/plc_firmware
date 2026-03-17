@@ -1,0 +1,748 @@
+{
+  "base": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100",
+  "generated_at": "2026-03-17T13:47:01",
+  "sessions": [
+    {
+      "session_index": 1,
+      "returncode": 1,
+      "runtime_s": 240.006,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session01.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session01_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session01_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session01_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:01:15.397 phase=bootstrap",
+          "2026-03-17T13:01:19.137 phase=wait_for_session",
+          "2026-03-17T13:04:49.289 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 1,
+          "slac_failures": 4,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.4853515625,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:01:15.397 phase=bootstrap",
+        "2026-03-17T13:01:19.137 phase=wait_for_session",
+        "2026-03-17T13:04:49.289 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 2,
+      "returncode": 1,
+      "runtime_s": 255.006,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session02.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session02_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session02_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session02_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:05:45.427 phase=bootstrap",
+          "2026-03-17T13:05:49.162 phase=wait_for_session",
+          "2026-03-17T13:09:19.251 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 1,
+          "slac_failures": 3,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.3603515625,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:05:45.427 phase=bootstrap",
+        "2026-03-17T13:05:49.162 phase=wait_for_session",
+        "2026-03-17T13:09:19.251 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 3,
+      "returncode": 1,
+      "runtime_s": 255.007,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session03.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session03_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session03_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session03_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:10:30.424 phase=bootstrap",
+          "2026-03-17T13:10:33.935 phase=wait_for_session",
+          "2026-03-17T13:14:03.966 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 0,
+          "slac_failures": 0,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.3359375,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:10:30.424 phase=bootstrap",
+        "2026-03-17T13:10:33.935 phase=wait_for_session",
+        "2026-03-17T13:14:03.966 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 4,
+      "returncode": 1,
+      "runtime_s": 255.008,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session04.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session04_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session04_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session04_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:15:15.432 phase=bootstrap",
+          "2026-03-17T13:15:19.168 phase=wait_for_session",
+          "2026-03-17T13:18:49.425 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B2",
+          "cp_connected": true,
+          "cp_duty_pct": 5,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 0,
+          "slac_failures": 4,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.283203125,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:15:15.432 phase=bootstrap",
+        "2026-03-17T13:15:19.168 phase=wait_for_session",
+        "2026-03-17T13:18:49.425 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 5,
+      "returncode": 1,
+      "runtime_s": 255.005,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session05.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session05_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session05_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session05_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:20:00.437 phase=bootstrap",
+          "2026-03-17T13:20:04.169 phase=wait_for_session",
+          "2026-03-17T13:23:34.319 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 1,
+          "slac_failures": 3,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.2490234375,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:20:00.437 phase=bootstrap",
+        "2026-03-17T13:20:04.169 phase=wait_for_session",
+        "2026-03-17T13:23:34.319 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 6,
+      "returncode": 1,
+      "runtime_s": 240.005,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session06.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session06_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session06_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session06_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:24:45.454 phase=bootstrap",
+          "2026-03-17T13:24:49.211 phase=wait_for_session",
+          "2026-03-17T13:28:19.215 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 1,
+          "slac_failures": 4,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.2890625,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:24:45.454 phase=bootstrap",
+        "2026-03-17T13:24:49.211 phase=wait_for_session",
+        "2026-03-17T13:28:19.215 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 7,
+      "returncode": 1,
+      "runtime_s": 240.007,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session07.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session07_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session07_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session07_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:29:15.459 phase=bootstrap",
+          "2026-03-17T13:29:19.214 phase=wait_for_session",
+          "2026-03-17T13:32:49.247 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 1,
+          "slac_failures": 4,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.2529296875,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:29:15.459 phase=bootstrap",
+        "2026-03-17T13:29:19.214 phase=wait_for_session",
+        "2026-03-17T13:32:49.247 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 8,
+      "returncode": 1,
+      "runtime_s": 255.006,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session08.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session08_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session08_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session08_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:33:45.481 phase=bootstrap",
+          "2026-03-17T13:33:49.238 phase=wait_for_session",
+          "2026-03-17T13:37:19.297 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 1,
+          "slac_failures": 3,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.244140625,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:33:45.481 phase=bootstrap",
+        "2026-03-17T13:33:49.238 phase=wait_for_session",
+        "2026-03-17T13:37:19.297 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 9,
+      "returncode": 1,
+      "runtime_s": 240.006,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session09.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session09_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session09_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session09_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:38:30.510 phase=bootstrap",
+          "2026-03-17T13:38:34.248 phase=wait_for_session",
+          "2026-03-17T13:42:04.337 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": null,
+        "current_demand_ready_since": null,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B1",
+          "cp_connected": true,
+          "cp_duty_pct": 100,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 1,
+          "slac_failures": 4,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 4.2529296875,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:38:30.510 phase=bootstrap",
+        "2026-03-17T13:38:34.248 phase=wait_for_session",
+        "2026-03-17T13:42:04.337 phase=stopping"
+      ]
+    },
+    {
+      "session_index": 10,
+      "returncode": 1,
+      "runtime_s": 255.006,
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session10.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session10_can.log",
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session10_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap30_serial_20260317_130100_session10_runner.out",
+      "summary": {
+        "result": "fail",
+        "phase": "stopping",
+        "events": [
+          "2026-03-17T13:43:00.538 phase=bootstrap",
+          "2026-03-17T13:43:04.279 phase=wait_for_session",
+          "2026-03-17T13:46:34.304 phase=stopping"
+        ],
+        "notes": [],
+        "failures": [
+          "session never reached sustained CurrentDemand",
+          "session never reached sustained CurrentDemand"
+        ],
+        "current_demand_started_at": 1773735291.1245437,
+        "current_demand_ready_since": 1773735291.1245475,
+        "vehicle_stop_requested": false,
+        "vehicle_stop_reason": "",
+        "plc": {
+          "mode_id": 1,
+          "mode_name": "external_controller",
+          "can_stack": 0,
+          "module_mgr": 0,
+          "cp_phase": "B",
+          "cp_connected": true,
+          "cp_duty_pct": 5,
+          "slac_session": false,
+          "slac_matched": false,
+          "slac_fsm": 0,
+          "slac_failures": 0,
+          "hlc_ready": false,
+          "hlc_active": false,
+          "precharge_seen": false,
+          "precharge_ready": false,
+          "session_started": false,
+          "stop_active": false,
+          "stop_hard": false,
+          "stop_done": true,
+          "bms_stage_name": "none",
+          "delivery_ready": false,
+          "target_v": 0.0,
+          "target_i": 0.0,
+          "fb_v": 0.0,
+          "fb_i": 0.0,
+          "relay1": false
+        },
+        "module": {
+          "address": 1,
+          "group": 1,
+          "rated_current_a": 30.0,
+          "status": "status=0x00400000 flags=OFF",
+          "voltage_v": 10.140625,
+          "current_a": 0.0,
+          "off": true
+        }
+      },
+      "result": "fail",
+      "failures": [
+        "session never reached sustained CurrentDemand",
+        "session never reached sustained CurrentDemand"
+      ],
+      "events": [
+        "2026-03-17T13:43:00.538 phase=bootstrap",
+        "2026-03-17T13:43:04.279 phase=wait_for_session",
+        "2026-03-17T13:46:34.304 phase=stopping"
+      ]
+    }
+  ],
+  "passes": 0,
+  "fails": 10
+}
