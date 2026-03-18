@@ -1,0 +1,23 @@
+{
+  "serial_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_plc2_monitor15m_mod02_20260319_011117.log",
+  "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_plc2_monitor15m_mod02_20260319_011117_can.log",
+  "result": "pass",
+  "matched": false,
+  "hlc_active": false,
+  "precharge": false,
+  "current_demand": true,
+  "current_demand_ready": true,
+  "seconds_to_matched_from_monitor_start": null,
+  "seconds_to_hlc_active_from_monitor_start": null,
+  "seconds_to_precharge_from_monitor_start": null,
+  "seconds_to_current_demand_from_monitor_start": 0.686,
+  "seconds_to_current_demand_ready_from_monitor_start": 0.686,
+  "monitor_duration_s": 900.049,
+  "first_drop": null,
+  "last_state": {
+    "cp": null,
+    "relay1": 1,
+    "hlc_active": null
+  },
+  "notes": []
+}

@@ -1,0 +1,38 @@
+{
+  "base_prefix": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500",
+  "generated_at": "2026-03-17T20:30:13",
+  "sessions": [
+    {
+      "session": "01",
+      "rc": 1,
+      "result": "fail",
+      "failure": "timeout waiting for ack 0x1A",
+      "slac_matched": false,
+      "hlc_ready": false,
+      "cp_phase": "B",
+      "current_demand_ready_since": null,
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session01_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session01_runner.out",
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session01.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session01_can.log",
+      "reset_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session01_reset.log"
+    },
+    {
+      "session": "02",
+      "rc": 1,
+      "result": "fail",
+      "failure": "timeout waiting for ack 0x1A",
+      "slac_matched": false,
+      "hlc_ready": false,
+      "cp_phase": "B",
+      "current_demand_ready_since": null,
+      "summary_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session02_summary.json",
+      "runner_file": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session02_runner.out",
+      "plc_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session02.log",
+      "can_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session02_can.log",
+      "reset_log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_2x_hold120_gap30_spiqca_probe_20260317_221500_session02_reset.log"
+    }
+  ],
+  "passes": 0,
+  "fails": 2
+}

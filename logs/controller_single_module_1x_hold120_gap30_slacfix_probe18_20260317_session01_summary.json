@@ -1,0 +1,54 @@
+{
+  "result": "fail",
+  "phase": "stopping",
+  "events": [
+    "2026-03-17T23:30:52.341 phase=bootstrap",
+    "2026-03-17T23:30:56.276 phase=wait_for_session",
+    "2026-03-17T23:31:29.777 phase=stopping"
+  ],
+  "notes": [],
+  "failures": [
+    "timeout waiting for PLC status"
+  ],
+  "current_demand_started_at": 1773770464.6110876,
+  "current_demand_ready_since": 1773770464.611089,
+  "vehicle_stop_requested": false,
+  "vehicle_stop_reason": "",
+  "plc": {
+    "mode_id": 1,
+    "mode_name": "external_controller",
+    "can_stack": 0,
+    "module_mgr": 0,
+    "cp_phase": "B",
+    "cp_connected": true,
+    "cp_duty_pct": 5,
+    "slac_session": true,
+    "slac_matched": true,
+    "slac_fsm": 8,
+    "slac_failures": 0,
+    "hlc_ready": true,
+    "hlc_active": true,
+    "precharge_seen": true,
+    "precharge_ready": true,
+    "session_started": true,
+    "stop_active": true,
+    "stop_hard": false,
+    "stop_done": false,
+    "bms_stage_name": "none",
+    "delivery_ready": false,
+    "target_v": 0.0,
+    "target_i": 0.0,
+    "fb_v": 0.0,
+    "fb_i": 0.0,
+    "relay1": false
+  },
+  "module": {
+    "address": 1,
+    "group": 1,
+    "rated_current_a": 30.0,
+    "status": "status=0x00400000 flags=OFF",
+    "voltage_v": 9.5126953125,
+    "current_a": 0.0,
+    "off": true
+  }
+}
