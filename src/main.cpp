@@ -11,6 +11,7 @@
 #include <freertos/task.h>
 #include <WiFi.h>
 #include <esp_heap_caps.h>
+#include <esp_task_wdt.h>
 #include <esp_timer.h>
 #include <soc/soc_memory_types.h>
 
@@ -183,9 +184,8 @@ constexpr int HLC_FIRST_PACKET_TIMEOUT_MS = 20000;
 constexpr int HLC_IDLE_TIMEOUT_MS = 60000;
 constexpr uint32_t HLC_TASK_STACK_WORDS = 65536;
 constexpr UBaseType_t HLC_CLIENT_QUEUE_DEPTH = 2;
-constexpr UBaseType_t LWIP_TX_QUEUE_DEPTH = 12;
-constexpr uint8_t LWIP_TX_MAX_FRAMES_PER_LOOP = 4u;
-constexpr int LWIP_TX_WRITE_TIMEOUT_MS = 5;
+constexpr UBaseType_t LWIP_TX_QUEUE_DEPTH = 32;
+constexpr uint8_t LWIP_TX_MAX_FRAMES_PER_LOOP = 8u;
 constexpr bool ENABLE_DECODED_LOGS = true;
 
 constexpr uint16_t QCA7K_SPI_READ = (1u << 15);
@@ -201,25 +201,311 @@ constexpr uint16_t SPI_REG_INTR_CAUSE = 0x0C00;
 constexpr uint16_t SPI_REG_INTR_ENABLE = 0x0D00;
 constexpr uint16_t SPI_REG_SIGNATURE = 0x1A00;
 
+constexpr uint16_t QCASPI_SLAVE_RESET_BIT = (1u << 6);
 constexpr uint16_t SPI_INT_CPU_ON = (1u << 6);
 constexpr uint16_t SPI_INT_WRBUF_ERR = (1u << 2);
 constexpr uint16_t SPI_INT_RDBUF_ERR = (1u << 1);
 constexpr uint16_t SPI_INT_PKT_AVLBL = (1u << 0);
 constexpr uint16_t QCA_INT_ENABLE_MASK =
     static_cast<uint16_t>(SPI_INT_CPU_ON | SPI_INT_WRBUF_ERR | SPI_INT_RDBUF_ERR | SPI_INT_PKT_AVLBL);
+constexpr uint16_t QCA_INT_STARTUP_MASK =
+    static_cast<uint16_t>(SPI_INT_CPU_ON | SPI_INT_WRBUF_ERR | SPI_INT_RDBUF_ERR | SPI_INT_PKT_AVLBL);
 constexpr uint16_t QCASPI_GOOD_SIGNATURE = 0xAA55;
 
 constexpr uint16_t QCA7K_BUFFER_SIZE = 3163;
-constexpr size_t RX_STREAM_CAPACITY = 4096;
+constexpr uint16_t ETH_FRAME_MIN_LEN_NO_FCS = 60u;
 constexpr size_t RX_CHUNK_CAPACITY = 4096;
 constexpr size_t RX_QUEUE_CAPACITY = 32;
-constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 16u;
+constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 8u;
 constexpr uint32_t QCA_POLL_FALLBACK_MS = 5u;
+constexpr uint32_t QCA_RESET_TIMEOUT_MS = 1000u;
+constexpr uint32_t QCA_STARTUP_FORCE_SYNC_MS = 100u;
+constexpr uint32_t QCA_STARTUP_IO_WAIT_MS = 500u;
+constexpr uint8_t QCA_MAX_BURSTS_PER_POLL = 4u;
+constexpr uint16_t RX_PROCESS_BREATHER_STRIDE = 1024u;
+constexpr uint8_t FSM_POLL_BREATHER_STRIDE = 1u;
+constexpr uint16_t SERIAL_CMD_MAX_BYTES_PER_LOOP = 192u;
+constexpr uint16_t SERIAL_CMD_BREATHER_STRIDE = 64u;
+
+constexpr int32_t QCAFRM_ERR_BASE = -1000;
+constexpr int32_t QCAFRM_GATHER = 0;
+constexpr int32_t QCAFRM_NOHEAD = QCAFRM_ERR_BASE - 1;
+constexpr int32_t QCAFRM_NOTAIL = QCAFRM_ERR_BASE - 2;
+constexpr int32_t QCAFRM_INVLEN = QCAFRM_ERR_BASE - 3;
+
+enum class QcaFrameDecodeState : uint8_t {
+    HwLen0 = 0,
+    HwLen1,
+    HwLen2,
+    HwLen3,
+    Header0,
+    Header1,
+    Header2,
+    Header3,
+    Len0,
+    Len1,
+    Reserved0,
+    Reserved1,
+    Payload,
+    Footer0,
+    Footer1,
+};
+
+enum class CrashBreadcrumbStage : uint16_t {
+    Unknown = 0,
+    SetupStart,
+    SetupAfterStartupHold,
+    SetupAfterQcaInit,
+    LoopEnter,
+    LoopAfterSerial,
+    LoopAfterQcaIngress,
+    LoopAfterCtrlRx,
+    LoopAfterCtrlTx,
+    LoopAfterCpFsm,
+    LoopAfterLwipTx,
+    LoopSleep,
+    QcaIngressEnter,
+    QcaIngressBeforePoll,
+    QcaPollEnter,
+    QcaPollAfterMask,
+    QcaPollBeforeDrain,
+    QcaPollAfterBurstRead,
+    QcaPollAfterBurstProcess,
+    QcaPollAfterFinish,
+    QcaReadBurstEnter,
+    QcaReadBurstAfterAvail,
+    QcaReadBurstBeforePayload,
+    QcaReadBurstAfterPayload,
+    QcaWriteEnter,
+    QcaWriteWaitWrbuf,
+    QcaWriteFrameStart,
+    QcaWriteFrameDone,
+    QcaProcessRxStart,
+    QcaProcessRxDone,
+    CtrlAuthHandle,
+    CtrlFeedbackHandle,
+    FsmPollActive,
+};
+
+struct CrashBreadcrumb {
+    uint32_t magic;
+    uint32_t boot_count;
+    uint32_t loop_count;
+    uint32_t last_ms;
+    uint16_t stage;
+    uint16_t detail;
+};
+
+constexpr uint32_t CRASH_BREADCRUMB_MAGIC = 0x4352504Du; // CRPM
+RTC_NOINIT_ATTR CrashBreadcrumb g_crash_breadcrumb;
 
 volatile bool g_qca_irq_pending = false;
 
 void IRAM_ATTR qca_irq_handler() {
     g_qca_irq_pending = true;
+}
+
+void mark_lwip_tx_transport_flush(const char* reason);
+void maybe_learn_qca_mac_from_homeplug_frame(const uint8_t* frame, uint16_t len);
+
+const char* crash_breadcrumb_stage_name(CrashBreadcrumbStage stage) {
+    switch (stage) {
+    case CrashBreadcrumbStage::Unknown: return "Unknown";
+    case CrashBreadcrumbStage::SetupStart: return "SetupStart";
+    case CrashBreadcrumbStage::SetupAfterStartupHold: return "SetupAfterStartupHold";
+    case CrashBreadcrumbStage::SetupAfterQcaInit: return "SetupAfterQcaInit";
+    case CrashBreadcrumbStage::LoopEnter: return "LoopEnter";
+    case CrashBreadcrumbStage::LoopAfterSerial: return "LoopAfterSerial";
+    case CrashBreadcrumbStage::LoopAfterQcaIngress: return "LoopAfterQcaIngress";
+    case CrashBreadcrumbStage::LoopAfterCtrlRx: return "LoopAfterCtrlRx";
+    case CrashBreadcrumbStage::LoopAfterCtrlTx: return "LoopAfterCtrlTx";
+    case CrashBreadcrumbStage::LoopAfterCpFsm: return "LoopAfterCpFsm";
+    case CrashBreadcrumbStage::LoopAfterLwipTx: return "LoopAfterLwipTx";
+    case CrashBreadcrumbStage::LoopSleep: return "LoopSleep";
+    case CrashBreadcrumbStage::QcaIngressEnter: return "QcaIngressEnter";
+    case CrashBreadcrumbStage::QcaIngressBeforePoll: return "QcaIngressBeforePoll";
+    case CrashBreadcrumbStage::QcaPollEnter: return "QcaPollEnter";
+    case CrashBreadcrumbStage::QcaPollAfterMask: return "QcaPollAfterMask";
+    case CrashBreadcrumbStage::QcaPollBeforeDrain: return "QcaPollBeforeDrain";
+    case CrashBreadcrumbStage::QcaPollAfterBurstRead: return "QcaPollAfterBurstRead";
+    case CrashBreadcrumbStage::QcaPollAfterBurstProcess: return "QcaPollAfterBurstProcess";
+    case CrashBreadcrumbStage::QcaPollAfterFinish: return "QcaPollAfterFinish";
+    case CrashBreadcrumbStage::QcaReadBurstEnter: return "QcaReadBurstEnter";
+    case CrashBreadcrumbStage::QcaReadBurstAfterAvail: return "QcaReadBurstAfterAvail";
+    case CrashBreadcrumbStage::QcaReadBurstBeforePayload: return "QcaReadBurstBeforePayload";
+    case CrashBreadcrumbStage::QcaReadBurstAfterPayload: return "QcaReadBurstAfterPayload";
+    case CrashBreadcrumbStage::QcaWriteEnter: return "QcaWriteEnter";
+    case CrashBreadcrumbStage::QcaWriteWaitWrbuf: return "QcaWriteWaitWrbuf";
+    case CrashBreadcrumbStage::QcaWriteFrameStart: return "QcaWriteFrameStart";
+    case CrashBreadcrumbStage::QcaWriteFrameDone: return "QcaWriteFrameDone";
+    case CrashBreadcrumbStage::QcaProcessRxStart: return "QcaProcessRxStart";
+    case CrashBreadcrumbStage::QcaProcessRxDone: return "QcaProcessRxDone";
+    case CrashBreadcrumbStage::CtrlAuthHandle: return "CtrlAuthHandle";
+    case CrashBreadcrumbStage::CtrlFeedbackHandle: return "CtrlFeedbackHandle";
+    case CrashBreadcrumbStage::FsmPollActive: return "FsmPollActive";
+    }
+    return "Unknown";
+}
+
+inline void note_crash_breadcrumb(CrashBreadcrumbStage stage, uint16_t detail = 0u) {
+    g_crash_breadcrumb.magic = CRASH_BREADCRUMB_MAGIC;
+    g_crash_breadcrumb.stage = static_cast<uint16_t>(stage);
+    g_crash_breadcrumb.detail = detail;
+    g_crash_breadcrumb.last_ms = millis();
+}
+
+inline void feed_loop_watchdog() {
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        (void)esp_task_wdt_reset();
+    }
+}
+
+inline void cooperative_runtime_breather(CrashBreadcrumbStage stage, uint16_t detail = 0u) {
+    note_crash_breadcrumb(stage, detail);
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        feed_loop_watchdog();
+        delay(1);
+    }
+}
+
+const char* homeplug_mmtype_name(uint16_t mmtype) {
+    switch (mmtype) {
+    case (slac::defs::MMTYPE_CM_SET_KEY | slac::defs::MMTYPE_MODE_REQ): return "CM_SET_KEY.REQ";
+    case (slac::defs::MMTYPE_CM_SET_KEY | slac::defs::MMTYPE_MODE_CNF): return "CM_SET_KEY.CNF";
+    case (slac::defs::MMTYPE_CM_SLAC_PARAM | slac::defs::MMTYPE_MODE_REQ): return "CM_SLAC_PARAM.REQ";
+    case (slac::defs::MMTYPE_CM_SLAC_PARAM | slac::defs::MMTYPE_MODE_CNF): return "CM_SLAC_PARAM.CNF";
+    case (slac::defs::MMTYPE_CM_START_ATTEN_CHAR | slac::defs::MMTYPE_MODE_IND): return "CM_START_ATTEN_CHAR.IND";
+    case (slac::defs::MMTYPE_CM_MNBC_SOUND | slac::defs::MMTYPE_MODE_IND): return "CM_MNBC_SOUND.IND";
+    case (slac::defs::MMTYPE_CM_ATTEN_PROFILE | slac::defs::MMTYPE_MODE_IND): return "CM_ATTEN_PROFILE.IND";
+    case (slac::defs::MMTYPE_CM_ATTEN_CHAR | slac::defs::MMTYPE_MODE_IND): return "CM_ATTEN_CHAR.IND";
+    case (slac::defs::MMTYPE_CM_ATTEN_CHAR | slac::defs::MMTYPE_MODE_RSP): return "CM_ATTEN_CHAR.RSP";
+    case (slac::defs::MMTYPE_CM_SLAC_MATCH | slac::defs::MMTYPE_MODE_REQ): return "CM_SLAC_MATCH.REQ";
+    case (slac::defs::MMTYPE_CM_SLAC_MATCH | slac::defs::MMTYPE_MODE_CNF): return "CM_SLAC_MATCH.CNF";
+    case (slac::defs::MMTYPE_CM_VALIDATE | slac::defs::MMTYPE_MODE_REQ): return "CM_VALIDATE.REQ";
+    case (slac::defs::MMTYPE_CM_VALIDATE | slac::defs::MMTYPE_MODE_CNF): return "CM_VALIDATE.CNF";
+    default: return "UNKNOWN";
+    }
+}
+
+void format_hex_bytes_compact(const uint8_t* data, size_t len, char* out, size_t out_size) {
+    if (!out || out_size == 0u) {
+        return;
+    }
+    if (!data || len == 0u) {
+        out[0] = '\0';
+        return;
+    }
+    size_t pos = 0u;
+    for (size_t i = 0; i < len && pos + 3u < out_size; ++i) {
+        const int written = snprintf(out + pos, out_size - pos, "%02X", static_cast<unsigned>(data[i]));
+        if (written <= 0) {
+            break;
+        }
+        pos += static_cast<size_t>(written);
+        if ((i + 1u) < len && pos + 2u < out_size) {
+            out[pos++] = ' ';
+        }
+    }
+    out[std::min(pos, out_size - 1u)] = '\0';
+}
+
+void log_homeplug_slac_details(const char* dir, uint16_t mmtype, uint8_t mmv, const uint8_t* frame, uint16_t len) {
+    if (!ENABLE_DECODED_LOGS || !dir || !frame || len < 17u) {
+        return;
+    }
+
+    const uint16_t payload_offset = (mmv == static_cast<uint8_t>(slac::defs::MMV::AV_1_0)) ? 17u : 19u;
+    if (len <= payload_offset) {
+        return;
+    }
+
+    const uint8_t* payload = frame + payload_offset;
+    const size_t payload_len = static_cast<size_t>(len - payload_offset);
+    char run_id_hex[3u * slac::defs::RUN_ID_LEN]{};
+    char forwarding_hex[3u * ETH_ALEN]{};
+    char msound_hex[3u * 6u]{};
+    char raw_hex[3u * 32u]{};
+
+    switch (mmtype) {
+    case (slac::defs::MMTYPE_CM_SLAC_PARAM | slac::defs::MMTYPE_MODE_REQ):
+        format_hex_bytes_compact(payload + 2u, std::min<size_t>(slac::defs::RUN_ID_LEN, payload_len > 2u ? payload_len - 2u : 0u),
+                                 run_id_hex, sizeof(run_id_hex));
+        format_hex_bytes_compact(payload, std::min<size_t>(16u, payload_len), raw_hex, sizeof(raw_hex));
+        Serial.printf("[QCA] HP %s param.req app=%u sec=%u run_id=%s body=%s\n",
+                      dir,
+                      payload_len > 0u ? static_cast<unsigned>(payload[0]) : 0u,
+                      payload_len > 1u ? static_cast<unsigned>(payload[1]) : 0u,
+                      run_id_hex,
+                      raw_hex);
+        break;
+
+    case (slac::defs::MMTYPE_CM_SLAC_PARAM | slac::defs::MMTYPE_MODE_CNF):
+        format_hex_bytes_compact(payload, std::min<size_t>(6u, payload_len), msound_hex, sizeof(msound_hex));
+        format_hex_bytes_compact(payload + 9u, std::min<size_t>(ETH_ALEN, payload_len > 9u ? payload_len - 9u : 0u),
+                                 forwarding_hex, sizeof(forwarding_hex));
+        format_hex_bytes_compact(payload + 17u, std::min<size_t>(slac::defs::RUN_ID_LEN, payload_len > 17u ? payload_len - 17u : 0u),
+                                 run_id_hex, sizeof(run_id_hex));
+        format_hex_bytes_compact(payload, std::min<size_t>(27u, payload_len), raw_hex, sizeof(raw_hex));
+        Serial.printf("[QCA] HP %s param.cnf target=%s num=%u timeout=%u resp=%u fwd=%s app=%u sec=%u run_id=%s body=%s\n",
+                      dir,
+                      msound_hex,
+                      payload_len > 6u ? static_cast<unsigned>(payload[6]) : 0u,
+                      payload_len > 7u ? static_cast<unsigned>(payload[7]) : 0u,
+                      payload_len > 8u ? static_cast<unsigned>(payload[8]) : 0u,
+                      forwarding_hex,
+                      payload_len > 15u ? static_cast<unsigned>(payload[15]) : 0u,
+                      payload_len > 16u ? static_cast<unsigned>(payload[16]) : 0u,
+                      run_id_hex,
+                      raw_hex);
+        break;
+
+    case (slac::defs::MMTYPE_CM_START_ATTEN_CHAR | slac::defs::MMTYPE_MODE_IND):
+        format_hex_bytes_compact(payload + 5u, std::min<size_t>(ETH_ALEN, payload_len > 5u ? payload_len - 5u : 0u),
+                                 forwarding_hex, sizeof(forwarding_hex));
+        format_hex_bytes_compact(payload + 11u, std::min<size_t>(slac::defs::RUN_ID_LEN, payload_len > 11u ? payload_len - 11u : 0u),
+                                 run_id_hex, sizeof(run_id_hex));
+        format_hex_bytes_compact(payload, std::min<size_t>(24u, payload_len), raw_hex, sizeof(raw_hex));
+        Serial.printf("[QCA] HP %s start_atten app=%u sec=%u num=%u timeout=%u resp=%u fwd=%s run_id=%s body=%s\n",
+                      dir,
+                      payload_len > 0u ? static_cast<unsigned>(payload[0]) : 0u,
+                      payload_len > 1u ? static_cast<unsigned>(payload[1]) : 0u,
+                      payload_len > 2u ? static_cast<unsigned>(payload[2]) : 0u,
+                      payload_len > 3u ? static_cast<unsigned>(payload[3]) : 0u,
+                      payload_len > 4u ? static_cast<unsigned>(payload[4]) : 0u,
+                      forwarding_hex,
+                      run_id_hex,
+                      raw_hex);
+        break;
+
+    default:
+        break;
+    }
+}
+
+void log_homeplug_frame(const char* dir, const uint8_t* frame, uint16_t len) {
+    if (!ENABLE_DECODED_LOGS || !dir || !frame || len < 17u) {
+        return;
+    }
+    const uint16_t eth_type = static_cast<uint16_t>((frame[12] << 8) | frame[13]);
+    if (eth_type != slac::defs::ETH_P_HOMEPLUG_GREENPHY) {
+        return;
+    }
+
+    const uint8_t mmv = frame[14];
+    const uint16_t mmtype = static_cast<uint16_t>(frame[15] | (static_cast<uint16_t>(frame[16]) << 8u));
+    Serial.printf("[QCA] HP %s mmtype=0x%04X(%s) mmv=0x%02X len=%u src=%02X:%02X:%02X:%02X:%02X:%02X dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+                  dir,
+                  static_cast<unsigned>(mmtype),
+                  homeplug_mmtype_name(mmtype),
+                  static_cast<unsigned>(mmv),
+                  static_cast<unsigned>(len),
+                  static_cast<unsigned>(frame[6]), static_cast<unsigned>(frame[7]),
+                  static_cast<unsigned>(frame[8]), static_cast<unsigned>(frame[9]),
+                  static_cast<unsigned>(frame[10]), static_cast<unsigned>(frame[11]),
+                  static_cast<unsigned>(frame[0]), static_cast<unsigned>(frame[1]),
+                  static_cast<unsigned>(frame[2]), static_cast<unsigned>(frame[3]),
+                  static_cast<unsigned>(frame[4]), static_cast<unsigned>(frame[5]));
+    log_homeplug_slac_details(dir, mmtype, mmv, frame, len);
 }
 
 constexpr uint16_t PLC_PEER_MAC_DEFAULT[3] = {0x00B0, 0x5200, 0x0001};
@@ -689,37 +975,77 @@ public:
             return false;
         }
 
+        uint16_t stale_intr = 0;
+        (void)spi_read_register16(SPI_REG_INTR_CAUSE, &stale_intr);
+        if (stale_intr != 0u) {
+            (void)spi_write_register16(SPI_REG_INTR_CAUSE, stale_intr);
+        }
+        (void)spi_write_register16(SPI_REG_INTR_ENABLE, 0u);
+
         if (interrupt_attached) {
             detachInterrupt(digitalPinToInterrupt(PIN_QCA700X_INT));
         }
         attachInterrupt(digitalPinToInterrupt(PIN_QCA700X_INT), qca_irq_handler, RISING);
         interrupt_attached = true;
         startup_pending = false;
-        enable_interrupts();
+        cpu_on_seen_since_reset = false;
+        reset_started_ms = 0u;
+        interrupts_armed = false;
         g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
         ready = true;
+        clear_rx_state();
         last_error.clear();
         return true;
     }
 
     void modem_reset() {
+        if (!ready) {
+            return;
+        }
         clear_rx_state();
+        mark_lwip_tx_transport_flush("qca modem reset");
         startup_pending = true;
         interrupts_armed = false;
+        cpu_on_seen_since_reset = false;
+        last_startup_signature = 0u;
+        last_startup_wrbuf = 0u;
+        reset_started_ms = millis();
         g_qca_irq_pending = false;
-        uint16_t reg = read_register16(SPI_REG_SPI_CONFIG);
-        reg = static_cast<uint16_t>(reg | SPI_INT_CPU_ON);
-        write_register16(SPI_REG_SPI_CONFIG, reg);
+        uint16_t reg = 0u;
+        if (!spi_read_register16(SPI_REG_SPI_CONFIG, &reg)) {
+            if (last_error.empty()) {
+                last_error = "QCA7000 reset read failed";
+            }
+            return;
+        }
+        reg = static_cast<uint16_t>(reg | QCASPI_SLAVE_RESET_BIT);
+        if (!spi_write_register16(SPI_REG_SPI_CONFIG, reg)) {
+            if (last_error.empty()) {
+                last_error = "QCA7000 reset write failed";
+            }
+            return;
+        }
+        enable_interrupts(QCA_INT_STARTUP_MASK);
+        last_error = "QCA7000 reset in progress";
     }
 
     bool is_ready() const {
         return ready;
     }
 
+    IOResult write_nowait(const void* buffer, size_t size) {
+        return write_internal(buffer, size, 0, true);
+    }
+
+    bool wait_for_sync(uint32_t timeout_ms, uint32_t poll_delay_ms = 5u) {
+        return ensure_startup_ready(timeout_ms, poll_delay_ms);
+    }
+
     void service_ingress_once() {
         if (!ready) {
             return;
         }
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaIngressEnter);
         const uint32_t now_ms = millis();
         const bool line_high = digitalRead(PIN_QCA700X_INT) == HIGH;
         const bool fallback_poll = (last_poll_ms == 0u) || static_cast<int32_t>(now_ms - last_poll_ms) >=
@@ -728,7 +1054,11 @@ public:
             return;
         }
         last_poll_ms = now_ms;
-        poll_ingress(g_qca_irq_pending || line_high || fallback_poll);
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaIngressBeforePoll,
+                              static_cast<uint16_t>((g_qca_irq_pending ? 0x100u : 0u) |
+                                                    (line_high ? 0x010u : 0u) |
+                                                    (fallback_poll ? 0x001u : 0u)));
+        poll_ingress(fallback_poll);
     }
 
     IOResult read(uint8_t* buffer, int timeout_ms) override {
@@ -736,79 +1066,45 @@ public:
             last_error = "transport not ready";
             return IOResult::Failure;
         }
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaIngressEnter,
+                              static_cast<uint16_t>(0x2000u | ((timeout_ms > 0) ? std::min(timeout_ms, 0x0FFF) : 0u)));
+        const bool short_deadline = timeout_ms >= 0 && timeout_ms <= 5;
+        if (startup_pending) {
+            if (short_deadline) {
+                last_error = "transport startup in progress";
+                return IOResult::Timeout;
+            }
+            if (!ensure_startup_ready(500, 5)) {
+                return IOResult::Failure;
+            }
+        }
 
         const uint32_t start_ms = millis();
         while (true) {
-            RxFrame frame{};
-            if (pop_frame(frame)) {
-                memset(buffer, 0, ETH_FRAME_LEN);
-                memcpy(buffer, frame.data.data(), frame.len);
+            uint16_t frame_len = 0u;
+            if (pop_frame(buffer, &frame_len)) {
+                note_crash_breadcrumb(CrashBreadcrumbStage::QcaProcessRxDone,
+                                      static_cast<uint16_t>(0x2000u | std::min<uint16_t>(frame_len, 0x0FFFu)));
                 return IOResult::Ok;
             }
 
-            poll_ingress(true);
+            service_ingress_once();
+            if (pop_frame(buffer, &frame_len)) {
+                note_crash_breadcrumb(CrashBreadcrumbStage::QcaProcessRxDone,
+                                      static_cast<uint16_t>(0x2400u | std::min<uint16_t>(frame_len, 0x0BFFu)));
+                return IOResult::Ok;
+            }
 
             if (timeout_ms >= 0 && (uint32_t)(millis() - start_ms) >= static_cast<uint32_t>(timeout_ms)) {
                 return IOResult::Timeout;
             }
-            delay(1);
+            cooperative_runtime_breather(CrashBreadcrumbStage::QcaIngressBeforePoll,
+                                         static_cast<uint16_t>(std::min(timeout_ms < 0 ? 0 : timeout_ms, 0xFFFF)));
         }
     }
 
     IOResult write(const void* buffer, size_t size, int timeout_ms) override {
-        if (!ready) {
-            last_error = "transport not ready";
-            return IOResult::Failure;
-        }
-        if (size == 0 || size > ETH_FRAME_LEN) {
-            last_error = "invalid frame size";
-            return IOResult::Failure;
-        }
-        if (!ensure_startup_ready(500, 5)) {
-            return IOResult::Failure;
-        }
-
-        const uint16_t total_len = static_cast<uint16_t>(size + 10u);
-        const uint32_t start_ms = millis();
-        while (true) {
-            uint16_t wrbuf_space = read_register16(SPI_REG_WRBUF_SPC_AVA);
-            if (wrbuf_space >= total_len) {
-                break;
-            }
-
-            if (timeout_ms >= 0 && (uint32_t)(millis() - start_ms) >= static_cast<uint32_t>(timeout_ms)) {
-                return IOResult::Timeout;
-            }
-            delay(1);
-        }
-
-        uint8_t hdr[8] = {
-            0xAA, 0xAA, 0xAA, 0xAA,
-            static_cast<uint8_t>(size & 0xFFu),
-            static_cast<uint8_t>((size >> 8u) & 0xFFu),
-            0x00, 0x00
-        };
-
-        if (!lock_spi(50)) {
-            last_error = "spi lock timeout";
-            return IOResult::Failure;
-        }
-        spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
-        digitalWrite(PIN_QCA700X_CS, LOW);
-        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_BFR_SIZE));
-        spi.transfer16(total_len);
-        digitalWrite(PIN_QCA700X_CS, HIGH);
-
-        digitalWrite(PIN_QCA700X_CS, LOW);
-        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_EXTERNAL));
-        spi.transfer(hdr, sizeof(hdr));
-        spi.transfer(const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(buffer)), size);
-        spi.transfer16(0x5555);
-        digitalWrite(PIN_QCA700X_CS, HIGH);
-        spi.endTransaction();
-        unlock_spi();
-
-        return IOResult::Ok;
+        return write_internal(buffer, size, timeout_ms, false);
     }
 
     const std::string& get_error() const override {
@@ -828,13 +1124,16 @@ private:
 
         while ((millis() - start_ms) < timeout_ms) {
             if (!primed) {
-                (void)read_register16(SPI_REG_SIGNATURE);
+                (void)spi_read_register16(SPI_REG_SIGNATURE, &last_sig);
                 primed = true;
                 delay(poll_delay_ms);
                 continue;
             }
 
-            last_sig = read_register16(SPI_REG_SIGNATURE);
+            if (!spi_read_register16(SPI_REG_SIGNATURE, &last_sig)) {
+                delay(poll_delay_ms);
+                continue;
+            }
             if (last_sig == QCASPI_GOOD_SIGNATURE) {
                 return true;
             }
@@ -853,51 +1152,123 @@ private:
         }
         if (!startup_pending) {
             if (!interrupts_armed) {
-                enable_interrupts();
+                enable_interrupts(QCA_INT_ENABLE_MASK);
             }
             return true;
         }
 
-        uint16_t sig = 0;
-        if (!probe_signature(sig, timeout_ms, poll_delay_ms)) {
+        const uint32_t start_ms = millis();
+        while (startup_pending) {
+            poll_ingress(true);
+            const uint32_t now_ms = millis();
+            const bool allow_signature_only =
+                reset_started_ms != 0u &&
+                static_cast<int32_t>(now_ms - (reset_started_ms + QCA_STARTUP_FORCE_SYNC_MS)) >= 0;
+            if (try_complete_startup_sync(allow_signature_only)) {
+                break;
+            }
+            if (timeout_ms == 0u ||
+                static_cast<uint32_t>(now_ms - start_ms) >= timeout_ms) {
+                break;
+            }
+            if (poll_delay_ms > 0u) {
+                delay(poll_delay_ms);
+            } else {
+                taskYIELD();
+            }
+        }
+
+        if (startup_pending) {
             char buf[96];
-            snprintf(buf, sizeof(buf), "QCA7000 startup timeout (sig=0x%04X)", sig);
+            snprintf(buf, sizeof(buf), "QCA7000 startup timeout (cpu_on=%d sig=0x%04X wrbuf=%u)",
+                     cpu_on_seen_since_reset ? 1 : 0,
+                     last_startup_signature,
+                     static_cast<unsigned>(last_startup_wrbuf));
             last_error = buf;
             return false;
         }
 
-        startup_pending = false;
-        enable_interrupts();
+        enable_interrupts(QCA_INT_ENABLE_MASK);
         g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
         last_error.clear();
         return true;
     }
 
-    void enable_interrupts() {
-        write_register16(SPI_REG_INTR_ENABLE, QCA_INT_ENABLE_MASK);
-        interrupts_armed = true;
+    bool try_complete_startup_sync(bool allow_without_cpu_on) {
+        if (!startup_pending) {
+            return true;
+        }
+        if (!cpu_on_seen_since_reset && !allow_without_cpu_on) {
+            return false;
+        }
+
+        uint16_t sig0 = 0u;
+        uint16_t sig1 = 0u;
+        uint16_t wrbuf_space = 0u;
+        if (!spi_read_register16(SPI_REG_SIGNATURE, &sig0) ||
+            !spi_read_register16(SPI_REG_SIGNATURE, &sig1)) {
+            return false;
+        }
+        last_startup_signature = sig1;
+        if (sig0 != QCASPI_GOOD_SIGNATURE || sig1 != QCASPI_GOOD_SIGNATURE) {
+            return false;
+        }
+        if (!spi_read_register16(SPI_REG_WRBUF_SPC_AVA, &wrbuf_space)) {
+            return false;
+        }
+        last_startup_wrbuf = wrbuf_space;
+        if (wrbuf_space != QCA7K_BUFFER_SIZE) {
+            return false;
+        }
+
+        startup_pending = false;
+        const bool recovered_without_cpu_on = !cpu_on_seen_since_reset && allow_without_cpu_on;
+        cpu_on_seen_since_reset = false;
+        reset_started_ms = 0u;
+        g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
+        if (recovered_without_cpu_on) {
+            Serial.println("[QCA] startup sync recovered without CPU_ON irq");
+        }
+        Serial.printf("[QCA] sync ready sig=0x%04X wrbuf=%u\n",
+                      sig1,
+                      static_cast<unsigned>(wrbuf_space));
+        last_error.clear();
+        return true;
     }
 
-    uint16_t read_register16(uint16_t reg) {
+    void enable_interrupts(uint16_t mask) {
+        if (spi_write_register16(SPI_REG_INTR_ENABLE, mask)) {
+            interrupts_armed = true;
+        } else {
+            interrupts_armed = false;
+        }
+    }
+
+    bool spi_read_register16(uint16_t reg, uint16_t* out) {
+        if (!out) {
+            last_error = "spi read null destination";
+            return false;
+        }
         const uint16_t tx = static_cast<uint16_t>(QCA7K_SPI_READ | QCA7K_SPI_INTERNAL | reg);
-        uint16_t rx = 0;
         if (!lock_spi(50)) {
-            return 0;
+            last_error = "spi lock timeout";
+            return false;
         }
         spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
         digitalWrite(PIN_QCA700X_CS, LOW);
         spi.transfer16(tx);
-        rx = spi.transfer16(0x0000);
+        *out = spi.transfer16(0x0000);
         digitalWrite(PIN_QCA700X_CS, HIGH);
         spi.endTransaction();
         unlock_spi();
-        return rx;
+        return true;
     }
 
-    void write_register16(uint16_t reg, uint16_t value) {
+    bool spi_write_register16(uint16_t reg, uint16_t value) {
         const uint16_t tx = static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | reg);
         if (!lock_spi(50)) {
-            return;
+            last_error = "spi lock timeout";
+            return false;
         }
         spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
         digitalWrite(PIN_QCA700X_CS, LOW);
@@ -906,10 +1277,59 @@ private:
         digitalWrite(PIN_QCA700X_CS, HIGH);
         spi.endTransaction();
         unlock_spi();
+        return true;
+    }
+
+    bool read_and_mask_interrupt_cause(uint16_t* intr_cause) {
+        if (!intr_cause) {
+            last_error = "interrupt cause null destination";
+            return false;
+        }
+        if (!lock_spi(50)) {
+            last_error = "spi lock timeout";
+            return false;
+        }
+        spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_INTR_ENABLE));
+        spi.transfer16(0x0000);
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_READ | QCA7K_SPI_INTERNAL | SPI_REG_INTR_CAUSE));
+        *intr_cause = spi.transfer16(0x0000);
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+        spi.endTransaction();
+        unlock_spi();
+        interrupts_armed = false;
+        return true;
+    }
+
+    void finish_interrupt_service(uint16_t intr_cause) {
+        if (!lock_spi(50)) {
+            last_error = "spi lock timeout";
+            return;
+        }
+        spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
+        if (intr_cause != 0u) {
+            digitalWrite(PIN_QCA700X_CS, LOW);
+            spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_INTR_CAUSE));
+            spi.transfer16(intr_cause);
+            digitalWrite(PIN_QCA700X_CS, HIGH);
+        }
+
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_INTR_ENABLE));
+        spi.transfer16(startup_pending ? QCA_INT_STARTUP_MASK : QCA_INT_ENABLE_MASK);
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+        spi.endTransaction();
+        unlock_spi();
+        interrupts_armed = true;
+        g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
     }
 
     void clear_rx_state() {
-        rx_stream_len = 0;
+        reset_decoder_state();
         q_head = 0;
         q_tail = 0;
         q_count = 0;
@@ -926,15 +1346,147 @@ private:
         return value != 0 && value <= QCA7K_BUFFER_SIZE && value <= RX_CHUNK_CAPACITY;
     }
 
+    void reset_decoder_state() {
+        rx_decode_state = QcaFrameDecodeState::HwLen0;
+        rx_expected_frame_len = 0u;
+        rx_decode_offset = 0u;
+    }
+
+    int32_t decode_rx_byte(uint8_t recv_byte) {
+        switch (rx_decode_state) {
+        case QcaFrameDecodeState::HwLen0:
+            rx_decode_state = (recv_byte == 0x00u) ? QcaFrameDecodeState::HwLen1 : QcaFrameDecodeState::HwLen0;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::HwLen1:
+            rx_decode_state = (recv_byte == 0x00u) ? QcaFrameDecodeState::HwLen2 : QcaFrameDecodeState::HwLen0;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::HwLen2:
+            rx_decode_state = QcaFrameDecodeState::HwLen3;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::HwLen3:
+            rx_decode_state = QcaFrameDecodeState::Header0;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Header0:
+            if (recv_byte != 0xAAu) {
+                reset_decoder_state();
+                return QCAFRM_NOHEAD;
+            }
+            rx_decode_state = QcaFrameDecodeState::Header1;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Header1:
+            if (recv_byte != 0xAAu) {
+                reset_decoder_state();
+                return QCAFRM_NOHEAD;
+            }
+            rx_decode_state = QcaFrameDecodeState::Header2;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Header2:
+            if (recv_byte != 0xAAu) {
+                reset_decoder_state();
+                return QCAFRM_NOHEAD;
+            }
+            rx_decode_state = QcaFrameDecodeState::Header3;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Header3:
+            if (recv_byte != 0xAAu) {
+                reset_decoder_state();
+                return QCAFRM_NOHEAD;
+            }
+            rx_decode_state = QcaFrameDecodeState::Len0;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Len0:
+            rx_expected_frame_len = recv_byte;
+            rx_decode_state = QcaFrameDecodeState::Len1;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Len1:
+            rx_expected_frame_len =
+                static_cast<uint16_t>(rx_expected_frame_len | (static_cast<uint16_t>(recv_byte) << 8u));
+            rx_decode_state = QcaFrameDecodeState::Reserved0;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Reserved0:
+            rx_decode_state = QcaFrameDecodeState::Reserved1;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Reserved1:
+            if (rx_expected_frame_len < ETH_FRAME_MIN_LEN_NO_FCS || rx_expected_frame_len > ETH_FRAME_LEN) {
+                reset_decoder_state();
+                return QCAFRM_INVLEN;
+            }
+            rx_decode_offset = 0u;
+            rx_decode_state = QcaFrameDecodeState::Payload;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Payload:
+            if (rx_decode_offset >= rx_expected_frame_len ||
+                rx_decode_offset >= rx_frame_build.size()) {
+                reset_decoder_state();
+                return QCAFRM_INVLEN;
+            }
+            rx_frame_build[rx_decode_offset++] = recv_byte;
+            if (rx_decode_offset >= rx_expected_frame_len) {
+                rx_decode_state = QcaFrameDecodeState::Footer0;
+            }
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Footer0:
+            if (recv_byte != 0x55u) {
+                reset_decoder_state();
+                return QCAFRM_NOTAIL;
+            }
+            rx_decode_state = QcaFrameDecodeState::Footer1;
+            return QCAFRM_GATHER;
+        case QcaFrameDecodeState::Footer1: {
+            if (recv_byte != 0x55u) {
+                reset_decoder_state();
+                return QCAFRM_NOTAIL;
+            }
+            const int32_t frame_len = static_cast<int32_t>(rx_expected_frame_len);
+            reset_decoder_state();
+            return frame_len;
+        }
+        }
+        reset_decoder_state();
+        return QCAFRM_INVLEN;
+    }
+
+    void note_invalid_decoder(int32_t rc, uint16_t pos, uint16_t total_avail) {
+        const uint32_t now_ms = millis();
+        if (invalid_frame_streak == 0u) {
+            invalid_frame_since_ms = now_ms;
+        }
+        if (invalid_frame_streak < 0xFFu) {
+            invalid_frame_streak++;
+        }
+        if (invalid_frame_streak == 1u || (invalid_frame_streak % 4u) == 0u) {
+            Serial.printf("[QCA] invalid RX framing rc=%ld state=%ld pos=%u avail=%u streak=%u\n",
+                          static_cast<long>(rc),
+                          static_cast<long>(static_cast<uint8_t>(rx_decode_state)),
+                          static_cast<unsigned>(pos),
+                          static_cast<unsigned>(total_avail),
+                          invalid_frame_streak);
+        }
+        if (invalid_frame_streak >= 10u && invalid_frame_since_ms != 0u &&
+            static_cast<int32_t>(now_ms - invalid_frame_since_ms) >= 400) {
+            Serial.printf("[QCA] invalid RX framing persisted, resetting modem\n");
+            invalid_frame_streak = 0;
+            invalid_frame_since_ms = 0;
+            last_reset_ms = now_ms;
+            modem_reset();
+        }
+    }
+
     uint16_t read_burst(uint8_t* dst) {
-        if (!ensure_startup_ready(300, 5)) {
+        if (!ready || startup_pending || !dst) {
             return 0;
         }
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaReadBurstEnter);
 
-        uint16_t available = read_register16(SPI_REG_RDBUF_BYTE_AVA);
+        uint16_t available = 0u;
+        if (!spi_read_register16(SPI_REG_RDBUF_BYTE_AVA, &available)) {
+            return 0;
+        }
         if (!valid_rx_len(available)) {
-            const uint16_t retry1 = read_register16(SPI_REG_RDBUF_BYTE_AVA);
-            const uint16_t retry2 = read_register16(SPI_REG_RDBUF_BYTE_AVA);
+            uint16_t retry1 = 0u;
+            uint16_t retry2 = 0u;
+            (void)spi_read_register16(SPI_REG_RDBUF_BYTE_AVA, &retry1);
+            (void)spi_read_register16(SPI_REG_RDBUF_BYTE_AVA, &retry2);
             if (valid_rx_len(retry1)) {
                 available = retry1;
             } else if (valid_rx_len(retry2)) {
@@ -989,11 +1541,13 @@ private:
                 return 0;
             }
         }
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaReadBurstAfterAvail, available);
 
         glitch_streak = 0;
         oversize_streak = 0;
 
         if (!lock_spi(50)) {
+            last_error = "spi lock timeout";
             return 0;
         }
         spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
@@ -1002,12 +1556,16 @@ private:
         spi.transfer16(available);
         digitalWrite(PIN_QCA700X_CS, HIGH);
 
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaReadBurstBeforePayload, available);
         digitalWrite(PIN_QCA700X_CS, LOW);
         spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_READ | QCA7K_SPI_EXTERNAL));
-        spi.transfer(dst, available);
+        // Use a read-only transfer so the inbound burst lands in dst without
+        // aliasing tx/rx buffers inside the ESP32 SPI driver.
+        spi.transferBytes(nullptr, dst, available);
         digitalWrite(PIN_QCA700X_CS, HIGH);
         spi.endTransaction();
         unlock_spi();
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaReadBurstAfterPayload, available);
 
         return available;
     }
@@ -1038,11 +1596,29 @@ private:
         return true;
     }
 
-    bool pop_frame(RxFrame& out) {
+    bool pop_frame(uint8_t* dst, uint16_t* out_len) {
         if (q_count == 0) {
             return false;
         }
-        out = frame_queue[q_head];
+        auto& slot = frame_queue[q_head];
+        if (slot.len == 0u || slot.len > ETH_FRAME_LEN) {
+            Serial.printf("[QCA] RX queue corruption len=%u head=%u count=%u, resetting modem\n",
+                          static_cast<unsigned>(slot.len),
+                          static_cast<unsigned>(q_head),
+                          static_cast<unsigned>(q_count));
+            slot.len = 0u;
+            clear_rx_state();
+            modem_reset();
+            return false;
+        }
+        if (out_len) {
+            *out_len = slot.len;
+        }
+        if (dst) {
+            memset(dst, 0, ETH_FRAME_LEN);
+            memcpy(dst, slot.data.data(), slot.len);
+        }
+        slot.len = 0u;
         q_head = (q_head + 1u) % RX_QUEUE_CAPACITY;
         q_count--;
         return true;
@@ -1054,203 +1630,211 @@ private:
         }
         const uint16_t eth_type = static_cast<uint16_t>((frame[12] << 8) | frame[13]);
         if (eth_type == slac::defs::ETH_P_HOMEPLUG_GREENPHY) {
+            maybe_learn_qca_mac_from_homeplug_frame(frame, len);
+            log_homeplug_frame("rx", frame, len);
             push_frame(frame, len);
             return;
         }
         lwip_ingress_ethernet_frame(frame, len);
     }
 
-    void note_invalid_frame(const uint8_t* frame, size_t pos, size_t total_avail, uint16_t fl) {
-        const uint32_t now_ms = millis();
-        if (invalid_frame_streak == 0u) {
-            invalid_frame_since_ms = now_ms;
-        }
-        if (invalid_frame_streak < 0xFF) {
-            invalid_frame_streak++;
-        }
-        if (invalid_frame_streak == 1u || (invalid_frame_streak % 4u) == 0u) {
-            const uint32_t len_field = static_cast<uint32_t>(frame[0]) |
-                                       (static_cast<uint32_t>(frame[1]) << 8u) |
-                                       (static_cast<uint32_t>(frame[2]) << 16u) |
-                                       (static_cast<uint32_t>(frame[3]) << 24u);
-            Serial.printf("[QCA] invalid RX frame fl=%u avail=%u pos=%u lenField=%lu streak=%u\n",
-                          fl,
-                          static_cast<unsigned>(total_avail),
-                          static_cast<unsigned>(pos),
-                          static_cast<unsigned long>(len_field),
-                          invalid_frame_streak);
-        }
-        if (invalid_frame_streak >= 10u && invalid_frame_since_ms != 0u &&
-            static_cast<int32_t>(now_ms - invalid_frame_since_ms) >= 400) {
-            Serial.printf("[QCA] invalid RX framing persisted, resetting modem\n");
-            invalid_frame_streak = 0;
-            invalid_frame_since_ms = 0;
-            last_reset_ms = now_ms;
-            modem_reset();
-        }
-    }
-
     void process_rx_stream(uint16_t chunk_len) {
         if (chunk_len == 0) {
             return;
         }
-
-        if (rx_stream_len + chunk_len > RX_STREAM_CAPACITY) {
-            note_invalid_frame(rx_chunk.data(), 0, chunk_len, 0);
-            if (startup_pending) {
-                return;
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaProcessRxStart, chunk_len);
+        for (uint16_t i = 0u; i < chunk_len; ++i) {
+            const int32_t rc = decode_rx_byte(rx_chunk[i]);
+            if (rc == QCAFRM_GATHER || rc == QCAFRM_NOHEAD) {
+                if (((i + 1u) % RX_PROCESS_BREATHER_STRIDE) == 0u) {
+                    cooperative_runtime_breather(CrashBreadcrumbStage::QcaProcessRxStart, i + 1u);
+                }
+                continue;
             }
-            rx_stream_len = 0;
-        }
-        if (chunk_len > RX_STREAM_CAPACITY) {
-            return;
-        }
-        memcpy(rx_stream.data() + rx_stream_len, rx_chunk.data(), chunk_len);
-        rx_stream_len += chunk_len;
-
-        size_t pos = 0;
-        while ((rx_stream_len - pos) >= 14u) {
-            uint8_t* frame = rx_stream.data() + pos;
-            const bool sof_ok = (frame[4] == 0xAA && frame[5] == 0xAA && frame[6] == 0xAA && frame[7] == 0xAA);
-            const uint16_t fl = static_cast<uint16_t>(frame[8] | (frame[9] << 8));
-            const size_t total = static_cast<size_t>(fl) + 14u;
-            const size_t avail = rx_stream_len - pos;
-            const bool len_ok = (fl >= 60u) && (fl <= ETH_FRAME_LEN) && (total <= RX_STREAM_CAPACITY);
-            const bool partial_frame = sof_ok && len_ok && (avail < total);
-            if (partial_frame) {
-                break;
-            }
-            if (!sof_ok || !len_ok) {
-                note_invalid_frame(frame, pos, avail, fl);
+            if (rc == QCAFRM_INVLEN || rc == QCAFRM_NOTAIL) {
+                note_invalid_decoder(rc, i, chunk_len);
                 if (startup_pending) {
                     return;
                 }
-                bool resynced = false;
-                for (size_t scan = pos + 4u; scan + 3u < rx_stream_len; ++scan) {
-                    if (rx_stream[scan] == 0xAA && rx_stream[scan + 1u] == 0xAA &&
-                        rx_stream[scan + 2u] == 0xAA && rx_stream[scan + 3u] == 0xAA) {
-                        const size_t candidate = scan - 4u;
-                        if (candidate > pos) {
-                            pos = candidate;
-                            resynced = true;
-                            break;
-                        }
-                    }
-                }
-                if (resynced) {
-                    continue;
-                }
-                pos++;
                 continue;
             }
-            if (avail < total) {
-                break;
-            }
-
-            if (frame[total - 2u] == 0x55 && frame[total - 1u] == 0x55) {
-                dispatch_eth_frame(frame + 12u, fl);
+            if (rc > 0) {
+                dispatch_eth_frame(rx_frame_build.data(), static_cast<uint16_t>(rc));
                 invalid_frame_streak = 0;
                 invalid_frame_since_ms = 0;
-                pos += total;
-                continue;
             }
-
-            note_invalid_frame(frame, pos, avail, fl);
-            if (startup_pending) {
-                return;
-            }
-            bool resynced = false;
-            for (size_t scan = pos + 4u; scan + 3u < rx_stream_len; ++scan) {
-                if (rx_stream[scan] == 0xAA && rx_stream[scan + 1u] == 0xAA &&
-                    rx_stream[scan + 2u] == 0xAA && rx_stream[scan + 3u] == 0xAA) {
-                    const size_t candidate = scan - 4u;
-                    if (candidate > pos) {
-                        pos = candidate;
-                        resynced = true;
-                        break;
-                    }
-                }
-            }
-            if (!resynced) {
-                pos++;
+            if (((i + 1u) % RX_PROCESS_BREATHER_STRIDE) == 0u) {
+                cooperative_runtime_breather(CrashBreadcrumbStage::QcaProcessRxStart, i + 1u);
             }
         }
-
-        if (pos > 0) {
-            if (pos < rx_stream_len) {
-                memmove(rx_stream.data(), rx_stream.data() + pos, rx_stream_len - pos);
-            }
-            rx_stream_len -= pos;
-        }
-    }
-
-    bool service_interrupt_line(bool fallback_poll) {
-        if (!ensure_startup_ready(300, 5)) {
-            return false;
-        }
-
-        const bool line_high = digitalRead(PIN_QCA700X_INT) == HIGH;
-        if (!g_qca_irq_pending && !line_high) {
-            return fallback_poll;
-        }
-
-        uint16_t intr_cause = 0;
-        if (!lock_spi(50)) {
-            return fallback_poll || line_high;
-        }
-        spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
-        digitalWrite(PIN_QCA700X_CS, LOW);
-        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_INTR_ENABLE));
-        spi.transfer16(0x0000);
-        digitalWrite(PIN_QCA700X_CS, HIGH);
-
-        digitalWrite(PIN_QCA700X_CS, LOW);
-        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_READ | QCA7K_SPI_INTERNAL | SPI_REG_INTR_CAUSE));
-        intr_cause = spi.transfer16(0x0000);
-        digitalWrite(PIN_QCA700X_CS, HIGH);
-
-        digitalWrite(PIN_QCA700X_CS, LOW);
-        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_INTR_CAUSE));
-        spi.transfer16(intr_cause);
-        digitalWrite(PIN_QCA700X_CS, HIGH);
-        spi.endTransaction();
-        unlock_spi();
-
-        g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
-
-        if (intr_cause & SPI_INT_CPU_ON) {
-            startup_pending = true;
-            interrupts_armed = false;
-            if (!ensure_startup_ready(500, 5)) {
-                return false;
-            }
-        } else {
-            enable_interrupts();
-        }
-
-        if (intr_cause & (SPI_INT_RDBUF_ERR | SPI_INT_WRBUF_ERR)) {
-            Serial.printf("[QCA] interrupt error cause=0x%04X, resetting modem\n", intr_cause);
-            modem_reset();
-            return false;
-        }
-
-        return fallback_poll || (intr_cause & SPI_INT_PKT_AVLBL) != 0 || digitalRead(PIN_QCA700X_INT) == HIGH;
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaProcessRxDone, chunk_len);
     }
 
     void poll_ingress(bool fallback_poll) {
-        if (!service_interrupt_line(fallback_poll)) {
+        if (!ready) {
             return;
         }
-        for (uint8_t burst = 0; burst < 8u; ++burst) {
-            const uint16_t chunk_len = read_burst(rx_chunk.data());
-            if (chunk_len == 0) {
-                break;
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaPollEnter, fallback_poll ? 1u : 0u);
+
+        const bool line_high = digitalRead(PIN_QCA700X_INT) == HIGH;
+        const bool have_irq = g_qca_irq_pending || line_high;
+        uint16_t intr_cause = 0u;
+        bool intr_masked = false;
+
+        if (have_irq) {
+            if (!read_and_mask_interrupt_cause(&intr_cause)) {
+                return;
             }
-            process_rx_stream(chunk_len);
-            if (startup_pending) {
-                break;
+            intr_masked = true;
+            note_crash_breadcrumb(CrashBreadcrumbStage::QcaPollAfterMask, intr_cause);
+            if ((intr_cause & SPI_INT_CPU_ON) != 0u) {
+                cpu_on_seen_since_reset = true;
+            }
+            if ((intr_cause & (SPI_INT_RDBUF_ERR | SPI_INT_WRBUF_ERR)) != 0u) {
+                Serial.printf("[QCA] interrupt error cause=0x%04X, resetting modem\n", intr_cause);
+                finish_interrupt_service(intr_cause);
+                modem_reset();
+                return;
             }
         }
+
+        const uint32_t now_ms = millis();
+        if (startup_pending) {
+            const bool allow_signature_only =
+                reset_started_ms != 0u &&
+                static_cast<int32_t>(now_ms - (reset_started_ms + QCA_STARTUP_FORCE_SYNC_MS)) >= 0;
+            (void)try_complete_startup_sync(allow_signature_only);
+            if (startup_pending && reset_started_ms != 0u &&
+                static_cast<int32_t>(now_ms - (reset_started_ms + QCA_RESET_TIMEOUT_MS)) >= 0) {
+                Serial.println("[QCA] reset wait timeout, restarting modem sync");
+                if (intr_masked) {
+                    finish_interrupt_service(intr_cause);
+                }
+                modem_reset();
+                return;
+            }
+        }
+
+        const bool should_drain = !startup_pending &&
+                                  (fallback_poll || line_high || (intr_cause & SPI_INT_PKT_AVLBL) != 0u);
+        if (should_drain) {
+            note_crash_breadcrumb(CrashBreadcrumbStage::QcaPollBeforeDrain, intr_cause);
+            for (uint8_t burst = 0; burst < QCA_MAX_BURSTS_PER_POLL; ++burst) {
+                const uint16_t chunk_len = read_burst(rx_chunk.data());
+                note_crash_breadcrumb(CrashBreadcrumbStage::QcaPollAfterBurstRead,
+                                      static_cast<uint16_t>((static_cast<uint16_t>(burst) << 12u) |
+                                                            (chunk_len & 0x0FFFu)));
+                if (chunk_len == 0u) {
+                    break;
+                }
+                process_rx_stream(chunk_len);
+                note_crash_breadcrumb(CrashBreadcrumbStage::QcaPollAfterBurstProcess,
+                                      static_cast<uint16_t>((static_cast<uint16_t>(burst) << 12u) |
+                                                            (chunk_len & 0x0FFFu)));
+                if (startup_pending) {
+                    break;
+                }
+                if ((burst + 1u) < QCA_MAX_BURSTS_PER_POLL) {
+                    cooperative_runtime_breather(CrashBreadcrumbStage::QcaPollAfterBurstProcess, burst + 1u);
+                }
+            }
+        }
+
+        if (intr_masked) {
+            finish_interrupt_service(intr_cause);
+        }
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaPollAfterFinish, intr_cause);
+    }
+
+    IOResult write_internal(const void* buffer, size_t size, int timeout_ms, bool nonblocking) {
+        if (!ready) {
+            last_error = "transport not ready";
+            return IOResult::Failure;
+        }
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaWriteEnter, static_cast<uint16_t>(std::min<size_t>(size, 0xFFFFu)));
+        if (!buffer || size == 0u || size > ETH_FRAME_LEN) {
+            last_error = "invalid frame size";
+            return IOResult::Failure;
+        }
+        if (startup_pending) {
+            if (nonblocking) {
+                last_error = "transport startup in progress";
+                return IOResult::Timeout;
+            }
+            if (!ensure_startup_ready(QCA_STARTUP_IO_WAIT_MS, 1u)) {
+                return IOResult::Failure;
+            }
+        }
+
+        const uint16_t payload_len = static_cast<uint16_t>(size);
+        const uint16_t framed_eth_len = static_cast<uint16_t>(std::max<size_t>(size, ETH_FRAME_MIN_LEN_NO_FCS));
+        const uint16_t total_len = static_cast<uint16_t>(framed_eth_len + 10u);
+        const uint32_t start_ms = millis();
+        while (true) {
+            uint16_t wrbuf_space = 0u;
+            if (!spi_read_register16(SPI_REG_WRBUF_SPC_AVA, &wrbuf_space)) {
+                return IOResult::Failure;
+            }
+            note_crash_breadcrumb(CrashBreadcrumbStage::QcaWriteWaitWrbuf, wrbuf_space);
+            if (wrbuf_space >= total_len) {
+                break;
+            }
+            if (nonblocking || timeout_ms == 0 ||
+                (timeout_ms > 0 &&
+                 static_cast<uint32_t>(millis() - start_ms) >= static_cast<uint32_t>(timeout_ms))) {
+                last_error = "QCA7000 write buffer unavailable";
+                return IOResult::Timeout;
+            }
+            delay(1);
+        }
+
+        if (!write_framed_payload(reinterpret_cast<const uint8_t*>(buffer), payload_len, framed_eth_len, total_len)) {
+            return IOResult::Failure;
+        }
+
+        last_error.clear();
+        return IOResult::Ok;
+    }
+
+    bool write_framed_payload(const uint8_t* frame, uint16_t payload_len, uint16_t framed_eth_len, uint16_t total_len) {
+        static constexpr std::array<uint8_t, ETH_FRAME_MIN_LEN_NO_FCS> kZeroPad = {};
+        static constexpr uint8_t kFooter[2] = {0x55u, 0x55u};
+        uint8_t hdr[8] = {
+            0xAAu, 0xAAu, 0xAAu, 0xAAu,
+            static_cast<uint8_t>(framed_eth_len & 0xFFu),
+            static_cast<uint8_t>((framed_eth_len >> 8u) & 0xFFu),
+            0x00u, 0x00u
+        };
+        const uint16_t pad_len = static_cast<uint16_t>(framed_eth_len - payload_len);
+        log_homeplug_frame("tx", frame, payload_len);
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaWriteFrameStart, framed_eth_len);
+
+        if (!lock_spi(50)) {
+            last_error = "spi lock timeout";
+            return false;
+        }
+        spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_INTERNAL | SPI_REG_BFR_SIZE));
+        spi.transfer16(total_len);
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+
+        digitalWrite(PIN_QCA700X_CS, LOW);
+        spi.transfer16(static_cast<uint16_t>(QCA7K_SPI_WRITE | QCA7K_SPI_EXTERNAL));
+        // Do not use in-place full-duplex transfers for outbound frames: the
+        // ESP32 SPI driver aliases tx/rx for transfer(void*, size), which can
+        // overwrite bytes that have not been clocked out yet.
+        spi.writeBytes(hdr, sizeof(hdr));
+        spi.writeBytes(frame, payload_len);
+        if (pad_len > 0u) {
+            spi.writeBytes(kZeroPad.data(), pad_len);
+        }
+        spi.writeBytes(kFooter, sizeof(kFooter));
+        digitalWrite(PIN_QCA700X_CS, HIGH);
+        spi.endTransaction();
+        unlock_spi();
+        note_crash_breadcrumb(CrashBreadcrumbStage::QcaWriteFrameDone, framed_eth_len);
+        return true;
     }
 
     SPIClass spi;
@@ -1259,11 +1843,13 @@ private:
     bool startup_pending{true};
     bool interrupts_armed{false};
     bool interrupt_attached{false};
+    bool cpu_on_seen_since_reset{false};
     std::string last_error;
-
-    std::array<uint8_t, RX_STREAM_CAPACITY> rx_stream{};
     std::array<uint8_t, RX_CHUNK_CAPACITY> rx_chunk{};
-    size_t rx_stream_len{0};
+    std::array<uint8_t, ETH_FRAME_LEN> rx_frame_build{};
+    QcaFrameDecodeState rx_decode_state{QcaFrameDecodeState::HwLen0};
+    uint16_t rx_expected_frame_len{0u};
+    uint16_t rx_decode_offset{0u};
 
     std::array<RxFrame, RX_QUEUE_CAPACITY> frame_queue{};
     size_t q_head{0};
@@ -1279,6 +1865,9 @@ private:
     uint32_t last_oversize_log_ms{0};
     uint32_t last_reset_ms{0};
     uint32_t last_poll_ms{0};
+    uint32_t reset_started_ms{0};
+    uint16_t last_startup_signature{0u};
+    uint16_t last_startup_wrbuf{0u};
 
     bool lock_spi(uint32_t timeout_ms) {
         if (!spi_mutex) {
@@ -1469,6 +2058,7 @@ std::unique_ptr<slac::evse::EvseFsm> g_fsm;
 std::array<uint8_t, slac::defs::NMK_LEN> g_runtime_slac_nmk{};
 bool g_runtime_slac_nmk_valid = false;
 uint8_t g_local_mac[ETH_ALEN]{};
+uint8_t g_wifi_sta_mac[ETH_ALEN]{};
 uint8_t g_last_seen_ev_mac[ETH_ALEN]{};
 bool g_last_seen_ev_mac_valid = false;
 int g_last_cp_mv = 0;
@@ -1481,6 +2071,13 @@ void ensure_runtime_slac_nmk() {
     g_runtime_slac_nmk_valid = true;
     Serial.println("[SLAC] runtime NMK seeded");
 }
+
+bool is_zero_mac_addr(const uint8_t mac[ETH_ALEN]);
+bool is_broadcast_mac_addr(const uint8_t mac[ETH_ALEN]);
+bool is_valid_unicast_mac_addr(const uint8_t mac[ETH_ALEN]);
+void log_secc_link_local();
+void refresh_plc_link_local_identity();
+void update_plc_interface_mac(const uint8_t mac[ETH_ALEN], const char* source);
 
 struct RuntimeConfig {
     uint32_t magic{CFG_MAGIC};
@@ -1708,6 +2305,7 @@ char g_plc_ifname[JPV2G_IFACE_NAME_MAX] = {0};
 uint32_t g_next_lwip_drop_log_ms = 0;
 struct LwipTxSlot {
     uint16_t len;
+    uint32_t epoch;
     uint8_t data[ETH_FRAME_LEN];
 };
 QueueHandle_t g_lwip_tx_queue = nullptr;
@@ -1717,6 +2315,7 @@ StaticQueue_t g_lwip_tx_free_queue_struct{};
 std::array<uint8_t, LWIP_TX_QUEUE_DEPTH> g_lwip_tx_ready_queue_storage{};
 std::array<uint8_t, LWIP_TX_QUEUE_DEPTH> g_lwip_tx_free_queue_storage{};
 LwipTxSlot* g_lwip_tx_slots = nullptr;
+volatile uint32_t g_lwip_tx_epoch = 1u;
 uint32_t g_next_lwip_tx_drop_log_ms = 0;
 Mcp2515Transport g_can;
 cbmodules::ModuleManager g_module_mgr{};
@@ -4601,6 +5200,7 @@ void controller_handle_heartbeat(const CtrlRxFrame& f) {
 }
 
 void controller_handle_auth(const CtrlRxFrame& f) {
+    note_crash_breadcrumb(CrashBreadcrumbStage::CtrlAuthHandle, f.data[1]);
     const uint8_t seq = f.data[1];
     if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_auth, &g_ctrl.seq_seen_auth)) {
         Serial.printf("[CTRLRX] AUTH reject bad-seq=%u last=%u seen=%d state=%d hb=%d\n",
@@ -4715,6 +5315,7 @@ void controller_handle_slac(const CtrlRxFrame& f) {
 }
 
 void controller_handle_hlc_feedback(const CtrlRxFrame& f) {
+    note_crash_breadcrumb(CrashBreadcrumbStage::CtrlFeedbackHandle, f.data[1]);
     const uint8_t seq = f.data[1];
     if (!ctrl_seq_accept(seq, &g_ctrl.last_seq_feedback, &g_ctrl.seq_seen_feedback)) {
         send_ctrl_ack(0x1Au, seq, ACK_BAD_SEQ, 0, 0);
@@ -5511,9 +6112,11 @@ void serial_ctrl_handle_line(String line) {
 }
 
 void service_serial_commands() {
+    uint16_t processed = 0u;
     while (Serial.available() > 0) {
         const int ch = Serial.read();
         if (ch < 0) break;
+        processed++;
         if (ch == '\r') continue;
         if (ch == '\n') {
             if (!g_serial_cmd_buf.isEmpty()) {
@@ -5524,6 +6127,12 @@ void service_serial_commands() {
         }
         if (g_serial_cmd_buf.length() < 256) {
             g_serial_cmd_buf += static_cast<char>(ch);
+        }
+        if ((processed % SERIAL_CMD_BREATHER_STRIDE) == 0u && Serial.available() > 0) {
+            cooperative_runtime_breather(CrashBreadcrumbStage::LoopAfterSerial, processed);
+        }
+        if (processed >= SERIAL_CMD_MAX_BYTES_PER_LOOP) {
+            break;
         }
     }
 }
@@ -5550,6 +6159,92 @@ void build_link_local_from_mac(const uint8_t mac[6], uint8_t out_ip[16]) {
     out_ip[13] = mac[3];
     out_ip[14] = mac[4];
     out_ip[15] = mac[5];
+}
+
+bool is_zero_mac_addr(const uint8_t mac[ETH_ALEN]) {
+    static constexpr uint8_t kZeroMac[ETH_ALEN] = {0};
+    return mac && memcmp(mac, kZeroMac, ETH_ALEN) == 0;
+}
+
+bool is_broadcast_mac_addr(const uint8_t mac[ETH_ALEN]) {
+    static constexpr uint8_t kBroadcastMac[ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    return mac && memcmp(mac, kBroadcastMac, ETH_ALEN) == 0;
+}
+
+bool is_valid_unicast_mac_addr(const uint8_t mac[ETH_ALEN]) {
+    return mac && !is_zero_mac_addr(mac) && !is_broadcast_mac_addr(mac) && ((mac[0] & 0x01u) == 0u);
+}
+
+void log_secc_link_local() {
+    Serial.printf("[NET] SECC IPv6 LL fe80::%02x%02xff:fe%02x:%02x%02x\n",
+                  static_cast<unsigned>(g_secc_ip[8]),
+                  static_cast<unsigned>(g_secc_ip[9]),
+                  static_cast<unsigned>(g_secc_ip[10]),
+                  static_cast<unsigned>(g_secc_ip[13]),
+                  static_cast<unsigned>(g_secc_ip[14]),
+                  static_cast<unsigned>(g_secc_ip[15]));
+}
+
+void refresh_plc_link_local_identity() {
+    build_link_local_from_mac(g_local_mac, g_secc_ip);
+    log_secc_link_local();
+}
+
+void update_plc_interface_mac(const uint8_t mac[ETH_ALEN], const char* source) {
+    if (!is_valid_unicast_mac_addr(mac)) {
+        return;
+    }
+
+    const bool had_prior_mac = is_valid_unicast_mac_addr(g_local_mac);
+    const bool changed = !had_prior_mac || memcmp(g_local_mac, mac, ETH_ALEN) != 0;
+    if (!changed) {
+        return;
+    }
+
+    uint8_t previous_mac[ETH_ALEN]{};
+    memcpy(previous_mac, g_local_mac, sizeof(previous_mac));
+    memcpy(g_local_mac, mac, ETH_ALEN);
+    g_channel.set_local_mac(g_local_mac);
+    mark_lwip_tx_transport_flush("plc mac update");
+    refresh_plc_link_local_identity();
+
+    if (g_plc_netif_ready) {
+        LOCK_TCPIP_CORE();
+        memcpy(g_plc_netif.hwaddr, g_local_mac, ETH_ALEN);
+#if LWIP_IPV6
+        netif_create_ip6_linklocal_address(&g_plc_netif, 1);
+#endif
+        UNLOCK_TCPIP_CORE();
+    }
+
+    if (had_prior_mac) {
+        Serial.printf("[NET] PLC/QCA MAC updated from %s: %02X:%02X:%02X:%02X:%02X:%02X -> %02X:%02X:%02X:%02X:%02X:%02X\n",
+                      source ? source : "runtime",
+                      previous_mac[0], previous_mac[1], previous_mac[2],
+                      previous_mac[3], previous_mac[4], previous_mac[5],
+                      g_local_mac[0], g_local_mac[1], g_local_mac[2],
+                      g_local_mac[3], g_local_mac[4], g_local_mac[5]);
+    } else {
+        Serial.printf("[NET] PLC/QCA MAC learned from %s: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                      source ? source : "runtime",
+                      g_local_mac[0], g_local_mac[1], g_local_mac[2],
+                      g_local_mac[3], g_local_mac[4], g_local_mac[5]);
+    }
+}
+
+void maybe_learn_qca_mac_from_homeplug_frame(const uint8_t* frame, uint16_t len) {
+    if (!frame || len < 17u) {
+        return;
+    }
+    const uint16_t eth_type = static_cast<uint16_t>((frame[12] << 8) | frame[13]);
+    if (eth_type != slac::defs::ETH_P_HOMEPLUG_GREENPHY) {
+        return;
+    }
+    const uint16_t mmtype = static_cast<uint16_t>(frame[15] | (static_cast<uint16_t>(frame[16]) << 8u));
+    if (mmtype != (slac::defs::MMTYPE_CM_SET_KEY | slac::defs::MMTYPE_MODE_CNF)) {
+        return;
+    }
+    update_plc_interface_mac(frame + 6, "CM_SET_KEY.CNF");
 }
 
 bool ensure_lwip_tx_queue_ready() {
@@ -5591,6 +6286,21 @@ bool ensure_lwip_tx_queue_ready() {
     return true;
 }
 
+void mark_lwip_tx_transport_flush(const char* reason) {
+    uint32_t next_epoch = g_lwip_tx_epoch + 1u;
+    if (next_epoch == 0u) {
+        next_epoch = 1u;
+    }
+    g_lwip_tx_epoch = next_epoch;
+    const uint32_t now = millis();
+    if (g_next_lwip_tx_drop_log_ms == 0 || static_cast<int32_t>(now - g_next_lwip_tx_drop_log_ms) >= 0) {
+        Serial.printf("[NET] lwIP TX transport flush epoch=%lu reason=%s\n",
+                      static_cast<unsigned long>(next_epoch),
+                      reason ? reason : "-");
+        g_next_lwip_tx_drop_log_ms = now + 2000;
+    }
+}
+
 err_t plc_netif_linkoutput(struct netif* netif, struct pbuf* p) {
     (void)netif;
     if (!p || !g_lwip_tx_queue || !g_lwip_tx_free_queue || !g_lwip_tx_slots) {
@@ -5616,6 +6326,7 @@ err_t plc_netif_linkoutput(struct netif* netif, struct pbuf* p) {
     }
     LwipTxSlot& frame = g_lwip_tx_slots[slot];
     frame.len = total;
+    frame.epoch = g_lwip_tx_epoch;
     if (pbuf_copy_partial(p, frame.data, total, 0) != total) {
         (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
         return ERR_BUF;
@@ -5694,6 +6405,7 @@ bool init_plc_lwip_netif() {
     snprintf(g_plc_ifname, sizeof(g_plc_ifname), "%c%c%u",
              g_plc_netif.name[0], g_plc_netif.name[1], static_cast<unsigned>(g_plc_netif.num));
     g_plc_netif_ready = true;
+    refresh_plc_link_local_identity();
     Serial.printf("[NET] PLC lwIP netif ready: %s\n", g_plc_ifname);
     log_runtime_stats("lwip_netif_ready");
     return true;
@@ -5736,6 +6448,7 @@ void service_lwip_tx_queue_once() {
     }
     uint8_t slot = 0u;
     uint8_t drained = 0u;
+    const uint32_t current_epoch = g_lwip_tx_epoch;
     while (drained < LWIP_TX_MAX_FRAMES_PER_LOOP &&
            xQueueReceive(g_lwip_tx_queue, &slot, 0) == pdTRUE) {
         if (slot >= LWIP_TX_QUEUE_DEPTH) {
@@ -5743,19 +6456,28 @@ void service_lwip_tx_queue_once() {
             continue;
         }
         LwipTxSlot& frame = g_lwip_tx_slots[slot];
-        if (frame.len == 0 || frame.len > ETH_FRAME_LEN) {
+        if (frame.epoch != current_epoch || frame.len == 0 || frame.len > ETH_FRAME_LEN) {
+            frame.len = 0u;
             (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
             drained++;
             continue;
         }
-        const auto rc = g_transport->write(frame.data, frame.len, LWIP_TX_WRITE_TIMEOUT_MS);
+        const auto rc = g_transport->write_nowait(frame.data, frame.len);
         if (rc != slac::ITransport::IOResult::Ok) {
+            if (xQueueSendToFront(g_lwip_tx_queue, &slot, 0) != pdTRUE) {
+                frame.len = 0u;
+                (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
+            }
             const uint32_t now = millis();
             if (g_next_lwip_tx_drop_log_ms == 0 || static_cast<int32_t>(now - g_next_lwip_tx_drop_log_ms) >= 0) {
-                Serial.printf("[NET] lwIP TX write failed rc=%d\n", static_cast<int>(rc));
+                Serial.printf("[NET] lwIP TX backpressure rc=%d err=%s\n",
+                              static_cast<int>(rc),
+                              g_transport->get_error().c_str());
                 g_next_lwip_tx_drop_log_ms = now + 2000;
             }
+            break;
         }
+        frame.len = 0u;
         (void)xQueueSend(g_lwip_tx_free_queue, &slot, 0);
         drained++;
     }
@@ -6886,6 +7608,9 @@ void reprime_slac_modem(uint32_t now_ms, const char* reason) {
     Serial.printf("[SLAC] modem reprime (%s)\n", reason ? reason : "-");
     g_transport->modem_reset();
     delay(150);
+    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 5u)) {
+        Serial.printf("[QCA] reprime sync wait failed: %s\n", g_transport->get_error().c_str());
+    }
     g_fsm->invalidate_key_state();
     g_fsm->start(now_ms);
     g_fsm_priming = true;
@@ -6972,6 +7697,11 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
 
     g_transport->modem_reset();
     delay(150);
+    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 5u)) {
+        Serial.printf("[QCA] init sync wait failed: %s\n", g_transport->get_error().c_str());
+        g_next_qca_init_ms = now_ms + QCA_INIT_RETRY_MS;
+        return false;
+    }
 
     if (!g_channel.open(g_transport, g_local_mac)) {
         Serial.printf("[SLAC] channel open failed: %s\n", g_channel.get_error().c_str());
@@ -6986,6 +7716,7 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
     g_fsm = std::make_unique<slac::evse::EvseFsm>(g_channel, [](const std::string& msg) {
         Serial.printf("[FSM] %s\n", msg.c_str());
     });
+    g_fsm->set_control_mac(g_wifi_sta_mac);
     ensure_runtime_slac_nmk();
     g_fsm->set_nmk(g_runtime_slac_nmk.data());
 
@@ -7039,7 +7770,9 @@ void service_hlc_disconnect_hold(uint32_t now_ms) {
 }
 
 void process_cp_and_fsm(uint32_t now_ms) {
+    note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0001u);
     const int cp_mv = read_cp_mv_robust();
+    note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0002u);
     g_last_cp_mv = cp_mv;
     const char raw_cp_state = cp_state_from_mv(cp_mv);
     if (cp_connected(raw_cp_state)) {
@@ -7115,9 +7848,15 @@ void process_cp_and_fsm(uint32_t now_ms) {
     if (g_fsm && g_fsm_priming) {
         for (int i = 0; i < SLAC_ACTIVE_MAX_FRAMES_PER_LOOP; ++i) {
             const int timeout_ms = (i == 0) ? 2 : 0;
+            note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, static_cast<uint16_t>(0x0100u | (i + 1)));
             const bool got = g_fsm->poll_channel_once(timeout_ms, now_ms);
             if (!got) break;
+            if (((i + 1) % FSM_POLL_BREATHER_STRIDE) == 0) {
+                cooperative_runtime_breather(CrashBreadcrumbStage::FsmPollActive,
+                                             static_cast<uint16_t>(0x0180u | (i + 1)));
+            }
         }
+        note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0100u);
         g_fsm->poll(now_ms);
         const slac::evse::State priming_state = g_fsm->get_state();
         if (priming_state != g_last_fsm_state) {
@@ -7131,6 +7870,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
     }
 
     apply_cp_output(g_cp_state, now_ms);
+    note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0003u);
 
     if (!connected) {
         return;
@@ -7166,9 +7906,15 @@ void process_cp_and_fsm(uint32_t now_ms) {
 
     for (int i = 0; i < SLAC_ACTIVE_MAX_FRAMES_PER_LOOP; ++i) {
         const int timeout_ms = (i == 0) ? 2 : 0;
+        note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, static_cast<uint16_t>(0x1000u | (i + 1)));
         const bool got = g_fsm->poll_channel_once(timeout_ms, now_ms);
         if (!got) break;
+        if (((i + 1) % FSM_POLL_BREATHER_STRIDE) == 0) {
+            cooperative_runtime_breather(CrashBreadcrumbStage::FsmPollActive,
+                                         static_cast<uint16_t>(0x1080u | (i + 1)));
+        }
     }
+    note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0200u);
     g_fsm->poll(now_ms);
 
     // The EVSE FSM requires an explicit LinkDetected event after CM_SLAC_MATCH.REQ.
@@ -7263,6 +8009,19 @@ void process_cp_and_fsm(uint32_t now_ms) {
 void setup() {
     Serial.begin(115200);
     delay(200);
+    if (g_crash_breadcrumb.magic != CRASH_BREADCRUMB_MAGIC) {
+        memset(&g_crash_breadcrumb, 0, sizeof(g_crash_breadcrumb));
+        g_crash_breadcrumb.magic = CRASH_BREADCRUMB_MAGIC;
+    }
+    g_crash_breadcrumb.boot_count++;
+    Serial.printf("[BOOT] reset_reason=%d retained_stage=%s detail=%u last_ms=%lu loop_count=%lu boot_count=%lu\n",
+                  static_cast<int>(esp_reset_reason()),
+                  crash_breadcrumb_stage_name(static_cast<CrashBreadcrumbStage>(g_crash_breadcrumb.stage)),
+                  static_cast<unsigned>(g_crash_breadcrumb.detail),
+                  static_cast<unsigned long>(g_crash_breadcrumb.last_ms),
+                  static_cast<unsigned long>(g_crash_breadcrumb.loop_count),
+                  static_cast<unsigned long>(g_crash_breadcrumb.boot_count));
+    note_crash_breadcrumb(CrashBreadcrumbStage::SetupStart);
     g_loop_task = xTaskGetCurrentTaskHandle();
     enable_psram_malloc_policy();
     g_serial_cmd_buf.reserve(256u);
@@ -7278,8 +8037,12 @@ void setup() {
     init_status_leds();
     service_status_leds(millis());
 
-    esp_read_mac(g_local_mac, ESP_MAC_WIFI_STA);
-    Serial.printf("[NET] local MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
+    esp_read_mac(g_wifi_sta_mac, ESP_MAC_WIFI_STA);
+    memcpy(g_local_mac, g_wifi_sta_mac, sizeof(g_local_mac));
+    Serial.printf("[NET] WiFi STA MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  g_wifi_sta_mac[0], g_wifi_sta_mac[1], g_wifi_sta_mac[2],
+                  g_wifi_sta_mac[3], g_wifi_sta_mac[4], g_wifi_sta_mac[5]);
+    Serial.printf("[NET] PLC MAC placeholder %02X:%02X:%02X:%02X:%02X:%02X\n",
                   g_local_mac[0], g_local_mac[1], g_local_mac[2], g_local_mac[3], g_local_mac[4], g_local_mac[5]);
 
     (void)relay1_init();
@@ -7303,15 +8066,9 @@ void setup() {
         }
         delay(10);
     }
+    note_crash_breadcrumb(CrashBreadcrumbStage::SetupAfterStartupHold);
 
-    build_link_local_from_mac(g_local_mac, g_secc_ip);
-    Serial.printf("[NET] SECC IPv6 LL fe80::%02x%02x:%02xff:fe%02x:%02x%02x\n",
-                  static_cast<unsigned>(g_secc_ip[8]),
-                  static_cast<unsigned>(g_secc_ip[9]),
-                  static_cast<unsigned>(g_secc_ip[10]),
-                  static_cast<unsigned>(g_secc_ip[13]),
-                  static_cast<unsigned>(g_secc_ip[14]),
-                  static_cast<unsigned>(g_secc_ip[15]));
+    refresh_plc_link_local_identity();
 
     analogReadResolution(12);
     analogSetPinAttenuation(CP_1_READ_PIN, ADC_11db);
@@ -7342,12 +8099,16 @@ void setup() {
     }
 
     (void)try_init_qca_and_fsm(millis());
+    note_crash_breadcrumb(CrashBreadcrumbStage::SetupAfterQcaInit);
 }
 
 void loop() {
     uint32_t now_ms = millis();
     const int64_t loop_start_us = esp_timer_get_time();
+    g_crash_breadcrumb.loop_count++;
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopEnter);
     service_serial_commands();
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopAfterSerial);
     service_emergency_stop(now_ms);
     if (!g_fsm && static_cast<int32_t>(now_ms - g_next_qca_init_ms) >= 0) {
         (void)try_init_qca_and_fsm(now_ms);
@@ -7355,13 +8116,17 @@ void loop() {
     if (g_transport && g_transport->is_ready()) {
         g_transport->service_ingress_once();
     }
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopAfterQcaIngress);
     controller_service_rx();
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopAfterCtrlRx);
     // Re-sample time after controller RX so same-iteration heartbeats do not
     // look "from the future" to the watchdog/session gate logic.
     now_ms = millis();
     controller_service_watchdogs(now_ms);
     controller_service_periodic_tx(now_ms);
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopAfterCtrlTx);
     process_cp_and_fsm(now_ms);
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopAfterCpFsm);
     service_hlc_disconnect_hold(now_ms);
     if (mode_uses_plc_module_manager()) {
         service_module_manager_once(now_ms);
@@ -7370,6 +8135,7 @@ void loop() {
         rfid_poll(now_ms);
     }
     service_lwip_tx_queue_once();
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopAfterLwipTx);
     service_status_leds(now_ms);
     const int64_t loop_busy_us = esp_timer_get_time() - loop_start_us;
     if (loop_busy_us > 0) {
@@ -7377,5 +8143,7 @@ void loop() {
     }
     service_runtime_stats(now_ms);
     const bool hlc_priority = g_session_started || g_hlc_active || cp_connected(g_cp_state);
+    feed_loop_watchdog();
+    note_crash_breadcrumb(CrashBreadcrumbStage::LoopSleep, hlc_priority ? 1u : 5u);
     delay(hlc_priority ? 1 : 5);
 }

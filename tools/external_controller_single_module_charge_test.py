@@ -98,6 +98,7 @@ IDENTITY_EVT_RE = re.compile(
     r"\[SERCTRL\] IDENTITY kind=([A-Z0-9_]+)\s+plc_id=(\d+)\s+connector_id=(\d+)\s+value=([0-9A-Fa-f]+)"
 )
 HLC_REQ_RE = re.compile(r"RX (PowerDeliveryReq|WeldingDetectionReq|SessionStopReq) \(proto=(\d+)\)")
+LOG_FRAGMENT_RE = re.compile(r"\[(?:SERCTRL|RELAY|CP|CTRL|QCA|SLAC|HLC|FSM|NET|MEM|WARN |HOST)\]")
 
 
 def ts() -> str:
@@ -295,18 +296,19 @@ class SerialLink:
                 continue
             line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
             self._log(f"{ts()} {line}")
-            if self.pending_status_line:
-                if line and not line.startswith("["):
-                    combined = self.pending_status_line + line
+            for fragment in split_log_fragments(line):
+                if self.pending_status_line:
+                    if fragment and not fragment.startswith("["):
+                        combined = self.pending_status_line + fragment
+                        self.pending_status_line = ""
+                        self.parse_line(combined)
+                        continue
+                    self.parse_line(self.pending_status_line)
                     self.pending_status_line = ""
-                    self.parse_line(combined)
+                if fragment.startswith("[SERCTRL] STATUS") and "stop_done=" not in fragment:
+                    self.pending_status_line = fragment
                     continue
-                self.parse_line(self.pending_status_line)
-                self.pending_status_line = ""
-            if line.startswith("[SERCTRL] STATUS") and "stop_done=" not in line:
-                self.pending_status_line = line
-                continue
-            self.parse_line(line)
+                self.parse_line(fragment)
 
 
 class DirectMaxwellCan:
@@ -602,6 +604,20 @@ def parse_status_line(line: str) -> Optional[PlcStatus]:
     )
 
 
+def split_log_fragments(line: str) -> list[str]:
+    matches = list(LOG_FRAGMENT_RE.finditer(line))
+    if len(matches) <= 1:
+        return [line]
+    fragments: list[str] = []
+    for idx, match in enumerate(matches):
+        start = match.start()
+        end = matches[idx + 1].start() if (idx + 1) < len(matches) else len(line)
+        fragment = line[start:end].strip()
+        if fragment:
+            fragments.append(fragment)
+    return fragments or [line]
+
+
 def append_serial_candidate(candidates: list[str], seen: set[str], path: str) -> None:
     if not path:
         return
@@ -874,12 +890,17 @@ class SingleModuleChargeRunner:
         self.last_hb = 0.0
         self.last_auth = 0.0
         self.last_slac_start = 0.0
+        self.last_status_rx = 0.0
         self.remote_start_sent = False
 
         self.current_demand_started_at: Optional[float] = None
         self.current_demand_ready_since: Optional[float] = None
         self.vehicle_stop_requested = False
         self.vehicle_stop_reason = ""
+
+    def _note_once(self, note: str) -> None:
+        if note not in self.notes:
+            self.notes.append(note)
 
     def _reset_plc_if_requested(self) -> None:
         if not self.args.esp_reset_before_start:
@@ -925,6 +946,7 @@ class SingleModuleChargeRunner:
                 self.live.relay_states[1] = status.relay1 != 0
                 self.live.relay_states[2] = status.relay2 != 0
                 self.live.relay_states[3] = status.relay3 != 0
+                self.last_status_rx = now
             self.status_queue.append(status)
             return
 
@@ -1072,6 +1094,15 @@ class SingleModuleChargeRunner:
             time.sleep(0.02)
         raise RuntimeError("timeout waiting for PLC status")
 
+    def _recent_status_fallback(self, max_age_s: float) -> Optional[PlcStatus]:
+        with self.live_lock:
+            status = self.live.last_status
+        if status is None or self.last_status_rx <= 0.0:
+            return None
+        if (time.time() - self.last_status_rx) > max_age_s:
+            return None
+        return status
+
     def _wait_for_ack(self, cmd_hex: int, timeout_s: float = 5.0) -> Ack:
         deadline = time.time() + timeout_s
         while time.time() < deadline:
@@ -1084,11 +1115,21 @@ class SingleModuleChargeRunner:
             time.sleep(0.02)
         raise RuntimeError(f"timeout waiting for ack 0x{cmd_hex:02X}")
 
-    def _query_status(self) -> PlcStatus:
+    def _query_status(self, timeout_s: float = 2.0, allow_stale: bool = False, stale_max_age_s: float = 3.0) -> PlcStatus:
         while self.status_queue:
             self.status_queue.popleft()
         self._send("CTRL STATUS")
-        return self._wait_for_status()
+        try:
+            return self._wait_for_status(timeout_s=timeout_s)
+        except RuntimeError as exc:
+            if allow_stale and "timeout waiting for PLC status" in str(exc):
+                fallback = self._recent_status_fallback(stale_max_age_s)
+                if fallback is not None:
+                    self._note_once(
+                        f"status timeout during {self.phase}; using cached PLC status <= {stale_max_age_s:.1f}s old"
+                    )
+                    return fallback
+            raise
 
     def _relay_is_closed(self) -> bool:
         with self.live_lock:
@@ -1237,7 +1278,14 @@ class SingleModuleChargeRunner:
             self.last_auth = now
 
         if (now - self.last_status_poll) >= self.args.status_interval_s:
-            self._query_status()
+            try:
+                self._query_status(
+                    timeout_s=min(1.0, self.args.status_interval_s),
+                    allow_stale=True,
+                    stale_max_age_s=max(3.0, self.args.status_interval_s * 2.5),
+                )
+            except Exception as exc:
+                self._note_once(f"status poll degraded during {self.phase}: {exc}")
             self.last_status_poll = now
 
         with self.live_lock:
@@ -1359,6 +1407,35 @@ class SingleModuleChargeRunner:
         self.last_feedback_cmd = now
         return ready
 
+    def _tick_cleanup_contract(self, now: float) -> None:
+        if (now - self.last_hb) * 1000.0 >= self.args.heartbeat_ms:
+            self._send(f"CTRL HB {self.args.heartbeat_timeout_ms}")
+            try:
+                ack = self._wait_for_ack(ACK_CMD_HEARTBEAT, timeout_s=2.0)
+                if ack.status == ACK_OK:
+                    self.last_hb = now
+                else:
+                    self._note_once(f"cleanup heartbeat rejected status={ack.status}")
+            except Exception as exc:
+                self._note_once(f"cleanup heartbeat degraded: {exc}")
+
+        if (now - self.last_feedback_cmd) >= self.args.feedback_interval_s:
+            self._send("CTRL FEEDBACK 1 0 0 0 0 0 0 1")
+            try:
+                ack = self._wait_for_ack(ACK_CMD_FEEDBACK, timeout_s=2.0)
+                if ack.status != ACK_OK:
+                    self._note_once(f"cleanup stop-notify rejected status={ack.status}")
+                self.last_feedback_cmd = now
+            except Exception as exc:
+                self._note_once(f"cleanup stop-notify degraded: {exc}")
+
+        if (now - self.last_status_poll) >= max(0.25, min(1.0, self.args.status_interval_s)):
+            try:
+                self._query_status(timeout_s=0.8, allow_stale=True, stale_max_age_s=3.0)
+            except Exception as exc:
+                self._note_once(f"cleanup status degraded: {exc}")
+            self.last_status_poll = now
+
     def _tick_progress(self, now: float, stage: str, ready: bool) -> None:
         if (now - self.last_progress) < 5.0:
             return
@@ -1407,22 +1484,19 @@ class SingleModuleChargeRunner:
                 self.notes.append(f"module stop failed during cleanup: {exc}")
 
         stop_deadline = time.time() + self.args.stop_timeout_s
-        feedback_sent = False
+        self.last_feedback_cmd = 0.0
         while time.time() < stop_deadline:
             now = time.time()
             self._tick_relay(now)
             self._tick_telemetry(now)
-            if not feedback_sent:
-                self._send("CTRL FEEDBACK 1 0 0 0 0 0 0 1")
-                try:
-                    self._wait_for_ack(ACK_CMD_FEEDBACK, timeout_s=2.0)
-                except Exception:
-                    pass
-                feedback_sent = True
-            self._query_status()
             with self.live_lock:
                 done = self.live.stop_done
+                hlc_active = self.live.hlc_active
+                cp_phase = self.live.cp_phase
+            self._tick_cleanup_contract(now)
             if done and self._relay_is_open():
+                break
+            if self._relay_is_open() and (not hlc_active) and cp_phase in ("A", "B", "B1", "B2"):
                 break
             time.sleep(0.1)
 
@@ -1552,7 +1626,10 @@ class SingleModuleChargeRunner:
                 self.failures.append("session never reached sustained CurrentDemand")
                 raise RuntimeError(self.failures[-1])
 
-            self._cleanup()
+            try:
+                self._cleanup()
+            except Exception as cleanup_exc:
+                self._note_once(f"cleanup degraded after pass: {cleanup_exc}")
             return 0
         except Exception as exc:
             if str(exc):

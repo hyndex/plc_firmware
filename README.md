@@ -18,8 +18,26 @@ This README describes the current firmware behavior end to end.
   Short controller-mode reference
 - `docs/external_controller_slac_handling.md`
   Detailed mode1 SLAC lifecycle, bench flow, retry policy, and cautions
+- `docs/external_controller_validation_20260318.md`
+  Latest controller-mode validation report with short-session, 45-minute, and one-hour results
 - `docs/mode2_controller_can_uart.md`
   Legacy-mode archival note
+
+## Current Validation Snapshot
+
+Latest controller-mode validation on `2026-03-17` and `2026-03-18` used the
+current transport-hardening and harness-cleanup baseline.
+
+- both PLCs were reflashed and reprovisioned in persisted
+  `mode=1 external_controller`
+- `9` consecutive completed `120 s` sessions passed in the latest interrupted
+  short-session batch
+- one `45 minute` session passed with no premature teardown or dropout before
+  the commanded host stop
+- one `5 x 1 hour` batch with a PLC reset before every session completed
+  `5/5 pass`
+- exact timings, artifacts, and teardown interpretation are recorded in
+  `docs/external_controller_validation_20260318.md`
 
 ## Runtime Model
 

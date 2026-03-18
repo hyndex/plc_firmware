@@ -1,6 +1,6 @@
 # External Controller SLAC Handling Guide
 
-Updated: 2026-03-15
+Updated: 2026-03-18
 
 This document is the current reference for:
 
@@ -452,6 +452,34 @@ Important batch rule:
 - the harness opens the PLC port exclusively
 - concurrent copies or stale background processes will corrupt the dataset
 
+### 10.2 Long-hold usage
+
+For long holds, the harness timeout must cover:
+
+- attach and SLAC startup time
+- the requested `CurrentDemand` hold
+- the stop / cleanup window
+
+Do not leave the default short timeout in place for a `45 minute` run.
+
+Validated long-hold example:
+
+```bash
+python3 tools/external_controller_single_module_charge_test.py \
+  --plc-port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 \
+  --plc-id 1 \
+  --controller-id 1 \
+  --current-demand-hold-s 2700 \
+  --session-start-timeout-s 3600 \
+  --stop-timeout-s 20
+```
+
+Teardown interpretation rule:
+
+- if `modem reprime`, `HLC ready=0 active=0`, or `client session done` happen
+  only after the host `CTRL STOP`, they are expected cleanup markers
+- if they happen before the host stop, treat them as dropout evidence
+
 ## 11. Bench Validation Snapshot
 
 ### 11.1 Standalone confirmation
@@ -559,6 +587,65 @@ References:
 - [`session05.log`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session05.log#L3451)
 - [`session05_runner.out`](/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_single_module_10x_hold120_gap60_serial_20260315_083729_session05_runner.out#L28)
 
+### 11.5 Post-cleanup short-session validation on 2026-03-17 and 2026-03-18
+
+After the transport and harness cleanup fixes, the simple controller-mode path
+was rerun in a new serial batch:
+
+- `9` completed consecutive `120 s` sessions passed
+- average `CTRL SLAC start -> MATCHED`: `1.925 s`
+- average `CTRL SLAC start -> PreCharge`: `6.226 s`
+- average `CTRL SLAC start -> CurrentDemand`: `8.239 s`
+- average `CTRL SLAC start -> CurrentDemand ready`: `8.337 s`
+- average `host stop -> relay open`: `0.123 s`
+- average `host stop -> stop_done=1`: `20.342 s`
+
+Important nuance:
+
+- the intended batch was `10` sessions
+- session `10` was interrupted externally before its summary and aggregate
+  files were written
+- the validated dataset therefore consists of the `9` completed sessions only
+
+Full per-session table and artifact links:
+
+- [`docs/external_controller_validation_20260318.md`](/home/jpi/Desktop/EVSE/plc_firmware/docs/external_controller_validation_20260318.md)
+
+### 11.6 Long-hold validation on 2026-03-18
+
+One `45 minute` controller-mode hold was then run with:
+
+- `CurrentDemand` target hold `2700 s`
+- `session_start_timeout_s=3600`
+- `stop_timeout_s=20`
+
+Result:
+
+- `pass`
+- `CTRL SLAC start -> MATCHED`: `1.920 s`
+- `CTRL SLAC start -> CurrentDemand`: `8.323 s`
+- `CTRL SLAC start -> CurrentDemand ready`: `8.654 s`
+- sustained `CurrentDemand` before host stop: `2700.010 s`
+
+Observed teardown order:
+
+1. host `CTRL STOP soft 20000`
+2. relay open `0.132 s` later
+3. `stop_done=1` at `20.087 s`
+4. `SLAC modem reprime (session stop)` and `HLC client session done rc=-9`
+   only after the stop path completed
+
+No premature teardown markers appeared before the commanded stop:
+
+- no `PowerDeliveryRuntime stop=1`
+- no `WeldingDetectionRuntime`
+- no `SessionStopRuntime`
+- no `modem reprime` before the host stop
+
+Full timing table and artifact links:
+
+- [`docs/external_controller_validation_20260318.md`](/home/jpi/Desktop/EVSE/plc_firmware/docs/external_controller_validation_20260318.md)
+
 ## 12. Current Conclusions and Cautions
 
 Current state after the latest firmware and harness updates:
@@ -568,10 +655,14 @@ Current state after the latest firmware and harness updates:
 - the PLC owns SLAC retry / hold / E/F recovery after that
 - standalone still works
 - mode 1 now repeatedly reaches `CurrentDemand` in the simple single-module path
+- the host-driven cleanup path is stable in the simple harness
+- a `45 minute` hold has completed cleanly in the simple single-module path
 
 Remaining instability is no longer best described as "controller mode cannot do
 SLAC". The remaining issues are:
 
 - long but recoverable SLAC retries on some attaches
-- occasional host/UART supervision failures after or around charge bring-up
+- the latest interrupted short-session batch still lacks a closed `10/10`
+  aggregate because session `10` was stopped externally
+- SLAC `CM_SET_KEY` strictness hardening is still deferred
 - more complex donor/share behavior in the larger borrower/donor harness
