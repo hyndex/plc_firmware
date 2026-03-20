@@ -1,0 +1,20 @@
+{
+  "port": "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00",
+  "ts": "20260320_182216",
+  "mode": "standalone-plc2",
+  "status": "pass",
+  "start_time": "2026-03-20 18:22:35",
+  "delivery": 1,
+  "ready": 1,
+  "relay1": 1,
+  "charge_duration_s": 900.5,
+  "samples": 5346,
+  "min_present_v": 0.0,
+  "max_present_v": 500.5,
+  "min_present_i": 0.0,
+  "max_present_i": 41.8,
+  "last_present_v": 500.3,
+  "last_present_i": 40.75,
+  "last_req_v": 500.0,
+  "last_req_i": 50.0
+}

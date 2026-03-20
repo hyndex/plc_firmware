@@ -1,0 +1,3 @@
+[RESET] rebooting PLC on /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00 wait_s=14.0
+[FAIL] [Errno 16] could not open port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00: [Errno 16] Device or resource busy: '/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00'
+[PHASE] stopping

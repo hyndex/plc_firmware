@@ -1,0 +1,23 @@
+RUN_BASE=/home/jpi/Desktop/EVSE/plc_firmware/logs/stateless_reset_batch5_20260319
+[RESET] session=01 start=2026-03-19T19:05:47
+[RUN] session=01 start=2026-03-19T19:06:02
+[DONE] session=01 rc=0 result=pass end=2026-03-19T19:08:32
+[GAP] after_session=01 sleep_s=10 start=2026-03-19T19:08:32
+[RESET] session=02 start=2026-03-19T19:08:42
+[RUN] session=02 start=2026-03-19T19:08:56
+[DONE] session=02 rc=0 result=pass end=2026-03-19T19:11:19
+[GAP] after_session=02 sleep_s=10 start=2026-03-19T19:11:19
+[RESET] session=03 start=2026-03-19T19:11:29
+[RUN] session=03 start=2026-03-19T19:11:44
+[DONE] session=03 rc=0 result=pass end=2026-03-19T19:14:07
+[GAP] after_session=03 sleep_s=10 start=2026-03-19T19:14:07
+[RESET] session=04 start=2026-03-19T19:14:17
+[RUN] session=04 start=2026-03-19T19:14:31
+[DONE] session=04 rc=0 result=pass end=2026-03-19T19:16:54
+[GAP] after_session=04 sleep_s=10 start=2026-03-19T19:16:54
+[RESET] session=05 start=2026-03-19T19:17:04
+[RUN] session=05 start=2026-03-19T19:17:18
+[DONE] session=05 rc=1 result=fail end=2026-03-19T19:24:21
+[SUMMARY] base=/home/jpi/Desktop/EVSE/plc_firmware/logs/stateless_reset_batch5_20260319 passes=4 fails=1 end=2026-03-19T19:24:21
+[ARTIFACT] aggregate_json=/home/jpi/Desktop/EVSE/plc_firmware/logs/stateless_reset_batch5_20260319_aggregate.json
+[ARTIFACT] aggregate_csv=/home/jpi/Desktop/EVSE/plc_firmware/logs/stateless_reset_batch5_20260319_aggregate.csv

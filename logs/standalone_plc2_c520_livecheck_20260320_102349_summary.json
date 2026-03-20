@@ -1,0 +1,9 @@
+{
+  "duration_s": 60.0,
+  "samples": 0,
+  "charging": false,
+  "min_v": null,
+  "max_v": null,
+  "min_i": null,
+  "max_i": null
+}

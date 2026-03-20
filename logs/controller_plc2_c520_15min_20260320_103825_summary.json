@@ -1,0 +1,62 @@
+{
+  "result": "fail",
+  "phase": "stopping",
+  "events": [
+    "2026-03-20T10:38:53.218 phase=bootstrap",
+    "2026-03-20T10:38:55.193 phase=wait_for_session",
+    "2026-03-20T10:42:55.233 phase=stopping"
+  ],
+  "notes": [],
+  "failures": [
+    "session never reached proven CurrentDemand charging",
+    "session never reached proven CurrentDemand charging"
+  ],
+  "current_demand_started_at": 1773983342.9187195,
+  "current_demand_ready_since": 1773983343.122916,
+  "charge_proof_since": 1773983347.9955537,
+  "charge_proof_peak_v": 500.51171875,
+  "charge_proof_peak_i": 41.5009765625,
+  "charge_proof_peak_power_w": 20769.12890625,
+  "vehicle_stop_requested": false,
+  "vehicle_stop_reason": "",
+  "plc": {
+    "mode_id": 1,
+    "mode_name": "external_controller",
+    "can_stack": 0,
+    "module_mgr": 0,
+    "cp_phase": "C",
+    "cp_connected": true,
+    "cp_duty_pct": 100,
+    "slac_session": true,
+    "slac_matched": true,
+    "slac_fsm": 8,
+    "slac_failures": 0,
+    "hlc_ready": true,
+    "hlc_active": true,
+    "precharge_seen": true,
+    "precharge_ready": true,
+    "session_started": true,
+    "stop_active": true,
+    "stop_hard": false,
+    "stop_done": false,
+    "bms_stage_name": "none",
+    "delivery_ready": false,
+    "target_v": 0.0,
+    "target_i": 0.0,
+    "fb_v": 0.0,
+    "fb_i": 0.0,
+    "relay1": false
+  },
+  "module": {
+    "address": 2,
+    "group": 2,
+    "status": "status=0x00400000 flags=OFF",
+    "voltage_v": 11.220703125,
+    "current_a": 0.0,
+    "current_limit_point": 0.0126953125,
+    "input_power_w": 0.0,
+    "input_mode": 3,
+    "rated_output_current_reg_a": 30.0,
+    "off": true
+  }
+}

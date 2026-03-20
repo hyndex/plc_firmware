@@ -119,21 +119,13 @@ Operational rule:
 - does not directly change relay state
 - use `CTRL RELAY` when the controller wants relay state to change
 
-### `CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]`
+### Persisted PLC Settings
 
-- updates in-memory mode and addressing
-- does not persist until `CTRL SAVE`
-- flashing a different build target does not override an already-saved NVS mode until reboot with the new saved config
-
-### `CTRL OWNERSHIP <connector_id> <module_addr>`
-
-- updates in-memory connector/module identity
-- does not persist until `CTRL SAVE`
-- bench default donor identity is now `connector_id=2`, `module_addr=2`
-
-### `CTRL SAVE`
-
-- persists current runtime config to NVS
+- `CTRL MODE`, `CTRL OWNERSHIP`, and `CTRL SAVE` are disabled at runtime
+- persisted PLC settings are installation-time settings only
+- use the SW4 setup portal to change mode, PLC/controller identity, module address, connector id, or timeout defaults
+- the setup portal saves to NVS and reboots automatically
+- flashing a different build target does not override an already-saved NVS config unless NVS is erased or reprovisioned
 
 ### `CTRL STATUS`
 
@@ -142,6 +134,7 @@ Operational rule:
 ### `CTRL RESET`
 
 - resets controller runtime state and clears session-side controller state
+- does not reload NVS or apply install-time identity changes
 
 ## 6. Serial Responses
 

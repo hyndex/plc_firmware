@@ -1,0 +1,13 @@
+{
+  "duration_s": 300.0,
+  "current_demand_samples": 1755,
+  "ok_samples": 1755,
+  "min_present_v": 500.2,
+  "max_present_v": 500.5,
+  "min_present_i": 40.65,
+  "max_present_i": 40.95,
+  "first_ok_offset_s": 0.1,
+  "last_ok_offset_s": 299.9,
+  "last_line_offset_s": 300.0,
+  "stable": true
+}

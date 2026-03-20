@@ -1,0 +1,20 @@
+[RESET] rebooting PLC on /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 wait_s=14.0
+[RESET] boot log captured in /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_pycheck_20260320_103312.log.reset.log
+PLC_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_pycheck_20260320_103312.log
+CAN_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_pycheck_20260320_103312_can.log
+SUMMARY_FILE=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_pycheck_20260320_103312_summary.json
+[PHASE] bootstrap
+[BOOT] mode=external_controller plc_id=2 connector_id=2 can_stack=0 module_mgr=0
+[MODULE] addr=2 grp=2 status=0x00400000 flags=OFF
+[PHASE] wait_for_session
+[CTRL] remote start -> B1 to B2
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=77.3 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=200.0 presentI=0.0 presentP=0 ready=0 cp=B2 slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=4.3 presentI=0.0 presentP=0 ready=0 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=77.3 presentI=8.9 presentP=684 ready=1 cp=C slac=1 hlc=1
+[PASSCHK] charge proof started V=101.0 I=10.7 P=1084
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.3 presentP=20636 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.2 presentP=20640 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.2 presentP=20608 ready=1 cp=C slac=1 hlc=1
+[PASS] charge proven with module 1 only Vpk=500.4 Ipk=41.3 Ppk=20643
+[PHASE] stopping

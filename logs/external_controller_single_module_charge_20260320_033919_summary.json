@@ -1,0 +1,58 @@
+{
+  "result": "fail",
+  "phase": "stopping",
+  "events": [
+    "2026-03-20T03:39:34.162 phase=bootstrap",
+    "2026-03-20T03:39:35.871 phase=wait_for_session",
+    "2026-03-20T03:43:35.963 phase=stopping"
+  ],
+  "notes": [],
+  "failures": [
+    "session never reached proven CurrentDemand charging",
+    "session never reached proven CurrentDemand charging"
+  ],
+  "current_demand_started_at": 1773958182.7726996,
+  "current_demand_ready_since": 1773958413.8619359,
+  "charge_proof_since": 1773958415.0096047,
+  "charge_proof_peak_v": 311.1982421875,
+  "charge_proof_peak_i": 29.0517578125,
+  "charge_proof_peak_power_w": 9040.85596370697,
+  "vehicle_stop_requested": false,
+  "vehicle_stop_reason": "",
+  "plc": {
+    "mode_id": 1,
+    "mode_name": "external_controller",
+    "can_stack": 0,
+    "module_mgr": 0,
+    "cp_phase": "B1",
+    "cp_connected": true,
+    "cp_duty_pct": 100,
+    "slac_session": false,
+    "slac_matched": false,
+    "slac_fsm": 1,
+    "slac_failures": 4,
+    "hlc_ready": true,
+    "hlc_active": false,
+    "precharge_seen": true,
+    "precharge_ready": false,
+    "session_started": false,
+    "stop_active": false,
+    "stop_hard": false,
+    "stop_done": true,
+    "bms_stage_name": "none",
+    "delivery_ready": false,
+    "target_v": 0.0,
+    "target_i": 0.0,
+    "fb_v": 0.0,
+    "fb_i": 0.0,
+    "relay1": false
+  },
+  "module": {
+    "address": 1,
+    "group": 1,
+    "status": "status=0x00400000 flags=OFF",
+    "voltage_v": 3.5458984375,
+    "current_a": 0.0,
+    "off": true
+  }
+}

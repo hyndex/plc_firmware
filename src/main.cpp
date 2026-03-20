@@ -2150,6 +2150,7 @@ enum class ControllerAuthState : uint8_t {
 };
 
 struct ControllerRuntimeState {
+    uint32_t heartbeat_timeout_ms{0};
     uint32_t last_heartbeat_ms{0};
     uint32_t last_auth_update_ms{0};
     uint32_t auth_expiry_ms{0};
@@ -2549,6 +2550,19 @@ uint32_t g_last_bms_update_ms = 0;
 bool g_last_bms_dirty = true;
 
 int16_t g_last_ev_soc_pct = -1;
+
+uint32_t effective_controller_heartbeat_timeout_ms() {
+    return (g_ctrl.heartbeat_timeout_ms != 0u)
+               ? g_ctrl.heartbeat_timeout_ms
+               : g_runtime_cfg.controller_heartbeat_timeout_ms;
+}
+
+void reset_session_measurements() {
+    g_meter_wh_real = 0.0;
+    g_meter_last_sample_ms = 0u;
+    g_last_measured_v = 0.0f;
+    g_last_measured_i = 0.0f;
+}
 uint32_t g_last_module_runtime_log_ms = 0;
 
 size_t task_stack_free_bytes(TaskHandle_t handle) {
@@ -3093,7 +3107,7 @@ bool controller_feedback_fresh(uint32_t now_ms) {
         const uint32_t timeout_ms =
             std::min<uint32_t>(5000u,
                                std::max<uint32_t>(CONTROLLER_FEEDBACK_TIMEOUT_MS,
-                                                  g_runtime_cfg.controller_heartbeat_timeout_ms + 500u));
+                                                  effective_controller_heartbeat_timeout_ms() + 500u));
         return (now_ms - g_ctrl_feedback.last_update_ms) <= timeout_ms;
     }
     if (mode_controller_has_final_decision()) {
@@ -3102,7 +3116,7 @@ bool controller_feedback_fresh(uint32_t now_ms) {
     const uint32_t timeout_ms =
         std::min<uint32_t>(5000u,
                            std::max<uint32_t>(CONTROLLER_FEEDBACK_TIMEOUT_MS,
-                                              g_runtime_cfg.controller_heartbeat_timeout_ms + 500u));
+                                              effective_controller_heartbeat_timeout_ms() + 500u));
     return (now_ms - g_ctrl_feedback.last_update_ms) <= timeout_ms;
 }
 
@@ -3111,14 +3125,11 @@ bool controller_heartbeat_alive(uint32_t now_ms) {
     if (!g_ctrl.heartbeat_seen) return false;
     if (now_ms < g_ctrl.last_heartbeat_ms) return false;
     const uint32_t age = now_ms - g_ctrl.last_heartbeat_ms;
-    return age <= g_runtime_cfg.controller_heartbeat_timeout_ms;
+    return age <= effective_controller_heartbeat_timeout_ms();
 }
 
 bool controller_auth_granted(uint32_t now_ms) {
     if (!mode_requires_controller_contract()) return true;
-    if (mode_controller_has_final_decision()) {
-        return g_ctrl.auth_state == ControllerAuthState::Granted;
-    }
     if (g_ctrl.auth_state != ControllerAuthState::Granted) return false;
     if (g_ctrl.auth_expiry_ms == 0) return false;
     return static_cast<int32_t>(now_ms - g_ctrl.auth_expiry_ms) <= 0;
@@ -3151,11 +3162,24 @@ bool controller_allows_slac_start(uint32_t now_ms) {
     return static_cast<int32_t>(now_ms - g_ctrl.slac_arm_expiry_ms) <= 0;
 }
 
+bool controller_requests_slac_pwm(uint32_t now_ms) {
+    if (!mode_requires_controller_contract()) {
+        return false;
+    }
+    if (g_ctrl.stop_active) {
+        return false;
+    }
+    if (g_session_started || g_session_matched || g_hlc_ready || g_hlc_active) {
+        return false;
+    }
+    return controller_allows_slac_start(now_ms);
+}
+
 bool controller_allows_energy(uint32_t now_ms) {
     if (g_emergency_stop_active) return false;
     if (!mode_requires_controller_contract()) return true;
     if (mode_controller_routes_power_externally_over_uart()) {
-        const bool granted = g_ctrl.auth_state == ControllerAuthState::Granted;
+        const bool granted = controller_auth_granted(now_ms);
         if (granted) {
             g_ctrl.last_energy_allowed_ms = now_ms;
         }
@@ -3229,6 +3253,54 @@ bool standalone_precharge_start_ready(HlcAppContext* ctx, float requested_v) {
                       static_cast<unsigned long>(ctx->precharge_count),
                       g_relay1_closed ? 1 : 0,
                       g_module_output_enabled ? 1 : 0);
+    }
+    return relaxed_ready;
+}
+
+bool controller_precharge_start_ready(HlcAppContext* ctx,
+                                      float requested_v,
+                                      const ControllerManagedFeedbackState& fb) {
+    if (!ctx || !mode_controller_uses_external_feedback()) {
+        return false;
+    }
+    if (!fb.valid || !g_relay1_closed) {
+        return false;
+    }
+
+    const float present_v =
+        std::isfinite(fb.present_voltage_v) ? std::max(0.0f, fb.present_voltage_v) : 0.0f;
+    const float present_i =
+        std::isfinite(fb.present_current_a) ? std::max(0.0f, fb.present_current_a) : 0.0f;
+    if (fb.ready || precharge_voltage_converged(requested_v, present_v)) {
+        return true;
+    }
+
+    // On the resistive-load bench the Maxwell module often stays logically OFF
+    // during low-current precharge, then wakes only once CurrentDemand raises
+    // the command. After multiple real precharge attempts and a measurable bus
+    // bias, allow PowerDelivery to hand off into CurrentDemand without
+    // fabricating present voltage/current telemetry.
+    if (ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT && present_v > 1.0f) {
+        return true;
+    }
+
+    const float target_v = std::isfinite(requested_v) ? std::max(0.0f, requested_v) : 0.0f;
+    const float accept_floor_v = std::max(PRECHARGE_START_ACCEPT_MIN_V, target_v * PRECHARGE_START_ACCEPT_MIN_RATIO);
+    const bool current_flow_ready =
+        ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT && present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A;
+    const bool relaxed_ready = present_v >= accept_floor_v || current_flow_ready;
+    if (relaxed_ready) {
+        Serial.printf("[HLC] {\"msg\":\"CtrlPreChargeRelaxedStart\",\"targetV\":%.1f,\"presentV\":%.1f,"
+                      "\"presentI\":%.2f,\"acceptFloorV\":%.1f,\"minCurrentA\":%.2f,\"prechargeCount\":%lu,"
+                      "\"relay1\":%d,\"fbReady\":%d}\n",
+                      target_v,
+                      present_v,
+                      present_i,
+                      accept_floor_v,
+                      PRECHARGE_START_ACCEPT_MIN_CURRENT_A,
+                      static_cast<unsigned long>(ctx->precharge_count),
+                      g_relay1_closed ? 1 : 0,
+                      fb.ready ? 1 : 0);
     }
     return relaxed_ready;
 }
@@ -3432,6 +3504,8 @@ float clamp_current_for_assignment_limit(float voltage_v, float current_a) {
 void clear_last_bms_request() {
     g_last_bms_requested_v = 0.0f;
     g_last_bms_requested_i = 0.0f;
+    g_last_requested_target_v = 0.0f;
+    g_last_requested_target_i = 0.0f;
     g_last_bms_hlc_stage = 0u;
     g_last_bms_valid = false;
     g_last_bms_delivery_ready = false;
@@ -3440,8 +3514,12 @@ void clear_last_bms_request() {
 }
 
 void update_last_bms_request(float req_v, float req_i, uint8_t hlc_stage, bool delivery_ready, bool valid) {
-    g_last_bms_requested_v = sane_non_negative(req_v);
-    g_last_bms_requested_i = sane_non_negative(req_i);
+    const float sane_v = sane_non_negative(req_v);
+    const float sane_i = sane_non_negative(req_i);
+    g_last_bms_requested_v = sane_v;
+    g_last_bms_requested_i = sane_i;
+    g_last_requested_target_v = sane_v;
+    g_last_requested_target_i = sane_i;
     g_last_bms_hlc_stage = hlc_stage;
     g_last_bms_valid = valid;
     g_last_bms_delivery_ready = delivery_ready;
@@ -3531,10 +3609,9 @@ void set_din_dc_status_shutdown(din_DC_EVSEStatusType* st,
     st->EVSEIsolationStatus_isUsed = 0;
 }
 
-void update_real_meter_with_status(const cbmodules::GroupStatus& st, uint32_t now_ms) {
-    const float v = sane_non_negative(st.combined_voltage_v);
-    const float i = sane_non_negative(st.combined_current_a);
-
+void update_real_meter_sample(float voltage_v, float current_a, uint32_t now_ms) {
+    const float v = sane_non_negative(voltage_v);
+    const float i = sane_non_negative(current_a);
     if (g_meter_last_sample_ms != 0 && now_ms >= g_meter_last_sample_ms) {
         const uint32_t dt_ms = now_ms - g_meter_last_sample_ms;
         const double p_w = static_cast<double>(v) * static_cast<double>(i);
@@ -3546,6 +3623,10 @@ void update_real_meter_with_status(const cbmodules::GroupStatus& st, uint32_t no
     g_meter_last_sample_ms = now_ms;
     g_last_measured_v = v;
     g_last_measured_i = i;
+}
+
+void update_real_meter_with_status(const cbmodules::GroupStatus& st, uint32_t now_ms) {
+    update_real_meter_sample(st.combined_voltage_v, st.combined_current_a, now_ms);
 }
 
 const char* module_lifecycle_name(cbmodules::ModuleLifecycle lc) {
@@ -3920,6 +4001,191 @@ void update_last_ev_soc_from_request(jpv2g_message_type_t type, const jpv2g_secc
     }
 }
 
+const char* hlc_protocol_name(int protocol) {
+    switch (protocol) {
+        case JPV2G_PROTOCOL_ISO15118_2:
+            return "iso2";
+        case JPV2G_PROTOCOL_DIN70121:
+            return "din";
+        default:
+            return "unknown";
+    }
+}
+
+const char* hlc_message_type_name(jpv2g_message_type_t type) {
+    switch (type) {
+        case JPV2G_SESSION_SETUP_REQ:
+            return "SessionSetupReq";
+        case JPV2G_AUTHORIZATION_REQ:
+            return "AuthorizationReq";
+        case JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ:
+            return "ChargeParameterDiscoveryReq";
+        case JPV2G_CABLE_CHECK_REQ:
+            return "CableCheckReq";
+        case JPV2G_PRE_CHARGE_REQ:
+            return "PreChargeReq";
+        case JPV2G_POWER_DELIVERY_REQ:
+            return "PowerDeliveryReq";
+        case JPV2G_CURRENT_DEMAND_REQ:
+            return "CurrentDemandReq";
+        case JPV2G_WELDING_DETECTION_REQ:
+            return "WeldingDetectionReq";
+        case JPV2G_SESSION_STOP_REQ:
+            return "SessionStopReq";
+        default:
+            return "OtherReq";
+    }
+}
+
+void log_hlc_request(jpv2g_message_type_t type, const jpv2g_secc_request_t* req) {
+    if (!req) return;
+    const char* protocol = hlc_protocol_name(req->protocol);
+    if (!req->body) {
+        Serial.printf("[HLC][REQ] {\"type\":\"%s\",\"protocol\":\"%s\",\"body\":0}\n",
+                      hlc_message_type_name(type),
+                      protocol);
+        return;
+    }
+
+    if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
+        switch (type) {
+            case JPV2G_SESSION_SETUP_REQ: {
+                const auto* rq = static_cast<const iso2_SessionSetupReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"SessionSetupReq\",\"protocol\":\"%s\",\"evccid_len\":%u}\n",
+                              protocol,
+                              static_cast<unsigned>(rq->EVCCID.bytesLen));
+                return;
+            }
+            case JPV2G_AUTHORIZATION_REQ:
+                Serial.printf("[HLC][REQ] {\"type\":\"AuthorizationReq\",\"protocol\":\"%s\"}\n", protocol);
+                return;
+            case JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ: {
+                const auto* rq = static_cast<const iso2_ChargeParameterDiscoveryReqType*>(req->body);
+                const int soc = rq->DC_EVChargeParameter_isUsed
+                                    ? static_cast<int>(rq->DC_EVChargeParameter.DC_EVStatus.EVRESSSOC)
+                                    : -1;
+                Serial.printf("[HLC][REQ] {\"type\":\"ChargeParameterDiscoveryReq\",\"protocol\":\"%s\",\"soc\":%d}\n",
+                              protocol,
+                              soc);
+                return;
+            }
+            case JPV2G_CABLE_CHECK_REQ: {
+                const auto* rq = static_cast<const iso2_CableCheckReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"CableCheckReq\",\"protocol\":\"%s\",\"soc\":%d}\n",
+                              protocol,
+                              static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                return;
+            }
+            case JPV2G_PRE_CHARGE_REQ: {
+                const auto* rq = static_cast<const iso2_PreChargeReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"PreChargeReq\",\"protocol\":\"%s\",\"targetV\":%.1f,"
+                              "\"targetI\":%.2f,\"soc\":%d}\n",
+                              protocol,
+                              iso_pv_to_float(&rq->EVTargetVoltage),
+                              iso_pv_to_float(&rq->EVTargetCurrent),
+                              static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                return;
+            }
+            case JPV2G_POWER_DELIVERY_REQ: {
+                const auto* rq = static_cast<const iso2_PowerDeliveryReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"PowerDeliveryReq\",\"protocol\":\"%s\",\"chargeProgress\":%u,"
+                              "\"scheduleId\":%u}\n",
+                              protocol,
+                              static_cast<unsigned>(rq->ChargeProgress),
+                              static_cast<unsigned>(rq->SAScheduleTupleID));
+                return;
+            }
+            case JPV2G_CURRENT_DEMAND_REQ: {
+                const auto* rq = static_cast<const iso2_CurrentDemandReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"CurrentDemandReq\",\"protocol\":\"%s\",\"targetV\":%.1f,"
+                              "\"targetI\":%.2f,\"soc\":%d}\n",
+                              protocol,
+                              iso_pv_to_float(&rq->EVTargetVoltage),
+                              iso_pv_to_float(&rq->EVTargetCurrent),
+                              static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                return;
+            }
+            case JPV2G_WELDING_DETECTION_REQ:
+                Serial.printf("[HLC][REQ] {\"type\":\"WeldingDetectionReq\",\"protocol\":\"%s\"}\n", protocol);
+                return;
+            case JPV2G_SESSION_STOP_REQ:
+                Serial.printf("[HLC][REQ] {\"type\":\"SessionStopReq\",\"protocol\":\"%s\"}\n", protocol);
+                return;
+            default:
+                break;
+        }
+    } else if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
+        switch (type) {
+            case JPV2G_SESSION_SETUP_REQ: {
+                const auto* rq = static_cast<const din_SessionSetupReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"SessionSetupReq\",\"protocol\":\"%s\",\"evccid_len\":%u}\n",
+                              protocol,
+                              static_cast<unsigned>(rq->EVCCID.bytesLen));
+                return;
+            }
+            case JPV2G_AUTHORIZATION_REQ:
+                Serial.printf("[HLC][REQ] {\"type\":\"AuthorizationReq\",\"protocol\":\"%s\"}\n", protocol);
+                return;
+            case JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ: {
+                const auto* rq = static_cast<const din_ChargeParameterDiscoveryReqType*>(req->body);
+                const int soc = rq->DC_EVChargeParameter_isUsed
+                                    ? static_cast<int>(rq->DC_EVChargeParameter.DC_EVStatus.EVRESSSOC)
+                                    : -1;
+                Serial.printf("[HLC][REQ] {\"type\":\"ChargeParameterDiscoveryReq\",\"protocol\":\"%s\",\"soc\":%d}\n",
+                              protocol,
+                              soc);
+                return;
+            }
+            case JPV2G_CABLE_CHECK_REQ: {
+                const auto* rq = static_cast<const din_CableCheckReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"CableCheckReq\",\"protocol\":\"%s\",\"soc\":%d}\n",
+                              protocol,
+                              static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                return;
+            }
+            case JPV2G_PRE_CHARGE_REQ: {
+                const auto* rq = static_cast<const din_PreChargeReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"PreChargeReq\",\"protocol\":\"%s\",\"targetV\":%.1f,"
+                              "\"targetI\":%.2f,\"soc\":%d}\n",
+                              protocol,
+                              din_pv_to_float(&rq->EVTargetVoltage),
+                              din_pv_to_float(&rq->EVTargetCurrent),
+                              static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                return;
+            }
+            case JPV2G_POWER_DELIVERY_REQ: {
+                const auto* rq = static_cast<const din_PowerDeliveryReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"PowerDeliveryReq\",\"protocol\":\"%s\",\"readyToCharge\":%u}\n",
+                              protocol,
+                              static_cast<unsigned>(rq->ReadyToChargeState));
+                return;
+            }
+            case JPV2G_CURRENT_DEMAND_REQ: {
+                const auto* rq = static_cast<const din_CurrentDemandReqType*>(req->body);
+                Serial.printf("[HLC][REQ] {\"type\":\"CurrentDemandReq\",\"protocol\":\"%s\",\"targetV\":%.1f,"
+                              "\"targetI\":%.2f,\"soc\":%d}\n",
+                              protocol,
+                              din_pv_to_float(&rq->EVTargetVoltage),
+                              din_pv_to_float(&rq->EVTargetCurrent),
+                              static_cast<int>(rq->DC_EVStatus.EVRESSSOC));
+                return;
+            }
+            case JPV2G_WELDING_DETECTION_REQ:
+                Serial.printf("[HLC][REQ] {\"type\":\"WeldingDetectionReq\",\"protocol\":\"%s\"}\n", protocol);
+                return;
+            case JPV2G_SESSION_STOP_REQ:
+                Serial.printf("[HLC][REQ] {\"type\":\"SessionStopReq\",\"protocol\":\"%s\"}\n", protocol);
+                return;
+            default:
+                break;
+        }
+    }
+
+    Serial.printf("[HLC][REQ] {\"type\":\"%s\",\"protocol\":\"%s\"}\n",
+                  hlc_message_type_name(type),
+                  protocol);
+}
+
 void fill_iso_meter_info_real(iso2_MeterInfoType* meter) {
     if (!meter) return;
     init_iso2_MeterInfoType(meter);
@@ -3995,21 +4261,23 @@ bool relay_set_impl(int pin, bool* state_cache, bool closed, const char* reason,
     if (!g_relay_ready && !relay1_init()) return false;
     if (!state_cache) return false;
     if (!lock_relay(30)) return false;
-    if (*state_cache == closed) {
-        unlock_relay();
-        return true;
-    }
     const auto port = static_cast<PCA95x5::Port::Port>(pin);
     const bool level = RELAY_ACTIVE_HIGH ? closed : !closed;
     const bool ok = g_relay_expander.direction(port, PCA95x5::Direction::OUT) &&
                     g_relay_expander.write(port, level ? PCA95x5::Level::H : PCA95x5::Level::L);
-    if (ok) {
+    const auto readback = ok ? g_relay_expander.read(port) : PCA95x5::Level::L;
+    const bool readback_ok = ok && (readback == (level ? PCA95x5::Level::H : PCA95x5::Level::L));
+    if (readback_ok) {
         *state_cache = closed;
         Serial.printf("[RELAY] %s -> %s (%s)\n", label ? label : "Relay", closed ? "CLOSED" : "OPEN",
                       reason ? reason : "-");
+    } else if (ok) {
+        Serial.printf("[RELAY] %s write verify failed (%s)\n",
+                      label ? label : "Relay",
+                      reason ? reason : "-");
     }
     unlock_relay();
-    return ok;
+    return readback_ok;
 }
 
 bool relay1_set(bool closed, const char* reason) {
@@ -4034,8 +4302,14 @@ bool read_sw4_pressed() {
 }
 
 bool read_emergency_pressed() {
-    if (!g_relay_ready && !relay1_init()) return false;
-    if (!lock_relay(20)) return false;
+    if (!g_relay_ready && !relay1_init()) {
+        Serial.println("[EMERGENCY] relay expander unavailable, fail-safe pressed");
+        return true;
+    }
+    if (!lock_relay(20)) {
+        Serial.println("[EMERGENCY] relay mutex unavailable, fail-safe pressed");
+        return true;
+    }
     const auto emergency = static_cast<PCA95x5::Port::Port>(EMERGENCY_EXP_PIN);
     const auto lv = g_relay_expander.read(emergency);
     unlock_relay();
@@ -4197,10 +4471,9 @@ bool load_runtime_config_from_nvs() {
     }
     const size_t stored = g_cfg_prefs.getBytesLength("runtime_cfg");
     if (stored == 0u) {
-        Serial.println("[CFG] no persisted config, writing defaults");
+        Serial.println("[CFG] no persisted config, using volatile defaults");
         normalize_runtime_config(&g_runtime_cfg);
         refresh_runtime_identity_cache();
-        (void)g_cfg_prefs.putBytes("runtime_cfg", &g_runtime_cfg, sizeof(g_runtime_cfg));
         g_cfg_prefs.end();
         return false;
     }
@@ -4335,8 +4608,13 @@ void launch_sw4_setup_portal_if_requested() {
         if (server.hasArg("slac_arm_ms")) next.controller_slac_arm_timeout_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("slac_arm_ms").toInt()));
         if (server.hasArg("led_count")) next.led_count = static_cast<uint8_t>(std::max<long>(0, server.arg("led_count").toInt()));
         normalize_runtime_config(&next);
+        const RuntimeConfig previous = g_runtime_cfg;
         g_runtime_cfg = next;
         const bool ok = save_runtime_config_to_nvs();
+        if (!ok) {
+            g_runtime_cfg = previous;
+            refresh_runtime_identity_cache();
+        }
         server.send(ok ? 200 : 500, "text/plain", ok ? "Saved. Rebooting..." : "Save failed");
         saved = ok;
     });
@@ -4641,10 +4919,13 @@ void controller_force_safe_stop(const char* reason) {
 
 void controller_reset_runtime_state() {
     controller_clear_slac_contract();
+    g_ctrl.heartbeat_timeout_ms = 0u;
     g_ctrl.auth_state = ControllerAuthState::Denied;
+    g_ctrl.last_auth_update_ms = 0u;
     g_ctrl.auth_expiry_ms = 0;
     g_ctrl.last_energy_allowed_ms = 0;
     g_ctrl.heartbeat_seen = false;
+    g_ctrl.heartbeat_session_marker = 0u;
     g_ctrl.last_heartbeat_ms = 0;
     g_ctrl.hb_lost_since_ms = 0;
     controller_reset_command_seq_state(true);
@@ -4661,6 +4942,8 @@ void controller_reset_runtime_state() {
     g_last_seen_ev_mac_valid = false;
     g_session_started_ms = 0;
     g_serial_tx = SerialStatusTxSchedule{};
+    clear_last_bms_request();
+    reset_session_measurements();
 }
 
 void restore_default_module_limits(const std::map<std::string, float>& previous_limits,
@@ -5185,7 +5468,7 @@ void controller_handle_heartbeat(const CtrlRxFrame& f) {
     }
     const uint8_t hb_100ms = f.data[3];
     if (hb_100ms > 0u) {
-        g_runtime_cfg.controller_heartbeat_timeout_ms =
+        g_ctrl.heartbeat_timeout_ms =
             std::max<uint32_t>(500u, std::min<uint32_t>(10000u, static_cast<uint32_t>(hb_100ms) * 100u));
     }
     g_ctrl.last_heartbeat_ms = f.rx_ms;
@@ -5223,11 +5506,13 @@ void controller_handle_auth(const CtrlRxFrame& f) {
     const uint32_t ttl_ms = (ttl_100ms > 0u) ? (static_cast<uint32_t>(ttl_100ms) * 100u)
                                              : g_runtime_cfg.controller_auth_ttl_ms;
     g_ctrl.auth_expiry_ms = f.rx_ms + ttl_ms;
-    if (g_ctrl.auth_state == ControllerAuthState::Denied && !mode_controller_has_final_decision()) {
+    if (g_ctrl.auth_state == ControllerAuthState::Denied) {
         controller_clear_managed_power_cache();
         controller_clear_managed_feedback_cache();
-        request_modules_off("CtrlAuthDenied");
-        (void)relay1_set(false, "CtrlAuthDenied");
+        if (!mode_controller_has_final_decision()) {
+            request_modules_off("CtrlAuthDenied");
+            (void)relay1_set(false, "CtrlAuthDenied");
+        }
     }
     send_ctrl_ack(0x11u, seq, ACK_OK, auth, 0);
 }
@@ -5353,6 +5638,9 @@ void controller_handle_hlc_feedback(const CtrlRxFrame& f) {
     g_ctrl_feedback.power_limit_achieved = power_limit;
     g_ctrl_feedback.present_voltage_v = std::max(0.0f, present_v);
     g_ctrl_feedback.present_current_a = std::max(0.0f, present_i);
+    if (valid) {
+        update_real_meter_sample(g_ctrl_feedback.present_voltage_v, g_ctrl_feedback.present_current_a, f.rx_ms);
+    }
     send_ctrl_ack(0x1Au, seq, ACK_OK, valid ? 1u : 0u, ready ? 1u : 0u);
 }
 
@@ -5536,6 +5824,17 @@ void controller_service_watchdogs(uint32_t now_ms) {
                 if (!g_session_started && !g_hlc_active) {
                     stop_session(now_ms);
                 }
+            }
+            if (g_ctrl.auth_expiry_ms != 0u && static_cast<int32_t>(now_ms - g_ctrl.auth_expiry_ms) > 0) {
+                if (g_ctrl.auth_state == ControllerAuthState::Granted) {
+                    Serial.println("[CTRL] controller auth expired in external_controller");
+                    g_ctrl.auth_state = ControllerAuthState::Denied;
+                    controller_clear_managed_feedback_cache();
+                }
+                g_ctrl.auth_expiry_ms = 0u;
+            }
+            if (g_ctrl_feedback.seen && !controller_feedback_fresh(now_ms)) {
+                controller_clear_managed_feedback_cache();
             }
             return;
         }
@@ -5867,9 +6166,8 @@ void serial_ctrl_print_help() {
     Serial.println("  CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]");
     Serial.println("  CTRL STOP <soft|hard|clear> [timeout_ms]");
     Serial.println("  CTRL LED <booting|available|preparing|charging|finishing|faulted|emergency>");
-    Serial.println("  CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]");
-    Serial.println("  CTRL OWNERSHIP <connector_id> <module_addr>");
-    Serial.println("  CTRL SAVE");
+    Serial.println("  CTRL MODE / CTRL OWNERSHIP / CTRL SAVE are disabled at runtime");
+    Serial.println("    Use the SW4 setup portal to change persisted PLC settings, then reboot");
     Serial.println("  CTRL STATUS");
     Serial.println("  mode1/external_controller: PLC bridges CP/SLAC/HLC, controller owns relay decisions + module CAN");
 }
@@ -5946,7 +6244,7 @@ void serial_ctrl_handle_line(String line) {
         controller_reset_runtime_state();
         g_serial_ctrl_seq = {};
         controller_force_safe_stop("CtrlReset");
-        Serial.println("[SERCTRL] RESET done");
+        Serial.println("[SERCTRL] RESET done (runtime/session state only; persisted settings unchanged)");
         return;
     }
     if (op == "RELAY") {
@@ -6026,52 +6324,15 @@ void serial_ctrl_handle_line(String line) {
         return;
     }
     if (op == "MODE") {
-        if (t.size() < 4) {
-            Serial.println("[SERCTRL] MODE <mode0|1> <plc_id> [controller_id]");
-            return;
-        }
-        OperatingMode next_mode = runtime_mode();
-        if (!parse_mode_token(t[2], &next_mode)) {
-            Serial.println("[SERCTRL] MODE invalid mode");
-            return;
-        }
-        controller_apply_mode_transition(next_mode);
-        g_runtime_cfg.plc_id = static_cast<uint8_t>(parse_u32_token(t[3], g_runtime_cfg.plc_id));
-        if (t.size() >= 5) {
-            g_runtime_cfg.controller_id = static_cast<uint8_t>(parse_u32_token(t[4], g_runtime_cfg.controller_id));
-        }
-        normalize_runtime_config(&g_runtime_cfg);
-        refresh_runtime_identity_cache();
-        Serial.printf("[SERCTRL] MODE mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X can_stack=%d module_mgr=%d (use CTRL SAVE then reboot)\n",
-                      static_cast<unsigned>(g_runtime_cfg.mode),
-                      runtime_mode_name(),
-                      static_cast<unsigned>(g_runtime_cfg.plc_id),
-                      static_cast<unsigned>(g_runtime_cfg.connector_id),
-                      static_cast<unsigned>(g_runtime_cfg.controller_id),
-                      static_cast<unsigned>(g_runtime_cfg.local_module_address),
-                      mode_uses_plc_can_stack() ? 1 : 0,
-                      mode_uses_plc_module_manager() ? 1 : 0);
+        Serial.println("[SERCTRL] MODE disabled at runtime; use the SW4 setup portal and reboot");
         return;
     }
     if (op == "OWNERSHIP") {
-        if (t.size() < 4) {
-            Serial.println("[SERCTRL] OWNERSHIP <connector_id> <module_addr>");
-            return;
-        }
-        g_runtime_cfg.connector_id = static_cast<uint8_t>(parse_u32_token(t[2], g_runtime_cfg.connector_id));
-        g_runtime_cfg.local_module_address = static_cast<uint8_t>(parse_u32_token(t[3], g_runtime_cfg.local_module_address));
-        normalize_runtime_config(&g_runtime_cfg);
-        refresh_runtime_identity_cache();
-        Serial.printf("[SERCTRL] OWNERSHIP connector_id=%u module_addr=0x%02X local_group=%u module_id=%s (save then reboot to rebind runtime inventory)\n",
-                      static_cast<unsigned>(g_runtime_cfg.connector_id),
-                      static_cast<unsigned>(g_runtime_cfg.local_module_address),
-                      static_cast<unsigned>(g_local_module_group),
-                      runtime_local_module_id().c_str());
+        Serial.println("[SERCTRL] OWNERSHIP disabled at runtime; use the SW4 setup portal and reboot");
         return;
     }
     if (op == "SAVE") {
-        const bool ok = save_runtime_config_to_nvs();
-        Serial.printf("[SERCTRL] SAVE %s\n", ok ? "OK" : "FAIL");
+        Serial.println("[SERCTRL] SAVE disabled at runtime; use the SW4 setup portal to persist settings");
         return;
     }
     if (op == "STATUS") {
@@ -6648,8 +6909,7 @@ int hlc_handle_precharge(HlcAppContext* ctx,
             ctx->precharge_converged = false;
             ctx->power_delivery_enabled = false;
         }
-        const bool precharge_ready =
-            mode_controller_has_final_decision() ? (fb_ok && fb.ready) : (allow_energy && fb_ok && fb.ready);
+        const bool precharge_ready = allow_energy && fb_ok && fb.ready;
         ctx->precharge_converged = precharge_ready;
         ctx->power_delivery_enabled = false;
         const float present_v = fb_ok ? sane_non_negative(fb.present_voltage_v) : snapshot_present_group_voltage_v();
@@ -6799,8 +7059,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         ControllerManagedFeedbackState fb{};
         const bool fb_ok = controller_get_managed_feedback(now_ms, &fb);
         const bool stop_charging = fb_ok && fb.stop_charging;
-        const bool response_ready =
-            mode_controller_has_final_decision() ? (fb_ok && fb.ready) : (allow_energy && fb_ok && fb.ready);
+        const bool response_ready = allow_energy && fb_ok && fb.ready;
         if (!allow_energy && !mode_controller_has_final_decision()) {
             request_modules_off("CurrentDemandBlocked");
             (void)relay1_set(false, "CurrentDemandBlocked");
@@ -6810,11 +7069,8 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         update_last_bms_request(requested_v, requested_i, 2u, response_ready, true);
 
         float present_v = fb_ok ? sane_non_negative(fb.present_voltage_v) : sane_non_negative(g_last_measured_v);
-        float present_i = fb_ok ? sane_non_negative(fb.present_current_a) : 0.0f;
-        if (!response_ready) {
-            present_i = 0.0f;
-        }
-        if (present_v <= 0.1f) {
+        const float present_i = fb_ok ? sane_non_negative(fb.present_current_a) : 0.0f;
+        if (!fb_ok && present_v <= 0.1f) {
             present_v = snapshot_present_group_voltage_v();
         }
 
@@ -7068,9 +7324,10 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
         } else if (mode_controller_uses_external_feedback()) {
             ControllerManagedFeedbackState fb{};
             const bool fb_ok = controller_get_managed_feedback(millis(), &fb);
+            const float requested_v = sane_non_negative(g_last_requested_target_v);
             const bool relaxed_start_ready =
-                fb_ok && fb.valid && g_relay1_closed && sane_non_negative(fb.present_voltage_v) > 1.0f;
-            ready = fb_ok && g_relay1_closed && (fb.ready || relaxed_start_ready);
+                fb_ok && controller_precharge_start_ready(ctx, requested_v, fb);
+            ready = allow_energy && fb_ok && g_relay1_closed && relaxed_start_ready;
             ctx->precharge_converged = ctx->precharge_converged || ready;
             ctx->power_delivery_enabled = ready;
             applied = ready;
@@ -7098,6 +7355,10 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
         }
     }
 
+    const float logged_applied_v =
+        mode_controller_uses_external_feedback() ? sane_non_negative(g_last_requested_target_v) : g_last_module_target_v;
+    const float logged_applied_i =
+        mode_controller_uses_external_feedback() ? sane_non_negative(g_last_requested_target_i) : g_last_module_target_i;
     Serial.printf("[HLC] {\"msg\":\"PowerDeliveryRuntime\",\"start\":%d,\"stop\":%d,\"renegotiate\":%d,"
                   "\"allow\":%d,\"applied\":%d,\"ready\":%d,\"relay1\":%d,\"prechargeDone\":%d,"
                   "\"targetV\":%.1f,\"appliedV\":%.1f,\"appliedI\":%.2f}\n",
@@ -7110,8 +7371,8 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
                   g_relay1_closed ? 1 : 0,
                   ctx->precharge_converged ? 1 : 0,
                   g_last_requested_target_v,
-                  g_last_module_target_v,
-                  g_last_module_target_i);
+                  logged_applied_v,
+                  logged_applied_i);
 
     const uint8_t* sid = ctx->secc->session_id;
     if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
@@ -7234,6 +7495,7 @@ int hlc_handle_request(jpv2g_message_type_t type,
     if (!ctx || !ctx->secc || !decoded) return -EINVAL;
     const jpv2g_secc_request_t* req = static_cast<const jpv2g_secc_request_t*>(decoded);
     update_last_ev_soc_from_request(type, req);
+    log_hlc_request(type, req);
     if (type == JPV2G_SESSION_SETUP_REQ && req->body) {
         if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
             const auto* rq = static_cast<const iso2_SessionSetupReqType*>(req->body);
@@ -7300,7 +7562,6 @@ void hlc_worker_task_main(void* arg) {
             g_hlc_active_client_fd = -1;
         }
         jpv2g_socket_close(client_fd);
-        g_hlc_active = false;
 
         const uint32_t done_ms = millis();
         const bool unexpected_disconnect_hold =
@@ -7332,6 +7593,7 @@ void hlc_worker_task_main(void* arg) {
             Serial.printf("[HLC] precharge reached, count=%lu\n", static_cast<unsigned long>(g_hlc_ctx.precharge_count));
         }
         Serial.printf("[HLC] client session done rc=%d\n", rc);
+        g_hlc_active = false;
     }
 }
 
@@ -7376,6 +7638,16 @@ void stop_hlc_stack() {
             }
         }
     }
+    if (g_hlc_active) {
+        const uint32_t wait_started_ms = millis();
+        while (g_hlc_active && (millis() - wait_started_ms) < 1500u) {
+            delay(1);
+        }
+        if (g_hlc_active) {
+            Serial.println("[HLC] stop requested while worker still active; deferring teardown");
+            return;
+        }
+    }
     if (g_hlc_ready) {
         jpv2g_secc_stop(&g_secc);
         if (g_codec) {
@@ -7395,6 +7667,8 @@ void stop_hlc_stack() {
     g_hlc_ctx.precharge_converged = false;
     g_hlc_ctx.power_delivery_enabled = false;
     g_hlc_ctx.stop_requested = false;
+    controller_clear_managed_feedback_cache();
+    clear_last_bms_request();
     if (!mode_controller_has_final_decision()) {
         request_modules_off("StopHlc");
         (void)relay1_set(false, "StopHlc");
@@ -7553,8 +7827,10 @@ void apply_cp_output(char state, uint32_t now_ms) {
     }
 
     const bool hold_active = static_cast<int32_t>(now_ms - g_slac_hold_until_ms) < 0;
-    const bool controller_permits_pwm = mode_requires_controller_contract() ? (g_session_started || g_hlc_active)
-                                                                            : (mode_is_local_autonomous() || g_session_started || g_hlc_active);
+    const bool controller_permits_pwm =
+        mode_requires_controller_contract()
+            ? (g_session_started || g_hlc_active || controller_requests_slac_pwm(now_ms))
+            : (mode_is_local_autonomous() || g_session_started || g_hlc_active);
     const bool pwm_enable_delay_elapsed =
         (g_slac_pwm_enable_at_ms == 0u) || static_cast<int32_t>(now_ms - g_slac_pwm_enable_at_ms) >= 0;
     const bool slac_ready_for_pwm = !g_fsm_priming && pwm_enable_delay_elapsed;
@@ -7585,13 +7861,18 @@ void start_session(uint32_t now_ms) {
     if (!g_fsm) {
         return;
     }
-    if (!mode_controller_has_final_decision()) {
-        controller_clear_managed_power_cache();
+    if (mode_requires_controller_contract()) {
         controller_clear_managed_feedback_cache();
     }
+    if (!mode_controller_has_final_decision()) {
+        controller_clear_managed_power_cache();
+    }
+    reset_session_measurements();
+    clear_last_bms_request();
+    g_last_seen_ev_mac_valid = false;
     g_fsm->start(now_ms);
     g_fsm_priming = false;
-    g_slac_pwm_enable_at_ms = mode_requires_controller_contract() ? (now_ms + CP_STABLE_MS) : 0u;
+    g_slac_pwm_enable_at_ms = 0u;
     g_session_started = true;
     g_session_started_ms = now_ms;
     g_bcd_entered = false;
@@ -7622,9 +7903,11 @@ void stop_session(uint32_t now_ms) {
     if (g_fsm && g_session_started) {
         g_fsm->leave_bcd(now_ms);
     }
+    if (mode_requires_controller_contract()) {
+        controller_clear_managed_feedback_cache();
+    }
     if (!mode_controller_has_final_decision()) {
         controller_clear_managed_power_cache();
-        controller_clear_managed_feedback_cache();
     }
     g_session_started = false;
     g_session_started_ms = 0;
@@ -7634,6 +7917,9 @@ void stop_session(uint32_t now_ms) {
     g_hlc_disconnect_hold_until_ms = 0;
     g_last_fsm_state = slac::evse::State::Reset;
     g_last_ev_soc_pct = -1;
+    g_last_seen_ev_mac_valid = false;
+    clear_last_bms_request();
+    reset_session_measurements();
     if (should_reprime) {
         reprime_slac_modem(now_ms, "session stop");
     }
@@ -7834,6 +8120,9 @@ void process_cp_and_fsm(uint32_t now_ms) {
             // controller start command.
             if (mode_requires_controller_contract() && raw_cp_state == 'A') {
                 controller_clear_slac_contract();
+                g_ctrl.auth_state = ControllerAuthState::Denied;
+                g_ctrl.auth_expiry_ms = 0u;
+                controller_clear_managed_feedback_cache();
             }
             stop_session(now_ms);
             stop_hlc_stack();
@@ -7883,7 +8172,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
     if (!g_session_started && !g_fsm_priming && g_cp_connected_since_ms != 0 &&
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
         slac_start_ok &&
-        (mode_requires_controller_contract() || pwm_ready)) {
+        pwm_ready) {
         start_session(now_ms);
         if (mode_requires_controller_contract() && !mode_controller_has_final_decision()) {
             g_ctrl.slac_start_latched = false;
@@ -7897,6 +8186,16 @@ void process_cp_and_fsm(uint32_t now_ms) {
                           g_ctrl.slac_armed ? 1 : 0,
                           g_ctrl.slac_start_latched ? 1 : 0);
             next_wait_log_ms = now_ms + 2000;
+        }
+    } else if (mode_requires_controller_contract() && !g_session_started &&
+               g_cp_connected_since_ms != 0 && slac_start_ok && !pwm_ready) {
+        static uint32_t next_pwm_wait_log_ms = 0;
+        if (next_pwm_wait_log_ms == 0 || static_cast<int32_t>(now_ms - next_pwm_wait_log_ms) >= 0) {
+            Serial.printf("[CTRL] waiting SLAC start pwm cp=%s duty=%u pwm_ready=%d\n",
+                          cp_phase_label(g_cp_state, g_last_cp_duty_pct),
+                          static_cast<unsigned>(g_last_cp_duty_pct),
+                          pwm_ready ? 1 : 0);
+            next_pwm_wait_log_ms = now_ms + 2000;
         }
     }
 

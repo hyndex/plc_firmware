@@ -1,0 +1,12 @@
+cycle=1 action=reset port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00
+cycle=1 action=wait seconds=16
+cycle=1 port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00 mode=1(external_controller) plc_id=1 connector_id=1 controller_id=7 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 cp=A relay1=0
+cycle=1 port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 mode=1(external_controller) plc_id=2 connector_id=2 controller_id=7 module_addr=0x02 local_group=2 module_id=PLC2_MXR_02 cp=B1 relay1=0
+cycle=2 action=reset port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00
+cycle=2 action=wait seconds=16
+cycle=2 port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00 mode=1(external_controller) plc_id=1 connector_id=1 controller_id=7 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 cp=A relay1=0
+cycle=2 port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 mode=1(external_controller) plc_id=2 connector_id=2 controller_id=7 module_addr=0x02 local_group=2 module_id=PLC2_MXR_02 cp=B1 relay1=0
+cycle=3 action=reset port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00
+cycle=3 action=wait seconds=16
+cycle=3 port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00 mode=1(external_controller) plc_id=1 connector_id=1 controller_id=7 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 cp=A relay1=0
+cycle=3 port=/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 mode=1(external_controller) plc_id=2 connector_id=2 controller_id=7 module_addr=0x02 local_group=2 module_id=PLC2_MXR_02 cp=B1 relay1=0

@@ -137,27 +137,35 @@ The firmware loads runtime config from NVS on boot. That means:
 
 - `platformio.ini` defaults are boot defaults only
 - saved NVS config wins after reboot
-- after changing mode or ownership through UART, use `CTRL SAVE` if the change should persist
-- use `CTRL RESET` or power-cycle after reconfiguration if you want a clean runtime restart
+- normal controller traffic is session-local and not persisted
+- persisted PLC settings must be changed through the SW4 setup portal
+- the setup portal saves to NVS and reboots automatically
+- `CTRL RESET` clears runtime/session state only; it does not apply persisted identity changes
 
 ### Mode 1 bench setup used here
 
 Borrower / PLC1:
 
 ```text
-CTRL MODE 1 1 1
-CTRL OWNERSHIP 1 1
-CTRL SAVE
-CTRL RESET
+SW4 held at boot -> setup portal
+mode=1
+plc_id=1
+controller_id=1
+connector_id=1
+module_addr=1
+Save & Reboot
 ```
 
 Donor / PLC2:
 
 ```text
-CTRL MODE 1 2 1
-CTRL OWNERSHIP 2 2
-CTRL SAVE
-CTRL RESET
+SW4 held at boot -> setup portal
+mode=1
+plc_id=2
+controller_id=1
+connector_id=2
+module_addr=2
+Save & Reboot
 ```
 
 ### Mode 0 bench setup
@@ -165,19 +173,25 @@ CTRL RESET
 Borrower / PLC1:
 
 ```text
-CTRL MODE 0 1 1
-CTRL OWNERSHIP 1 1
-CTRL SAVE
-CTRL RESET
+SW4 held at boot -> setup portal
+mode=0
+plc_id=1
+controller_id=1
+connector_id=1
+module_addr=1
+Save & Reboot
 ```
 
 Donor / PLC2:
 
 ```text
-CTRL MODE 0 2 1
-CTRL OWNERSHIP 2 2
-CTRL SAVE
-CTRL RESET
+SW4 held at boot -> setup portal
+mode=0
+plc_id=2
+controller_id=1
+connector_id=2
+module_addr=2
+Save & Reboot
 ```
 
 ### Confirm status

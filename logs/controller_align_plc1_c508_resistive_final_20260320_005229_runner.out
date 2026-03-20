@@ -1,0 +1,48 @@
+[RESET] rebooting PLC on /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:08-if00 wait_s=14.0
+[RESET] boot log captured in /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_align_plc1_c508_resistive_final_20260320_005229.log.reset.log
+PLC_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_align_plc1_c508_resistive_final_20260320_005229.log
+CAN_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_align_plc1_c508_resistive_final_20260320_005229_can.log
+SUMMARY_FILE=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_align_plc1_c508_resistive_final_20260320_005229_summary.json
+[PHASE] bootstrap
+[BOOT] mode=external_controller plc_id=1 connector_id=1 can_stack=0 module_mgr=0
+[MODULE] addr=1 grp=1 rated=30.0A status=0x00400000 flags=OFF
+[PHASE] wait_for_session
+[CTRL] remote start -> B1 to B2
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=0.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.6 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.6 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.5 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.3 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.2 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.1 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.0 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=4.0 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.9 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.9 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.8 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=3.7 presentI=0.0 presentP=0 ready=0 cp=B2 slac=1 hlc=1
+[PASSCHK] charge proof started V=117.1 I=12.7 P=1484
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=245.7 presentI=23.3 presentP=5720 ready=1 cp=C slac=1 hlc=1
+[PASS] charge proven with module 1 only Vpk=245.7 Ipk=23.3 Ppk=5720
+[PHASE] stopping

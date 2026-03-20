@@ -1,0 +1,61 @@
+[RESET] rebooting PLC on /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B8:F8:62:4B:C5:20-if00 wait_s=14.0
+[RESET] boot log captured in /home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_15min_20260320_103825.log.reset.log
+PLC_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_15min_20260320_103825.log
+CAN_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_15min_20260320_103825_can.log
+SUMMARY_FILE=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_plc2_c520_15min_20260320_103825_summary.json
+[PHASE] bootstrap
+[BOOT] mode=external_controller plc_id=2 connector_id=2 can_stack=0 module_mgr=0
+[MODULE] addr=2 grp=2 status=0x00400000 flags=OFF
+[PHASE] wait_for_session
+[CTRL] remote start -> B1 to B2
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=5.0 presentI=0.0 presentP=0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=5.0 presentI=0.0 presentP=0 ready=0 cp=B2 slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=27.5 presentI=2.1 presentP=58 ready=1 cp=C slac=1 hlc=1
+[PASSCHK] charge proof started V=114.4 I=35.1 P=4016
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=499.9 presentI=41.5 presentP=20747 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.3 presentI=41.5 presentP=20764 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.3 presentI=41.4 presentP=20736 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.4 presentP=20710 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.4 presentP=20715 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.3 presentP=20692 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.3 presentP=20665 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.3 presentP=20659 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.2 presentP=20641 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.5 presentI=41.2 presentP=20644 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.2 presentP=20609 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.2 presentP=20618 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.1 presentP=20583 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.1 presentP=20590 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.1 presentP=20556 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.3 presentI=41.1 presentP=20562 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.1 presentP=20568 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.0 presentP=20534 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=41.0 presentP=20543 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.0 presentP=20516 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.5 presentI=41.0 presentP=20521 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=41.0 presentP=20510 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.9 presentP=20493 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.9 presentP=20484 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.5 presentI=40.9 presentP=20493 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.9 presentP=20481 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.9 presentP=20465 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.9 presentP=20458 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.9 presentP=20468 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.8 presentP=20434 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.8 presentP=20443 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.8 presentP=20435 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.5 presentI=40.8 presentP=20441 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.8 presentP=20418 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.3 presentI=40.8 presentP=20413 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.8 presentP=20407 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.8 presentP=20408 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.8 presentP=20390 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.5 presentI=40.8 presentP=20393 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.8 presentP=20384 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.8 presentP=20393 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.5 presentI=40.8 presentP=20394 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.7 presentP=20377 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.2 presentI=40.7 presentP=20356 ready=1 cp=C slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=500.4 presentI=40.7 presentP=20367 ready=1 cp=C slac=1 hlc=1
+[FAIL] session never reached proven CurrentDemand charging
+[PHASE] stopping

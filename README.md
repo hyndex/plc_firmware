@@ -58,7 +58,9 @@ Important persistence rule:
 
 - flashing a different `platformio.ini` environment does not by itself guarantee the runtime mode changed
 - persisted NVS config is loaded on boot and can override the flashed defaults
-- after changing mode or ownership over UART, use `CTRL SAVE` to persist it and `CTRL RESET` or a reboot to start from a clean state
+- normal charging and controller traffic are RAM-only; session state is not persisted
+- persisted PLC settings are installation-time settings and should be changed only through the SW4 setup portal, which saves and reboots
+- `CTRL RESET` clears only runtime/session state; it does not reload persisted settings or rebind install-time identity
 
 Legacy inputs such as `2`, `3`, `controller`, `managed`, `controller_managed`,
 `controller_supported`, `uart`, and `uart_router` are still accepted for config
@@ -168,11 +170,14 @@ Supported controller commands:
 - `CTRL RELAY <enable_mask> <state_mask> [hold_ms]`
 - `CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]`
 - `CTRL STOP <soft|hard|clear> [timeout_ms]`
-- `CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]`
-- `CTRL OWNERSHIP <connector_id> <module_addr>`
-- `CTRL SAVE`
 - `CTRL STATUS`
 - `CTRL RESET`
+
+Persisted settings workflow:
+
+- use the SW4 setup portal to change persisted PLC mode / identity / timeout defaults
+- the setup portal saves to NVS and reboots automatically
+- flashing new firmware does not replace saved NVS config unless NVS is erased or reprovisioned
 
 Controller-facing status/event stream:
 

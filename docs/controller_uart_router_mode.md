@@ -47,11 +47,14 @@ Supported controller commands are plain text, one line per command:
 - `CTRL RELAY <enable_mask> <state_mask> [hold_ms]`
 - `CTRL FEEDBACK <valid0|1> <ready0|1> <present_v> <present_i> [curr_lim0|1] [volt_lim0|1] [pwr_lim0|1] [stop_notify0|1]`
 - `CTRL STOP <soft|hard|clear> [timeout_ms]`
-- `CTRL MODE <mode0|1> <plc_id 1..15> [controller_id 1..15]`
-- `CTRL OWNERSHIP <connector_id> <module_addr>`
-- `CTRL SAVE`
 - `CTRL STATUS`
 - `CTRL RESET`
+
+Persisted PLC settings are not changed from UART at runtime:
+
+- `CTRL MODE`, `CTRL OWNERSHIP`, and `CTRL SAVE` are disabled
+- use the SW4 setup portal to change persisted PLC mode / identity / timeout defaults
+- `CTRL RESET` clears only runtime/session state
 
 Removed from the supported UART surface:
 

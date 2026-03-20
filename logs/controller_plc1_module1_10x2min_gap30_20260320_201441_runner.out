@@ -1,0 +1,43 @@
+RUN_BASE=logs/controller_plc1_module1_10x2min_gap30_20260320_201441
+[RESET] session=01 start=2026-03-20T20:14:46
+[RUN] session=01 start=2026-03-20T20:15:01
+[DONE] session=01 rc=0 result=pass end=2026-03-20T20:17:26
+[GAP] after_session=01 sleep_s=30 start=2026-03-20T20:17:26
+[RESET] session=02 start=2026-03-20T20:17:56
+[RUN] session=02 start=2026-03-20T20:18:10
+[DONE] session=02 rc=0 result=pass end=2026-03-20T20:20:35
+[GAP] after_session=02 sleep_s=30 start=2026-03-20T20:20:35
+[RESET] session=03 start=2026-03-20T20:21:05
+[RUN] session=03 start=2026-03-20T20:21:19
+[DONE] session=03 rc=0 result=pass end=2026-03-20T20:23:45
+[GAP] after_session=03 sleep_s=30 start=2026-03-20T20:23:45
+[RESET] session=04 start=2026-03-20T20:24:15
+[RUN] session=04 start=2026-03-20T20:24:29
+[DONE] session=04 rc=0 result=pass end=2026-03-20T20:26:55
+[GAP] after_session=04 sleep_s=30 start=2026-03-20T20:26:55
+[RESET] session=05 start=2026-03-20T20:27:25
+[RUN] session=05 start=2026-03-20T20:27:39
+[DONE] session=05 rc=0 result=pass end=2026-03-20T20:30:04
+[GAP] after_session=05 sleep_s=30 start=2026-03-20T20:30:04
+[RESET] session=06 start=2026-03-20T20:30:34
+[RUN] session=06 start=2026-03-20T20:30:49
+[DONE] session=06 rc=0 result=pass end=2026-03-20T20:33:14
+[GAP] after_session=06 sleep_s=30 start=2026-03-20T20:33:14
+[RESET] session=07 start=2026-03-20T20:33:44
+[RUN] session=07 start=2026-03-20T20:33:58
+[DONE] session=07 rc=0 result=pass end=2026-03-20T20:36:24
+[GAP] after_session=07 sleep_s=30 start=2026-03-20T20:36:24
+[RESET] session=08 start=2026-03-20T20:36:54
+[RUN] session=08 start=2026-03-20T20:37:08
+[DONE] session=08 rc=0 result=pass end=2026-03-20T20:39:33
+[GAP] after_session=08 sleep_s=30 start=2026-03-20T20:39:33
+[RESET] session=09 start=2026-03-20T20:40:03
+[RUN] session=09 start=2026-03-20T20:40:18
+[DONE] session=09 rc=0 result=pass end=2026-03-20T20:42:43
+[GAP] after_session=09 sleep_s=30 start=2026-03-20T20:42:43
+[RESET] session=10 start=2026-03-20T20:43:13
+[RUN] session=10 start=2026-03-20T20:43:27
+[DONE] session=10 rc=0 result=pass end=2026-03-20T20:45:53
+[SUMMARY] base=logs/controller_plc1_module1_10x2min_gap30_20260320_201441 passes=10 fails=0 end=2026-03-20T20:45:53
+[ARTIFACT] aggregate_json=logs/controller_plc1_module1_10x2min_gap30_20260320_201441_aggregate.json
+[ARTIFACT] aggregate_csv=logs/controller_plc1_module1_10x2min_gap30_20260320_201441_aggregate.csv
