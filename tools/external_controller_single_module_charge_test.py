@@ -54,6 +54,7 @@ except Exception as exc:
 
 
 ACK_OK = 0
+ACK_BAD_SEQ = 4
 ACK_CMD_RELAY = 0x17
 ACK_CMD_STOP = 0x18
 ACK_CMD_HEARTBEAT = 0x10
@@ -133,10 +134,6 @@ def module_voltage_value(module: Optional[mxr.ModuleInfo]) -> float:
     return max(0.0, module.voltage_v)
 
 
-MXR_REG_SET_OUTPUT_VOLTAGE_UPPER_LIMIT = 0x0023
-MXR_POWER_LIMIT_RATIO_MAX = 1.0
-
-
 @dataclass
 class Ack:
     cmd_hex: int
@@ -144,6 +141,7 @@ class Ack:
     status: int
     detail0: int
     detail1: int
+    received_at: float
 
 
 @dataclass
@@ -317,22 +315,13 @@ class DirectMaxwellCan:
         iface: str,
         log_file: str,
         abs_current_scale: float,
-        module_rated_power_kw: float,
-        module_max_voltage_v: float,
-        module_voltage_headroom_v: float,
-        module_max_current_a: float,
     ) -> None:
         self.iface = iface
         self.log_file = log_file
         self.abs_current_scale = abs_current_scale
-        self.module_rated_power_kw = max(0.0, module_rated_power_kw)
-        self.module_max_voltage_v = max(0.0, module_max_voltage_v)
-        self.module_voltage_headroom_v = max(0.0, module_voltage_headroom_v)
-        self.module_max_current_a = max(0.0, module_max_current_a)
         self.sock = None
         self.log_fp = None
         self.started: set[tuple[int, int]] = set()
-        self.last_safety_signature: dict[tuple[int, int], tuple[int, int]] = {}
         self.last_on_attempt_at: dict[tuple[int, int], float] = {}
         self.last_input_mode: dict[tuple[int, int], int] = {}
 
@@ -439,79 +428,28 @@ class DirectMaxwellCan:
         mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, 0)
         time.sleep(0.02)
         self._log(f"RESET addr={module.address} grp={module.group} input_mode={desired_mode}")
-        mxr.soft_reset_defaults(self.sock, module, input_mode=desired_mode)
-        self.last_safety_signature.pop(key, None)
+        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00010000)
+        time.sleep(0.04)
+        mxr.send_set_int(self.sock, module.address, module.group, 0x0031, 0x00010000)
+        time.sleep(0.02)
+        mxr.send_set_int(self.sock, module.address, module.group, 0x0031, 0x00000000)
+        time.sleep(0.02)
+        mxr.send_set_int(self.sock, module.address, module.group, 0x0044, 0x00010000)
+        time.sleep(0.02)
+        mxr.send_set_int(self.sock, module.address, module.group, 0x0044, 0x00000000)
+        time.sleep(0.02)
+        mxr.send_set_int(self.sock, module.address, module.group, 0x0046, desired_mode)
+        time.sleep(0.04)
         self.last_on_attempt_at.pop(key, None)
         self.refresh(module, response_window_s=0.4)
-
-    def safe_output_request(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> tuple[float, float]:
-        safe_voltage_v = max(0.0, voltage_v)
-        if self.module_max_voltage_v > 0.0:
-            safe_voltage_v = min(safe_voltage_v, self.module_max_voltage_v)
-
-        safe_current_a = max(0.0, current_a)
-        if self.module_rated_power_kw > 0.0 and safe_voltage_v > 10.0:
-            safe_current_a = min(safe_current_a, (self.module_rated_power_kw * 1000.0) / safe_voltage_v)
-        if self.module_max_current_a > 0.0:
-            safe_current_a = min(safe_current_a, self.module_max_current_a)
-
-        return safe_voltage_v, safe_current_a
-
-    def _apply_safety_limits(self, module: mxr.ModuleInfo, requested_voltage_v: float, requested_current_a: float) -> tuple[float, float]:
-        if not self.sock:
-            raise RuntimeError("CAN socket not open")
-
-        safe_voltage_v, safe_current_a = self.safe_output_request(module, requested_voltage_v, requested_current_a)
-        voltage_upper_limit_v = safe_voltage_v + self.module_voltage_headroom_v
-        if self.module_max_voltage_v > 0.0:
-            voltage_upper_limit_v = min(voltage_upper_limit_v, self.module_max_voltage_v)
-        voltage_upper_limit_v = max(safe_voltage_v, voltage_upper_limit_v)
-
-        current_limit_ratio_sig = -1
-        rated_current_a = module.rated_current_a if module.rated_current_a and module.rated_current_a > 0.0 else None
-        if rated_current_a is not None:
-            current_limit_ratio = max(0.0, min(MXR_POWER_LIMIT_RATIO_MAX, safe_current_a / rated_current_a))
-            current_limit_ratio_sig = int(round(current_limit_ratio * 1000.0))
-        else:
-            current_limit_ratio = None
-
-        key = (module.address, module.group)
-        safety_signature = (
-            int(round(voltage_upper_limit_v * 10.0)),
-            current_limit_ratio_sig,
-        )
-        if self.last_safety_signature.get(key) != safety_signature:
-            if safe_voltage_v + 0.05 < requested_voltage_v or safe_current_a + 0.05 < requested_current_a:
-                self._log(
-                    f"CLAMP addr={module.address} grp={module.group} "
-                    f"voltage_v={requested_voltage_v:.1f}->{safe_voltage_v:.1f} "
-                    f"current_a={requested_current_a:.2f}->{safe_current_a:.2f}"
-                )
-            self._log(
-                f"SAFE addr={module.address} grp={module.group} v_cmd={safe_voltage_v:.1f} v_upper={voltage_upper_limit_v:.1f} "
-                f"i_cmd={safe_current_a:.2f} "
-                f"i_limit_ratio={(f'{current_limit_ratio:.3f}' if current_limit_ratio is not None else 'n/a')}"
-            )
-            mxr.send_set_float(
-                self.sock,
-                module.address,
-                module.group,
-                MXR_REG_SET_OUTPUT_VOLTAGE_UPPER_LIMIT,
-                voltage_upper_limit_v,
-            )
-            time.sleep(0.005)
-            if current_limit_ratio is not None:
-                mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_LIMIT_RATIO, current_limit_ratio)
-                time.sleep(0.005)
-            self.last_safety_signature[key] = safety_signature
-
-        return safe_voltage_v, safe_current_a
 
     def set_output(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> None:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
-        safe_voltage_v, safe_current_a = self._apply_safety_limits(module, voltage_v, current_a)
+        safe_voltage_v = max(0.0, voltage_v)
+        safe_current_a = max(0.0, current_a)
         current_raw = int(round(max(0.0, safe_current_a) * self.abs_current_scale))
+        current_raw = max(0, min(current_raw, 0xFFFFFFFF))
         key = (module.address, module.group)
         now = time.monotonic()
         if key not in self.started:
@@ -547,9 +485,8 @@ class DirectMaxwellCan:
         self._log(f"STOP addr={module.address} grp={module.group}")
         mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, 0)
         time.sleep(0.01)
-        mxr.module_off(self.sock, module)
+        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00010000)
         self.started.discard((module.address, module.group))
-        self.last_safety_signature.pop((module.address, module.group), None)
         self.last_on_attempt_at.pop((module.address, module.group), None)
 
 
@@ -863,10 +800,6 @@ class SingleModuleChargeRunner:
             args.can_iface,
             args.can_log,
             args.absolute_current_scale,
-            args.module_rated_power_kw,
-            args.module_max_voltage_v,
-            args.module_voltage_headroom_v,
-            args.module_max_current_a,
         )
 
         self.home_module: Optional[mxr.ModuleInfo] = None
@@ -892,6 +825,9 @@ class SingleModuleChargeRunner:
         self.last_slac_start = 0.0
         self.last_status_rx = 0.0
         self.remote_start_sent = False
+        self.next_tx_seq: dict[int, int] = {}
+        self.stage_name = "none"
+        self.precharge_feedback_count = 0
 
         self.current_demand_started_at: Optional[float] = None
         self.current_demand_ready_since: Optional[float] = None
@@ -904,6 +840,7 @@ class SingleModuleChargeRunner:
 
     def _reset_plc_if_requested(self) -> None:
         if not self.args.esp_reset_before_start:
+            self.next_tx_seq.clear()
             return
         reset_log = self.args.plc_log + ".reset.log"
         print(
@@ -917,6 +854,7 @@ class SingleModuleChargeRunner:
             self.args.esp_reset_pulse_s,
             self.args.esp_reset_wait_s,
         )
+        self.next_tx_seq.clear()
         print(f"[RESET] boot log captured in {reset_log}", flush=True)
 
     def _set_phase(self, name: str) -> None:
@@ -959,6 +897,7 @@ class SingleModuleChargeRunner:
                     status=int(ack_match.group(3)),
                     detail0=int(ack_match.group(4)),
                     detail1=int(ack_match.group(5)),
+                    received_at=now,
                 )
             )
             return
@@ -1103,17 +1042,76 @@ class SingleModuleChargeRunner:
             return None
         return status
 
-    def _wait_for_ack(self, cmd_hex: int, timeout_s: float = 5.0) -> Ack:
+    def _reserve_tx_seq(self, cmd_hex: int) -> Optional[int]:
+        if cmd_hex not in self.next_tx_seq:
+            return None
+        seq = self.next_tx_seq[cmd_hex]
+        self.next_tx_seq[cmd_hex] = (seq + 1) & 0xFF
+        return seq
+
+    def _sync_tx_seq(self, cmd_hex: int, ack_seq: int) -> None:
+        self.next_tx_seq[cmd_hex] = (ack_seq + 1) & 0xFF
+
+    def _wait_for_ack(
+        self,
+        cmd_hex: int,
+        timeout_s: float = 5.0,
+        expected_seq: Optional[int] = None,
+        sent_after: float = 0.0,
+    ) -> Ack:
         deadline = time.time() + timeout_s
         while time.time() < deadline:
-            while self.ack_queue:
-                ack = self.ack_queue.popleft()
-                if ack.cmd_hex == cmd_hex:
-                    return ack
+            if self.ack_queue:
+                pending = list(self.ack_queue)
+                self.ack_queue.clear()
+                match: Optional[Ack] = None
+                for ack in pending:
+                    if ack.cmd_hex != cmd_hex:
+                        self.ack_queue.append(ack)
+                        continue
+                    if ack.received_at < sent_after:
+                        continue
+                    if expected_seq is not None and ack.seq != expected_seq:
+                        self.ack_queue.append(ack)
+                        continue
+                    if match is None:
+                        match = ack
+                    else:
+                        self.ack_queue.append(ack)
+                if match is not None:
+                    self._sync_tx_seq(cmd_hex, match.seq)
+                    return match
             if self.link.reader_error:
                 raise RuntimeError(f"serial reader failed: {self.link.reader_error}")
             time.sleep(0.02)
         raise RuntimeError(f"timeout waiting for ack 0x{cmd_hex:02X}")
+
+    def _send_expect_ack(self, cmd: str, cmd_hex: int, timeout_s: float = 5.0, retries: int = 1) -> Ack:
+        attempts = max(1, retries + 1)
+        last_error: Optional[Exception] = None
+        for attempt in range(attempts):
+            expected_seq = self._reserve_tx_seq(cmd_hex)
+            sent_after = time.time()
+            self._send(cmd)
+            try:
+                ack = self._wait_for_ack(
+                    cmd_hex,
+                    timeout_s=timeout_s,
+                    expected_seq=expected_seq,
+                    sent_after=sent_after,
+                )
+                if ack.status == ACK_BAD_SEQ and attempt + 1 < attempts:
+                    self._note_once(f"retrying {cmd} after ACK_BAD_SEQ seq={ack.seq}")
+                    time.sleep(0.05)
+                    continue
+                return ack
+            except RuntimeError as exc:
+                last_error = exc
+                if attempt + 1 >= attempts:
+                    raise
+                self._note_once(f"retrying {cmd} after ack miss: {exc}")
+                time.sleep(0.1)
+        raise RuntimeError(str(last_error) if last_error else f"ack wait failed for {cmd}")
 
     def _query_status(self, timeout_s: float = 2.0, allow_stale: bool = False, stale_max_age_s: float = 3.0) -> PlcStatus:
         while self.status_queue:
@@ -1142,18 +1140,19 @@ class SingleModuleChargeRunner:
     def _set_relay(self, closed: bool, hold_ms: int, require_ack: bool = True) -> None:
         mask = 1 << (self.args.power_relay - 1)
         state_mask = mask if closed else 0
-        self._send(f"CTRL RELAY {mask} {state_mask} {max(0, hold_ms)}")
+        cmd = f"CTRL RELAY {mask} {state_mask} {max(0, hold_ms)}"
         if require_ack:
-            ack = self._wait_for_ack(ACK_CMD_RELAY)
+            ack = self._send_expect_ack(cmd, ACK_CMD_RELAY, timeout_s=3.0, retries=1)
             if ack.status != ACK_OK:
                 raise RuntimeError(
                     f"Relay{self.args.power_relay} rejected status={ack.status} "
                     f"detail0={ack.detail0} detail1={ack.detail1}"
                 )
+        else:
+            self._send(cmd)
 
     def _send_slac_start(self, now: float) -> None:
-        self._send(f"CTRL SLAC start {self.args.arm_ms}")
-        ack = self._wait_for_ack(ACK_CMD_SLAC)
+        ack = self._send_expect_ack(f"CTRL SLAC start {self.args.arm_ms}", ACK_CMD_SLAC, timeout_s=3.0, retries=1)
         if ack.status != ACK_OK:
             raise RuntimeError(f"CTRL SLAC start rejected status={ack.status}")
         self.last_slac_start = now
@@ -1165,30 +1164,24 @@ class SingleModuleChargeRunner:
         if status.mode_id != 1 or status.controller_id != self.args.controller_id:
             self._send(f"CTRL MODE 1 {self.args.plc_id} {self.args.controller_id}")
             time.sleep(0.3)
-        self._send(f"CTRL HB {self.args.heartbeat_timeout_ms}")
-        ack = self._wait_for_ack(ACK_CMD_HEARTBEAT)
+        ack = self._send_expect_ack(f"CTRL HB {self.args.heartbeat_timeout_ms}", ACK_CMD_HEARTBEAT, timeout_s=3.0, retries=1)
         if ack.status != ACK_OK:
             raise RuntimeError(f"CTRL HB rejected status={ack.status}")
-        self._send("CTRL STOP clear 3000")
-        ack = self._wait_for_ack(ACK_CMD_STOP)
+        ack = self._send_expect_ack("CTRL STOP clear 3000", ACK_CMD_STOP, timeout_s=3.0, retries=1)
         if ack.status != ACK_OK and ack.status != 4:
             raise RuntimeError(f"CTRL STOP clear rejected status={ack.status}")
-        self._send(f"CTRL AUTH deny {self.args.auth_ttl_ms}")
-        ack = self._wait_for_ack(ACK_CMD_AUTH)
+        ack = self._send_expect_ack(f"CTRL AUTH deny {self.args.auth_ttl_ms}", ACK_CMD_AUTH, timeout_s=3.0, retries=1)
         if ack.status != ACK_OK:
             raise RuntimeError(f"CTRL AUTH deny rejected status={ack.status}")
-        self._send("CTRL SLAC disarm 3000")
-        ack = self._wait_for_ack(ACK_CMD_SLAC)
+        ack = self._send_expect_ack("CTRL SLAC disarm 3000", ACK_CMD_SLAC, timeout_s=3.0, retries=1)
         if ack.status != ACK_OK:
             raise RuntimeError(f"CTRL SLAC disarm rejected status={ack.status}")
-        self._send("CTRL FEEDBACK 1 0 0 0 0 0 0")
-        ack = self._wait_for_ack(ACK_CMD_FEEDBACK)
+        ack = self._send_expect_ack("CTRL FEEDBACK 1 0 0 0 0 0 0", ACK_CMD_FEEDBACK, timeout_s=3.0, retries=1)
         if ack.status != ACK_OK:
             raise RuntimeError(f"CTRL FEEDBACK reset rejected status={ack.status}")
         for relay_idx in (1, 2, 3):
             mask = 1 << (relay_idx - 1)
-            self._send(f"CTRL RELAY {mask} 0 0")
-            ack = self._wait_for_ack(ACK_CMD_RELAY)
+            ack = self._send_expect_ack(f"CTRL RELAY {mask} 0 0", ACK_CMD_RELAY, timeout_s=3.0, retries=1)
             if ack.status != ACK_OK:
                 raise RuntimeError(f"CTRL RELAY open for relay{relay_idx} rejected status={ack.status}")
         status = self._query_status()
@@ -1219,7 +1212,7 @@ class SingleModuleChargeRunner:
                 return self.live.target_v
             if self.live.latched_target_v > 0.0:
                 return self.live.latched_target_v
-        return self.args.target_voltage_v
+        return self.current_plan.voltage_v if self.current_plan.enabled else 0.0
 
     def _requested_current(self) -> float:
         with self.live_lock:
@@ -1232,8 +1225,9 @@ class SingleModuleChargeRunner:
     def _aggregate_feedback_telemetry(self) -> Optional[tuple[float, float]]:
         if self.home_module is None:
             return None
-        if not (self.desired_relay or self._relay_is_closed()):
-            return 0.0, 0.0
+        last_seen = getattr(self.home_module, "last_seen", 0.0) or 0.0
+        if last_seen <= 0.0 or (time.monotonic() - last_seen) > max(1.0, self.args.telemetry_interval_s * 4.0):
+            return None
         return (
             module_voltage_value(self.home_module),
             module_current_value(self.home_module),
@@ -1241,14 +1235,15 @@ class SingleModuleChargeRunner:
 
     def _effective_stage_current(self, stage: str, requested_i: float) -> float:
         if stage == "precharge":
-            return max(self.args.precharge_current_a, requested_i)
-        if requested_i > 0.05:
-            return requested_i
-        return self.args.voltage_hold_current_a if self._target_voltage() > 10.0 else 0.0
+            return requested_i if requested_i > 0.05 else max(0.0, self.args.precharge_current_a)
+        return requested_i if requested_i > 0.05 else 0.0
 
     def _update_plan_from_stage(self) -> tuple[str, float, float]:
         with self.live_lock:
             stage = self.live.bms_stage_name
+        if stage != self.stage_name:
+            self.stage_name = stage
+            self.precharge_feedback_count = 0
         target_v = self._target_voltage()
         requested_i = self._requested_current()
         if stage == "precharge":
@@ -1264,15 +1259,23 @@ class SingleModuleChargeRunner:
 
     def _tick_contract(self, now: float) -> None:
         if (now - self.last_hb) * 1000.0 >= self.args.heartbeat_ms:
-            self._send(f"CTRL HB {self.args.heartbeat_timeout_ms}")
-            ack = self._wait_for_ack(ACK_CMD_HEARTBEAT)
+            ack = self._send_expect_ack(
+                f"CTRL HB {self.args.heartbeat_timeout_ms}",
+                ACK_CMD_HEARTBEAT,
+                timeout_s=2.0,
+                retries=1,
+            )
             if ack.status != ACK_OK:
                 raise RuntimeError(f"CTRL HB rejected status={ack.status}")
             self.last_hb = now
 
         if (now - self.last_auth) >= 1.0:
-            self._send(f"CTRL AUTH grant {self.args.auth_ttl_ms}")
-            ack = self._wait_for_ack(ACK_CMD_AUTH)
+            ack = self._send_expect_ack(
+                f"CTRL AUTH grant {self.args.auth_ttl_ms}",
+                ACK_CMD_AUTH,
+                timeout_s=2.0,
+                retries=1,
+            )
             if ack.status != ACK_OK:
                 raise RuntimeError(f"CTRL AUTH grant rejected status={ack.status}")
             self.last_auth = now
@@ -1314,24 +1317,27 @@ class SingleModuleChargeRunner:
     def _tick_relay(self, now: float) -> None:
         if self.desired_relay:
             if self.last_relay_command is not True or not self._relay_is_closed() or (now - self.last_relay_refresh) >= self.args.relay_refresh_s:
-                self._set_relay(True, self.args.relay_hold_ms, require_ack=False)
+                self._set_relay(True, self.args.relay_hold_ms, require_ack=True)
                 self.last_relay_refresh = now
                 self.last_relay_command = True
         else:
             if self.last_relay_command is not False or not self._relay_is_open():
-                self._set_relay(False, 0, require_ack=False)
+                self._set_relay(False, 0, require_ack=True)
                 self.last_relay_refresh = now
                 self.last_relay_command = False
 
     def _tick_module_output(self, now: float) -> None:
         if self.home_module is None:
             return
-        safe_v, safe_i = self.can.safe_output_request(self.home_module, self.current_plan.voltage_v, self.current_plan.current_a)
-        signature = (self.current_plan.enabled, int(round(safe_v * 10.0)), int(round(safe_i * 100.0)))
+        signature = (
+            self.current_plan.enabled,
+            int(round(max(0.0, self.current_plan.voltage_v) * 10.0)),
+            int(round(max(0.0, self.current_plan.current_a) * 100.0)),
+        )
         if self.current_plan.enabled and (
             self.last_output_signature != signature or (now - self.last_set_refresh) >= self.args.control_interval_s
         ):
-            self.can.set_output(self.home_module, safe_v, safe_i)
+            self.can.set_output(self.home_module, self.current_plan.voltage_v, self.current_plan.current_a)
             self.plan_active = True
             self.last_output_signature = signature
             self.last_set_refresh = now
@@ -1359,8 +1365,7 @@ class SingleModuleChargeRunner:
             return False
         telemetry = self._aggregate_feedback_telemetry()
         if telemetry is None:
-            self._send("CTRL FEEDBACK 0 0 0 0 0 0 0")
-            ack = self._wait_for_ack(ACK_CMD_FEEDBACK)
+            ack = self._send_expect_ack("CTRL FEEDBACK 0 0 0 0 0 0 0", ACK_CMD_FEEDBACK, timeout_s=2.0, retries=1)
             if ack.status != ACK_OK:
                 raise RuntimeError(f"CTRL FEEDBACK invalid rejected status={ack.status}")
             self.last_feedback_cmd = now
@@ -1369,39 +1374,51 @@ class SingleModuleChargeRunner:
         present_v, present_i = telemetry
         ready = False
         if stage == "precharge":
+            self.precharge_feedback_count += 1
             relay_closed = self._relay_is_closed() or self.desired_relay
-            voltage_ready = target_v > 10.0 and abs(present_v - target_v) <= self.args.feedback_voltage_tolerance_v
+            tolerance_v = (
+                self.args.feedback_voltage_tolerance_v
+                if target_v <= 1.0
+                else max(self.args.feedback_voltage_tolerance_v, target_v * 0.05)
+            )
+            if target_v <= 1.0:
+                voltage_ready = present_v <= tolerance_v
+            else:
+                voltage_ready = abs(present_v - target_v) <= tolerance_v or present_v >= (target_v - tolerance_v)
+            accept_floor_v = max(self.args.precharge_ready_min_voltage_v, target_v * 0.05)
             current_floor = max(0.5, self.args.precharge_current_a * self.args.precharge_ready_min_current_ratio)
-            current_ready = present_i >= current_floor
-            if self.args.allow_zero_load_ready:
-                current_ready = current_ready or present_v >= self.args.precharge_ready_min_voltage_v
-            bench_ready = relay_closed and present_v >= self.args.precharge_ready_min_voltage_v and current_ready
-            ready = voltage_ready or bench_ready
-            self._send(
-                f"CTRL FEEDBACK 1 {1 if ready else 0} {present_v:.1f} {present_i:.1f} 0 0 0"
+            relaxed_ready = present_v >= accept_floor_v or (
+                self.precharge_feedback_count >= 2 and present_i >= current_floor
+            )
+            ready = relay_closed and (voltage_ready or relaxed_ready)
+            ack = self._send_expect_ack(
+                f"CTRL FEEDBACK 1 {1 if ready else 0} {present_v:.1f} {present_i:.1f} 0 0 0",
+                ACK_CMD_FEEDBACK,
+                timeout_s=2.0,
+                retries=1,
             )
         elif stage in ("power_delivery", "current_demand"):
             relay_closed = self._relay_is_closed()
             current_ready = requested_i <= 0.05 or present_i >= self.args.current_demand_ready_min_current_a
-            if self.args.allow_zero_load_ready:
-                current_ready = current_ready or present_v >= self.args.current_demand_ready_min_voltage_v
             ready = (
-                target_v > 10.0
-                and relay_closed
+                relay_closed
                 and present_v >= self.args.current_demand_ready_min_voltage_v
                 and current_ready
             )
-            safe_v, safe_i = self.can.safe_output_request(self.home_module, self.current_plan.voltage_v, self.current_plan.current_a) if self.home_module else (0.0, 0.0)
-            current_limited = requested_i > (safe_i + 0.5)
-            voltage_limited = target_v > (safe_v + 0.5)
-            power_limited = False
-            self._send(
+            ack = self._send_expect_ack(
                 f"CTRL FEEDBACK 1 {1 if ready else 0} {present_v:.1f} {present_i:.1f} "
-                f"{1 if current_limited else 0} {1 if voltage_limited else 0} {1 if power_limited else 0}"
+                "0 0 0",
+                ACK_CMD_FEEDBACK,
+                timeout_s=2.0,
+                retries=1,
             )
         else:
-            self._send("CTRL FEEDBACK 1 0 0 0 0 0 0")
-        ack = self._wait_for_ack(ACK_CMD_FEEDBACK)
+            ack = self._send_expect_ack(
+                f"CTRL FEEDBACK 1 0 {present_v:.1f} {present_i:.1f} 0 0 0",
+                ACK_CMD_FEEDBACK,
+                timeout_s=2.0,
+                retries=1,
+            )
         if ack.status != ACK_OK:
             raise RuntimeError(f"CTRL FEEDBACK rejected status={ack.status}")
         self.last_feedback_cmd = now
@@ -1409,9 +1426,13 @@ class SingleModuleChargeRunner:
 
     def _tick_cleanup_contract(self, now: float) -> None:
         if (now - self.last_hb) * 1000.0 >= self.args.heartbeat_ms:
-            self._send(f"CTRL HB {self.args.heartbeat_timeout_ms}")
             try:
-                ack = self._wait_for_ack(ACK_CMD_HEARTBEAT, timeout_s=2.0)
+                ack = self._send_expect_ack(
+                    f"CTRL HB {self.args.heartbeat_timeout_ms}",
+                    ACK_CMD_HEARTBEAT,
+                    timeout_s=2.0,
+                    retries=1,
+                )
                 if ack.status == ACK_OK:
                     self.last_hb = now
                 else:
@@ -1420,9 +1441,13 @@ class SingleModuleChargeRunner:
                 self._note_once(f"cleanup heartbeat degraded: {exc}")
 
         if (now - self.last_feedback_cmd) >= self.args.feedback_interval_s:
-            self._send("CTRL FEEDBACK 1 0 0 0 0 0 0 1")
             try:
-                ack = self._wait_for_ack(ACK_CMD_FEEDBACK, timeout_s=2.0)
+                ack = self._send_expect_ack(
+                    "CTRL FEEDBACK 1 0 0 0 0 0 0 1",
+                    ACK_CMD_FEEDBACK,
+                    timeout_s=2.0,
+                    retries=1,
+                )
                 if ack.status != ACK_OK:
                     self._note_once(f"cleanup stop-notify rejected status={ack.status}")
                 self.last_feedback_cmd = now
@@ -1463,15 +1488,18 @@ class SingleModuleChargeRunner:
     def _cleanup(self) -> None:
         self._set_phase("stopping")
         try:
-            self._send(f"CTRL STOP soft {int(self.args.stop_timeout_s * 1000.0)}")
-            ack = self._wait_for_ack(ACK_CMD_STOP, timeout_s=3.0)
+            ack = self._send_expect_ack(
+                f"CTRL STOP soft {int(self.args.stop_timeout_s * 1000.0)}",
+                ACK_CMD_STOP,
+                timeout_s=3.0,
+                retries=1,
+            )
             if ack.status not in (ACK_OK, 4):
                 self.notes.append(f"CTRL STOP soft rejected status={ack.status}; forcing hard stop")
                 raise RuntimeError("soft stop rejected")
         except Exception:
-            self._send("CTRL STOP hard 3000")
             try:
-                self._wait_for_ack(ACK_CMD_STOP, timeout_s=3.0)
+                self._send_expect_ack("CTRL STOP hard 3000", ACK_CMD_STOP, timeout_s=3.0, retries=1)
             except Exception:
                 self.notes.append("hard stop ack missing during cleanup")
 
@@ -1500,19 +1528,16 @@ class SingleModuleChargeRunner:
                 break
             time.sleep(0.1)
 
-        self._send(f"CTRL AUTH deny {self.args.auth_ttl_ms}")
         try:
-            self._wait_for_ack(ACK_CMD_AUTH, timeout_s=2.0)
+            self._send_expect_ack(f"CTRL AUTH deny {self.args.auth_ttl_ms}", ACK_CMD_AUTH, timeout_s=2.0, retries=1)
         except Exception:
             pass
-        self._send("CTRL SLAC disarm 3000")
         try:
-            self._wait_for_ack(ACK_CMD_SLAC, timeout_s=2.0)
+            self._send_expect_ack("CTRL SLAC disarm 3000", ACK_CMD_SLAC, timeout_s=2.0, retries=1)
         except Exception:
             pass
-        self._send("CTRL FEEDBACK 1 0 0 0 0 0 0")
         try:
-            self._wait_for_ack(ACK_CMD_FEEDBACK, timeout_s=2.0)
+            self._send_expect_ack("CTRL FEEDBACK 1 0 0 0 0 0 0", ACK_CMD_FEEDBACK, timeout_s=2.0, retries=1)
         except Exception:
             pass
         try:
@@ -1618,7 +1643,12 @@ class SingleModuleChargeRunner:
 
                 if self._current_demand_ready(stage, ready):
                     result = "pass"
-                    print("[PASS] sustained CurrentDemand reached with module 1 only", flush=True)
+                    module_desc = (
+                        f"module {self.home_module.address}/g{self.home_module.group}"
+                        if self.home_module is not None
+                        else "requested module"
+                    )
+                    print(f"[PASS] sustained CurrentDemand reached with {module_desc}", flush=True)
                     break
                 time.sleep(0.02)
 
@@ -1664,10 +1694,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--esp-reset-before-start", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--esp-reset-pulse-s", type=float, default=DEFAULT_ESP_RESET_PULSE_S)
     parser.add_argument("--esp-reset-wait-s", type=float, default=DEFAULT_ESP_RESET_WAIT_S)
-    parser.add_argument("--target-voltage-v", type=float, default=500.0)
     parser.add_argument("--precharge-current-a", type=float, default=2.0)
-    parser.add_argument("--voltage-hold-current-a", type=float, default=2.0)
-    parser.add_argument("--allow-zero-load-ready", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--current-demand-hold-s", type=float, default=15.0)
     parser.add_argument("--session-start-timeout-s", type=float, default=240.0)
     parser.add_argument("--b1-start-delay-s", type=float, default=0.6)
@@ -1683,15 +1710,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--relay-hold-ms", type=int, default=5000)
     parser.add_argument("--relay-refresh-s", type=float, default=0.6)
     parser.add_argument("--feedback-voltage-tolerance-v", type=float, default=15.0)
-    parser.add_argument("--precharge-ready-min-voltage-v", type=float, default=20.0)
-    parser.add_argument("--precharge-ready-min-current-ratio", type=float, default=0.75)
-    parser.add_argument("--current-demand-ready-min-voltage-v", type=float, default=25.0)
-    parser.add_argument("--current-demand-ready-min-current-a", type=float, default=1.5)
+    parser.add_argument("--precharge-ready-min-voltage-v", type=float, default=5.0)
+    parser.add_argument("--precharge-ready-min-current-ratio", type=float, default=0.25)
+    parser.add_argument("--current-demand-ready-min-voltage-v", type=float, default=0.1)
+    parser.add_argument("--current-demand-ready-min-current-a", type=float, default=0.05)
     parser.add_argument("--absolute-current-scale", type=float, default=1024.0)
-    parser.add_argument("--module-rated-power-kw", type=float, default=30.0)
-    parser.add_argument("--module-max-voltage-v", type=float, default=1000.0)
-    parser.add_argument("--module-voltage-headroom-v", type=float, default=15.0)
-    parser.add_argument("--module-max-current-a", type=float, default=100.0)
     parser.add_argument("--stop-timeout-s", type=float, default=12.0)
     parser.add_argument(
         "--plc-log",

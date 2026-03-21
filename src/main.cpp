@@ -215,13 +215,13 @@ constexpr uint16_t QCASPI_GOOD_SIGNATURE = 0xAA55;
 constexpr uint16_t QCA7K_BUFFER_SIZE = 3163;
 constexpr uint16_t ETH_FRAME_MIN_LEN_NO_FCS = 60u;
 constexpr size_t RX_CHUNK_CAPACITY = 4096;
-constexpr size_t RX_QUEUE_CAPACITY = 32;
-constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 8u;
+constexpr size_t RX_QUEUE_CAPACITY = 48;
+constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 12u;
 constexpr uint32_t QCA_POLL_FALLBACK_MS = 5u;
 constexpr uint32_t QCA_RESET_TIMEOUT_MS = 1000u;
 constexpr uint32_t QCA_STARTUP_FORCE_SYNC_MS = 100u;
 constexpr uint32_t QCA_STARTUP_IO_WAIT_MS = 500u;
-constexpr uint8_t QCA_MAX_BURSTS_PER_POLL = 4u;
+constexpr uint8_t QCA_MAX_BURSTS_PER_POLL = 8u;
 constexpr uint16_t RX_PROCESS_BREATHER_STRIDE = 1024u;
 constexpr uint8_t FSM_POLL_BREATHER_STRIDE = 1u;
 constexpr uint16_t SERIAL_CMD_MAX_BYTES_PER_LOOP = 192u;
@@ -957,11 +957,7 @@ public:
         pinMode(QCA_SPI_MISO, INPUT);
         pinMode(QCA_SPI_MOSI, OUTPUT);
 
-        // Basic/reference behavior: explicit hardware reset pulse before probing signature.
-        digitalWrite(PIN_QCA700X_RESET, LOW);
-        delay(10);
-        digitalWrite(PIN_QCA700X_RESET, HIGH);
-        delay(10);
+        pulse_hardware_reset();
 
         spi.begin(QCA_SPI_SCK, QCA_SPI_MISO, QCA_SPI_MOSI, PIN_QCA700X_CS);
         spi.beginTransaction(SPISettings(QCA_SPI_HZ, MSBFIRST, SPI_MODE3));
@@ -999,11 +995,20 @@ public:
     }
 
     void modem_reset() {
+        (void)restart_startup_sync(false);
+    }
+
+    uint32_t rx_queue_drops() const {
+        return rx_queue_drop_count;
+    }
+
+    bool restart_startup_sync(bool hard_reset) {
         if (!ready) {
-            return;
+            last_error = "transport not ready";
+            return false;
         }
         clear_rx_state();
-        mark_lwip_tx_transport_flush("qca modem reset");
+        mark_lwip_tx_transport_flush(hard_reset ? "qca hard reset" : "qca modem reset");
         startup_pending = true;
         interrupts_armed = false;
         cpu_on_seen_since_reset = false;
@@ -1011,22 +1016,50 @@ public:
         last_startup_wrbuf = 0u;
         reset_started_ms = millis();
         g_qca_irq_pending = false;
+        startup_wait_recovered_without_irq = false;
+
+        if (hard_reset) {
+            pulse_hardware_reset();
+            uint16_t sig = 0u;
+            if (!probe_signature(sig, 750u, 5u)) {
+                last_startup_signature = sig;
+                char buf[96];
+                snprintf(buf, sizeof(buf), "QCA7000 hard-reset signature mismatch (last=0x%04X)", sig);
+                last_error = buf;
+                return false;
+            }
+        }
+
+        (void)spi_write_register16(SPI_REG_INTR_ENABLE, 0u);
+        clear_pending_interrupts();
+        enable_interrupts(QCA_INT_STARTUP_MASK);
         uint16_t reg = 0u;
         if (!spi_read_register16(SPI_REG_SPI_CONFIG, &reg)) {
             if (last_error.empty()) {
-                last_error = "QCA7000 reset read failed";
+                last_error = hard_reset ? "QCA7000 hard-reset read failed" : "QCA7000 reset read failed";
             }
-            return;
+            return false;
         }
         reg = static_cast<uint16_t>(reg | QCASPI_SLAVE_RESET_BIT);
         if (!spi_write_register16(SPI_REG_SPI_CONFIG, reg)) {
             if (last_error.empty()) {
-                last_error = "QCA7000 reset write failed";
+                last_error = hard_reset ? "QCA7000 hard-reset write failed" : "QCA7000 reset write failed";
             }
-            return;
+            return false;
         }
-        enable_interrupts(QCA_INT_STARTUP_MASK);
-        last_error = "QCA7000 reset in progress";
+        uint16_t startup_intr = 0u;
+        if (spi_read_register16(SPI_REG_INTR_CAUSE, &startup_intr)) {
+            if ((startup_intr & SPI_INT_CPU_ON) != 0u) {
+                cpu_on_seen_since_reset = true;
+            }
+            if (startup_intr != 0u) {
+                (void)spi_write_register16(SPI_REG_INTR_CAUSE, startup_intr);
+            }
+        }
+        const bool line_high = digitalRead(PIN_QCA700X_INT) == HIGH;
+        g_qca_irq_pending = line_high || startup_intr != 0u;
+        last_error = hard_reset ? "QCA7000 hard reset in progress" : "QCA7000 reset in progress";
+        return true;
     }
 
     bool is_ready() const {
@@ -1117,6 +1150,23 @@ private:
         uint16_t len{0};
     };
 
+    void pulse_hardware_reset() {
+        digitalWrite(PIN_QCA700X_RESET, LOW);
+        delay(10);
+        digitalWrite(PIN_QCA700X_RESET, HIGH);
+        delay(10);
+    }
+
+    void clear_pending_interrupts() {
+        uint16_t stale_intr = 0u;
+        if (!spi_read_register16(SPI_REG_INTR_CAUSE, &stale_intr)) {
+            return;
+        }
+        if (stale_intr != 0u) {
+            (void)spi_write_register16(SPI_REG_INTR_CAUSE, stale_intr);
+        }
+    }
+
     bool probe_signature(uint16_t& last_sig, uint32_t timeout_ms, uint32_t poll_delay_ms) {
         const uint32_t start_ms = millis();
         bool primed = false;
@@ -1157,7 +1207,8 @@ private:
             return true;
         }
 
-        const uint32_t start_ms = millis();
+        uint8_t startup_restart_attempts = 0u;
+        uint32_t attempt_start_ms = millis();
         while (startup_pending) {
             poll_ingress(true);
             const uint32_t now_ms = millis();
@@ -1167,8 +1218,19 @@ private:
             if (try_complete_startup_sync(allow_signature_only)) {
                 break;
             }
-            if (timeout_ms == 0u ||
-                static_cast<uint32_t>(now_ms - start_ms) >= timeout_ms) {
+            if (timeout_ms != 0u &&
+                static_cast<uint32_t>(now_ms - attempt_start_ms) >= timeout_ms) {
+                if (startup_restart_attempts < 2u) {
+                    const bool hard_reset = startup_restart_attempts >= 1u;
+                    Serial.printf("[QCA] startup sync timeout, retrying with %s reset\n",
+                                  hard_reset ? "hardware" : "soft");
+                    if (!restart_startup_sync(hard_reset)) {
+                        break;
+                    }
+                    startup_restart_attempts++;
+                    attempt_start_ms = millis();
+                    continue;
+                }
                 break;
             }
             if (poll_delay_ms > 0u) {
@@ -1226,6 +1288,7 @@ private:
         cpu_on_seen_since_reset = false;
         reset_started_ms = 0u;
         g_qca_irq_pending = digitalRead(PIN_QCA700X_INT) == HIGH;
+        startup_wait_recovered_without_irq = recovered_without_cpu_on;
         if (recovered_without_cpu_on) {
             Serial.println("[QCA] startup sync recovered without CPU_ON irq");
         }
@@ -1706,11 +1769,11 @@ private:
             (void)try_complete_startup_sync(allow_signature_only);
             if (startup_pending && reset_started_ms != 0u &&
                 static_cast<int32_t>(now_ms - (reset_started_ms + QCA_RESET_TIMEOUT_MS)) >= 0) {
-                Serial.println("[QCA] reset wait timeout, restarting modem sync");
+                Serial.println("[QCA] reset wait timeout, escalating modem sync recovery");
                 if (intr_masked) {
                     finish_interrupt_service(intr_cause);
                 }
-                modem_reset();
+                (void)restart_startup_sync(true);
                 return;
             }
         }
@@ -1868,6 +1931,7 @@ private:
     uint32_t reset_started_ms{0};
     uint16_t last_startup_signature{0u};
     uint16_t last_startup_wrbuf{0u};
+    bool startup_wait_recovered_without_irq{false};
 
     bool lock_spi(uint32_t timeout_ms) {
         if (!spi_mutex) {
@@ -2265,6 +2329,7 @@ bool g_session_matched = false;
 bool g_fsm_priming = false;
 uint32_t g_slac_pwm_enable_at_ms = 0;
 uint32_t g_session_started_ms = 0;
+uint32_t g_session_rx_queue_drop_baseline = 0;
 uint8_t g_slac_failures_this_cp = 0;
 uint8_t g_slac_soft_retries_this_cp = 0;
 uint32_t g_slac_hold_until_ms = 0;
@@ -3272,15 +3337,6 @@ bool controller_precharge_start_ready(HlcAppContext* ctx,
     const float present_i =
         std::isfinite(fb.present_current_a) ? std::max(0.0f, fb.present_current_a) : 0.0f;
     if (fb.ready || precharge_voltage_converged(requested_v, present_v)) {
-        return true;
-    }
-
-    // On the resistive-load bench the Maxwell module often stays logically OFF
-    // during low-current precharge, then wakes only once CurrentDemand raises
-    // the command. After multiple real precharge attempts and a measurable bus
-    // bias, allow PowerDelivery to hand off into CurrentDemand without
-    // fabricating present voltage/current telemetry.
-    if (ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT && present_v > 1.0f) {
         return true;
     }
 
@@ -7875,6 +7931,7 @@ void start_session(uint32_t now_ms) {
     g_slac_pwm_enable_at_ms = 0u;
     g_session_started = true;
     g_session_started_ms = now_ms;
+    g_session_rx_queue_drop_baseline = g_transport ? g_transport->rx_queue_drops() : 0u;
     g_bcd_entered = false;
     g_session_matched = false;
     g_last_fsm_state = g_fsm->get_state();
@@ -7888,8 +7945,7 @@ void reprime_slac_modem(uint32_t now_ms, const char* reason) {
 
     Serial.printf("[SLAC] modem reprime (%s)\n", reason ? reason : "-");
     g_transport->modem_reset();
-    delay(150);
-    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 5u)) {
+    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 1u)) {
         Serial.printf("[QCA] reprime sync wait failed: %s\n", g_transport->get_error().c_str());
     }
     g_fsm->invalidate_key_state();
@@ -7911,6 +7967,7 @@ void stop_session(uint32_t now_ms) {
     }
     g_session_started = false;
     g_session_started_ms = 0;
+    g_session_rx_queue_drop_baseline = 0u;
     g_slac_pwm_enable_at_ms = 0u;
     g_bcd_entered = false;
     g_session_matched = false;
@@ -7982,8 +8039,7 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
     Serial.println("[QCA] transport ready");
 
     g_transport->modem_reset();
-    delay(150);
-    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 5u)) {
+    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 1u)) {
         Serial.printf("[QCA] init sync wait failed: %s\n", g_transport->get_error().c_str());
         g_next_qca_init_ms = now_ms + QCA_INIT_RETRY_MS;
         return false;
@@ -8234,6 +8290,27 @@ void process_cp_and_fsm(uint32_t now_ms) {
         s == slac::evse::State::Matching || s == slac::evse::State::Sounding ||
         s == slac::evse::State::FinalizeSounding ||
         s == slac::evse::State::DoAttenChar || s == slac::evse::State::WaitForSlacMatch;
+    if (!g_session_matched && matching_in_progress && g_transport) {
+        const uint32_t rx_drops = g_transport->rx_queue_drops();
+        if (rx_drops != g_session_rx_queue_drop_baseline) {
+            const uint32_t delta = rx_drops - g_session_rx_queue_drop_baseline;
+            g_session_rx_queue_drop_baseline = rx_drops;
+            Serial.printf("[SLAC] rx queue drop during matching state=%s delta=%lu total=%lu\n",
+                          evse_state_name(s),
+                          static_cast<unsigned long>(delta),
+                          static_cast<unsigned long>(rx_drops));
+            if (schedule_soft_slac_retry(now_ms, "rx queue drop")) {
+                return;
+            }
+            enter_hold_with_optional_ef_pulse(now_ms, "rx queue drop");
+            stop_hlc_stack();
+            if (!mode_controller_has_final_decision()) {
+                request_modules_off("SlacRxQueueDrop");
+                (void)relay1_set(false, "SlacRxQueueDrop");
+            }
+            return;
+        }
+    }
     const uint32_t progress_timeout_ms =
         (s == slac::evse::State::WaitForMatchingStart) ? SLAC_INIT_PROGRESS_TIMEOUT_MS : SLAC_PROGRESS_TIMEOUT_MS;
     if (!g_session_matched && g_session_started_ms != 0 && matching_in_progress &&
