@@ -221,6 +221,8 @@ constexpr uint32_t QCA_POLL_FALLBACK_MS = 5u;
 constexpr uint32_t QCA_RESET_TIMEOUT_MS = 1000u;
 constexpr uint32_t QCA_STARTUP_FORCE_SYNC_MS = 100u;
 constexpr uint32_t QCA_STARTUP_IO_WAIT_MS = 500u;
+constexpr uint32_t QCA_POST_RESET_SETTLE_MS = 150u;
+constexpr uint32_t QCA_STARTUP_SYNC_POLL_DELAY_MS = 5u;
 constexpr uint8_t QCA_MAX_BURSTS_PER_POLL = 8u;
 constexpr uint16_t RX_PROCESS_BREATHER_STRIDE = 1024u;
 constexpr uint8_t FSM_POLL_BREATHER_STRIDE = 1u;
@@ -1824,7 +1826,7 @@ private:
                 last_error = "transport startup in progress";
                 return IOResult::Timeout;
             }
-            if (!ensure_startup_ready(QCA_STARTUP_IO_WAIT_MS, 1u)) {
+            if (!ensure_startup_ready(QCA_STARTUP_IO_WAIT_MS, QCA_STARTUP_SYNC_POLL_DELAY_MS)) {
                 return IOResult::Failure;
             }
         }
@@ -7885,7 +7887,7 @@ void apply_cp_output(char state, uint32_t now_ms) {
     const bool hold_active = static_cast<int32_t>(now_ms - g_slac_hold_until_ms) < 0;
     const bool controller_permits_pwm =
         mode_requires_controller_contract()
-            ? (g_session_started || g_hlc_active || controller_requests_slac_pwm(now_ms))
+            ? (g_session_started || g_hlc_active)
             : (mode_is_local_autonomous() || g_session_started || g_hlc_active);
     const bool pwm_enable_delay_elapsed =
         (g_slac_pwm_enable_at_ms == 0u) || static_cast<int32_t>(now_ms - g_slac_pwm_enable_at_ms) >= 0;
@@ -7928,7 +7930,7 @@ void start_session(uint32_t now_ms) {
     g_last_seen_ev_mac_valid = false;
     g_fsm->start(now_ms);
     g_fsm_priming = false;
-    g_slac_pwm_enable_at_ms = 0u;
+    g_slac_pwm_enable_at_ms = mode_requires_controller_contract() ? (now_ms + CP_STABLE_MS) : 0u;
     g_session_started = true;
     g_session_started_ms = now_ms;
     g_session_rx_queue_drop_baseline = g_transport ? g_transport->rx_queue_drops() : 0u;
@@ -7945,7 +7947,8 @@ void reprime_slac_modem(uint32_t now_ms, const char* reason) {
 
     Serial.printf("[SLAC] modem reprime (%s)\n", reason ? reason : "-");
     g_transport->modem_reset();
-    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 1u)) {
+    delay(QCA_POST_RESET_SETTLE_MS);
+    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, QCA_STARTUP_SYNC_POLL_DELAY_MS)) {
         Serial.printf("[QCA] reprime sync wait failed: %s\n", g_transport->get_error().c_str());
     }
     g_fsm->invalidate_key_state();
@@ -8039,7 +8042,8 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
     Serial.println("[QCA] transport ready");
 
     g_transport->modem_reset();
-    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, 1u)) {
+    delay(QCA_POST_RESET_SETTLE_MS);
+    if (!g_transport->wait_for_sync(QCA_STARTUP_IO_WAIT_MS, QCA_STARTUP_SYNC_POLL_DELAY_MS)) {
         Serial.printf("[QCA] init sync wait failed: %s\n", g_transport->get_error().c_str());
         g_next_qca_init_ms = now_ms + QCA_INIT_RETRY_MS;
         return false;
@@ -8228,7 +8232,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
     if (!g_session_started && !g_fsm_priming && g_cp_connected_since_ms != 0 &&
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
         slac_start_ok &&
-        pwm_ready) {
+        (mode_requires_controller_contract() || pwm_ready)) {
         start_session(now_ms);
         if (mode_requires_controller_contract() && !mode_controller_has_final_decision()) {
             g_ctrl.slac_start_latched = false;
