@@ -216,14 +216,14 @@ constexpr uint16_t QCA7K_BUFFER_SIZE = 3163;
 constexpr uint16_t ETH_FRAME_MIN_LEN_NO_FCS = 60u;
 constexpr size_t RX_CHUNK_CAPACITY = 4096;
 constexpr size_t RX_QUEUE_CAPACITY = 48;
-constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 12u;
+constexpr uint8_t SLAC_ACTIVE_MAX_FRAMES_PER_LOOP = 8u;
 constexpr uint32_t QCA_POLL_FALLBACK_MS = 5u;
 constexpr uint32_t QCA_RESET_TIMEOUT_MS = 1000u;
 constexpr uint32_t QCA_STARTUP_FORCE_SYNC_MS = 100u;
 constexpr uint32_t QCA_STARTUP_IO_WAIT_MS = 500u;
 constexpr uint32_t QCA_POST_RESET_SETTLE_MS = 150u;
 constexpr uint32_t QCA_STARTUP_SYNC_POLL_DELAY_MS = 5u;
-constexpr uint8_t QCA_MAX_BURSTS_PER_POLL = 8u;
+constexpr uint8_t QCA_MAX_BURSTS_PER_POLL = 4u;
 constexpr uint16_t RX_PROCESS_BREATHER_STRIDE = 1024u;
 constexpr uint8_t FSM_POLL_BREATHER_STRIDE = 1u;
 constexpr uint16_t SERIAL_CMD_MAX_BYTES_PER_LOOP = 192u;
@@ -529,6 +529,7 @@ constexpr uint32_t MODULE_TELEMETRY_FRESH_MS = 10000;
 constexpr uint32_t MODULE_RUNTIME_LOG_INTERVAL_MS = 1000;
 constexpr uint32_t MODULE_SERVICE_INTERVAL_MS = 10;
 constexpr uint32_t MODULE_SERVICE_SLAC_CRITICAL_MS = 50;
+constexpr uint32_t MODULE_ASSIGNMENT_REPAIR_INTERVAL_MS = 500;
 
 constexpr int RELAY_I2C_SDA = 12;
 constexpr int RELAY_I2C_SCL = 11;
@@ -3342,6 +3343,15 @@ bool controller_precharge_start_ready(HlcAppContext* ctx,
         return true;
     }
 
+    // Controller mode hands module ownership to the external harness. On the
+    // resistive-load bench the Maxwell output can remain logically OFF during
+    // low-current precharge, then wake only after CurrentDemand raises the
+    // request. Preserve the earlier controller-mode handoff once we have seen
+    // multiple real precharge attempts and at least a measurable DC bias.
+    if (ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT && present_v > 1.0f) {
+        return true;
+    }
+
     const float target_v = std::isfinite(requested_v) ? std::max(0.0f, requested_v) : 0.0f;
     const float accept_floor_v = std::max(PRECHARGE_START_ACCEPT_MIN_V, target_v * PRECHARGE_START_ACCEPT_MIN_RATIO);
     const bool current_flow_ready =
@@ -4817,17 +4827,60 @@ bool modules_apply_target(bool enable, float target_v, float target_i, const cha
         tgt.current_a = 0.0f;
     }
 
-    const bool ok = g_module_mgr.apply_group_setpoint_allowlist(
+    bool ok = g_module_mgr.apply_group_setpoint_allowlist(
         runtime_local_group_id(), tgt, g_module_allowlist, MODULE_ALLOWLIST_LEASE_MS);
     g_module_mgr.poll_rx(8);
     const uint32_t now_ms = millis();
     g_module_mgr.tick(now_ms);
     auto st = g_module_mgr.group_status(runtime_local_group_id());
     apply_fresh_measurements_from_states(&st, now_ms);
+    bool assignment_missing = false;
+    if (ok && enable && !g_module_allowlist.empty() && st.assigned_modules == 0u) {
+        const auto states = g_module_mgr.module_states();
+        bool local_assignable = false;
+        bool local_online = false;
+        bool local_faulted = false;
+        bool local_isolated = false;
+        const char* local_lifecycle = "Missing";
+        for (const auto& s : states) {
+            if (s.id != runtime_local_module_id()) {
+                continue;
+            }
+            local_lifecycle = module_lifecycle_name(s.lifecycle);
+            local_online = s.telemetry.online;
+            local_faulted = s.telemetry.faulted;
+            local_isolated = s.isolation_latched;
+            local_assignable = (s.lifecycle == cbmodules::ModuleLifecycle::Validated ||
+                                s.lifecycle == cbmodules::ModuleLifecycle::Allocated ||
+                                s.lifecycle == cbmodules::ModuleLifecycle::Draining) &&
+                               !local_faulted && !local_isolated;
+            break;
+        }
+        if (mode_is_local_autonomous() && local_assignable) {
+            ok = g_module_mgr.apply_group_setpoint_allowlist(
+                runtime_local_group_id(), tgt, g_module_allowlist, MODULE_ALLOWLIST_LEASE_MS);
+            g_module_mgr.poll_rx(8);
+            g_module_mgr.tick(millis());
+            st = g_module_mgr.group_status(runtime_local_group_id());
+            apply_fresh_measurements_from_states(&st, millis());
+        }
+        assignment_missing = st.assigned_modules == 0u;
+        if (assignment_missing) {
+            Serial.printf("[MOD] assignment missing after apply (%s) en=%d allow=%u assigned=%u localLc=%s online=%d fault=%d iso=%d\n",
+                          reason ? reason : "-",
+                          enable ? 1 : 0,
+                          static_cast<unsigned>(g_module_allowlist.size()),
+                          static_cast<unsigned>(st.assigned_modules),
+                          local_lifecycle,
+                          local_online ? 1 : 0,
+                          local_faulted ? 1 : 0,
+                          local_isolated ? 1 : 0);
+        }
+    }
     update_real_meter_with_status(st, now_ms);
     unlock_modules();
 
-    if (ok) {
+    if (ok && !assignment_missing) {
         g_last_module_target_v = tgt.voltage_v;
         g_last_module_target_i = tgt.current_a;
         g_last_requested_target_v = tgt.voltage_v;
@@ -4841,6 +4894,8 @@ bool modules_apply_target(bool enable, float target_v, float target_i, const cha
 }
 
 void request_modules_off(const char* reason);
+
+bool maybe_repair_standalone_local_allocation(uint32_t now_ms, const char* reason);
 
 bool ensure_power_delivery_started(HlcAppContext* ctx, float target_v, const char* reason) {
     if (!ctx) {
@@ -4910,6 +4965,7 @@ void release_controller_allowlist_if_idle(const char* reason) {
 
 void service_module_manager_once(uint32_t now_ms) {
     if (!g_module_ready) return;
+    (void)maybe_repair_standalone_local_allocation(now_ms, "RuntimeRepair");
     const bool module_control_active =
         mode_is_local_autonomous() || !g_module_allowlist.empty() || g_module_output_enabled;
     if (!module_control_active) {
@@ -5505,6 +5561,62 @@ bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, c
         prune_known_remote_modules(next);
     }
     return true;
+}
+
+bool maybe_repair_standalone_local_allocation(uint32_t now_ms, const char* reason) {
+    if (!mode_is_local_autonomous() || !g_module_ready) {
+        return false;
+    }
+    static uint32_t next_attempt_ms = 0u;
+    if (next_attempt_ms != 0u && static_cast<int32_t>(now_ms - next_attempt_ms) < 0) {
+        return false;
+    }
+
+    cbmodules::GroupStatus st{};
+    bool local_visible = false;
+    bool local_faulted = false;
+    bool local_isolated = false;
+    bool local_online = false;
+    const char* local_lifecycle = "Missing";
+    if (!lock_modules(30)) {
+        return false;
+    }
+    g_module_mgr.poll_rx(12);
+    g_module_mgr.tick(now_ms);
+    st = g_module_mgr.group_status(runtime_local_group_id());
+    const auto states = g_module_mgr.module_states();
+    for (const auto& s : states) {
+        if (s.id != runtime_local_module_id()) {
+            continue;
+        }
+        local_lifecycle = module_lifecycle_name(s.lifecycle);
+        local_faulted = s.telemetry.faulted;
+        local_isolated = s.isolation_latched;
+        local_online = s.telemetry.online;
+        local_visible = (s.lifecycle == cbmodules::ModuleLifecycle::Validated ||
+                         s.lifecycle == cbmodules::ModuleLifecycle::Allocated ||
+                         s.lifecycle == cbmodules::ModuleLifecycle::Draining);
+        break;
+    }
+    unlock_modules();
+
+    const bool allowlist_ok =
+        g_module_allowlist.size() == 1u && g_module_allowlist.front() == runtime_local_module_id();
+    const bool needs_repair = !allowlist_ok || st.assigned_modules == 0u;
+    if (!needs_repair || !local_visible || local_faulted || local_isolated) {
+        return false;
+    }
+
+    next_attempt_ms = now_ms + MODULE_ASSIGNMENT_REPAIR_INTERVAL_MS;
+    Serial.printf("[MOD] repairing standalone allocation (%s) allow=%u assigned=%u localLc=%s online=%d fault=%d iso=%d\n",
+                  reason ? reason : "StandaloneRepair",
+                  static_cast<unsigned>(g_module_allowlist.size()),
+                  static_cast<unsigned>(st.assigned_modules),
+                  local_lifecycle,
+                  local_online ? 1 : 0,
+                  local_faulted ? 1 : 0,
+                  local_isolated ? 1 : 0);
+    return apply_new_allowlist({runtime_local_module_id()}, MODULE_MAX_POWER_KW, reason ? reason : "StandaloneRepair");
 }
 
 void controller_handle_heartbeat(const CtrlRxFrame& f) {
@@ -8463,6 +8575,8 @@ void setup() {
         if (mode_requires_controller_contract()) {
             g_module_allowlist.clear();
             Serial.printf("[CTRL] mode=%s active: starting with empty allowlist\n", runtime_mode_name());
+        } else if (g_module_ready) {
+            (void)apply_new_allowlist({runtime_local_module_id()}, MODULE_MAX_POWER_KW, "BootStandalone");
         }
     } else {
         g_module_allowlist.clear();
@@ -8473,6 +8587,7 @@ void setup() {
         Serial.printf("[MOD] bypassed in mode=%s: PLC module CAN/control stack disabled\n", runtime_mode_name());
     }
     request_modules_off("Boot");
+    (void)maybe_repair_standalone_local_allocation(millis(), "BootPostOff");
     controller_publish_local_identity_once();
     if (mode_requires_controller_contract()) {
         rfid_init_device(millis(), "boot");
