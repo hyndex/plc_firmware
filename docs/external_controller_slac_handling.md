@@ -1,11 +1,12 @@
 # External Controller SLAC Handling Guide
 
-Updated: 2026-03-18
+Updated: 2026-03-25
 
 This document is the current reference for:
 
 - `mode=0` `standalone`
 - `mode=1` `external_controller`
+- [`tools/controller_cbmodules_single_module_charge.cpp`](/home/jpi/Desktop/EVSE/plc_firmware/tools/controller_cbmodules_single_module_charge.cpp)
 - [`tools/external_controller_single_module_charge_test.py`](/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py)
 
 The current design goal is:
@@ -28,8 +29,13 @@ runtime path.
 
 Current bench scripts:
 
+- [`tools/controller_cbmodules_single_module_charge.cpp`](/home/jpi/Desktop/EVSE/plc_firmware/tools/controller_cbmodules_single_module_charge.cpp)
+  - current recommended controller-mode validator
+  - uses the same `jpmodules::ModuleManager` path as standalone
+  - latches raw PLC SLAC/FSM log lines so controller-side SLAC retry does not
+    race delayed status visibility
 - [`tools/external_controller_single_module_charge_test.py`](/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py)
-  - recommended for pure controller-mode SLAC / HLC / charging validation
+  - older Python controller harness
   - single PLC, single module, single relay, no donor/share path
 
 ## 2. Terms and Visible States
@@ -110,6 +116,39 @@ Important rule in `mode=1`:
 
 - the PLC does not autonomously drive the module-manager path
 - `CTRL STOP` affects PLC-side stop policy, but relay state still belongs to `CTRL RELAY`
+
+## 3.1 Controller-side SLAC start rule
+
+The current controller harness must treat raw PLC log lines as the authoritative
+"SLAC has already started" signal.
+
+Required raw lines to latch immediately:
+
+- `[SLAC] session start`
+- `[FSM] EnterBCD`
+- `[FSM] Idle -> WaitForMatchingStart`
+- `[FSM] WaitForMatchingStart -> Matching`
+- `[FSM] WaitForSlacMatch -> Matched`
+
+Required raw failure lines:
+
+- `WaitForMatchingStart -> SignalError`
+- `SlacInitTimeout`
+- `MatchingFailed`
+- `SlacFailure`
+
+Why this matters:
+
+- the firmware now suppresses verbose `[SERCTRL] EVT SLAC` and related status
+  chatter during active controller charge windows
+- a host tool that waits only for delayed status visibility can mistakenly
+  resend `CTRL SLAC start` while the PLC is already in
+  `session start / EnterBCD / WaitForMatchingStart`
+- that duplicate host-side start handling was the observed cause of repeated
+  `SignalError / SlacInitTimeout` loops instead of clean one-shot matching
+
+The current C++ controller harness therefore latches raw SLAC/FSM lines first
+and only uses the summarized status stream as secondary confirmation.
 
 ## 4. Flashing and Making the Mode Effective
 

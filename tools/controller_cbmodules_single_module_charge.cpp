@@ -498,6 +498,24 @@ struct PlcLiveState {
     int64_t last_status_rx_ms{0};
 };
 
+void note_slac_starting(PlcLiveState& live) {
+    live.session_started = true;
+    live.slac_session = true;
+    live.slac_matched = false;
+    if (live.slac_fsm == 0) {
+        live.slac_fsm = 1;
+    }
+}
+
+void note_slac_failed(PlcLiveState& live) {
+    live.session_started = false;
+    live.slac_session = false;
+    live.slac_matched = false;
+    if (live.slac_failures < std::numeric_limits<int>::max()) {
+        live.slac_failures += 1;
+    }
+}
+
 class SerialControllerClient {
 public:
     SerialControllerClient(std::string port_path, int baud, std::string log_path)
@@ -958,6 +976,9 @@ private:
             live_.slac_matched = live_.slac_session && parse_bool_token(kv, "matched");
             live_.slac_fsm = parse_int_token(kv, "fsm").value_or(0);
             live_.slac_failures = parse_int_token(kv, "failures").value_or(0);
+            if (!live_.slac_session && !live_.slac_matched) {
+                live_.session_started = false;
+            }
             return;
         }
 
@@ -986,6 +1007,31 @@ private:
             live_.stop_active = parse_bool_token(kv, "stop_active");
             live_.stop_hard = parse_bool_token(kv, "stop_hard");
             live_.stop_done = parse_bool_token(kv, "stop_done");
+            return;
+        }
+
+        if (line.find("[SLAC] session start") != std::string::npos ||
+            line.find("[FSM] EnterBCD") != std::string::npos ||
+            line.find("[FSM] Idle -> WaitForMatchingStart") != std::string::npos ||
+            line.find("[FSM] WaitForMatchingStart -> Matching") != std::string::npos) {
+            std::lock_guard<std::mutex> live_lock(live_mutex_);
+            note_slac_starting(live_);
+            return;
+        }
+
+        if (line.find("[FSM] WaitForSlacMatch -> Matched") != std::string::npos) {
+            std::lock_guard<std::mutex> live_lock(live_mutex_);
+            note_slac_starting(live_);
+            live_.slac_matched = true;
+            return;
+        }
+
+        if (line.find("WaitForMatchingStart -> SignalError") != std::string::npos ||
+            line.find("SlacInitTimeout") != std::string::npos ||
+            line.find("MatchingFailed") != std::string::npos ||
+            line.find("SlacFailure") != std::string::npos) {
+            std::lock_guard<std::mutex> live_lock(live_mutex_);
+            note_slac_failed(live_);
             return;
         }
 
@@ -1973,8 +2019,8 @@ private:
     }
 
     bool active_charge_window(const PlcLiveState& live) const {
-        return live.hlc_active || live.slac_matched || stage_name_ == "precharge" || stage_name_ == "power_delivery" ||
-               stage_name_ == "current_demand";
+        return live.hlc_active || live.slac_matched || live.slac_session || live.session_started ||
+               stage_name_ == "precharge" || stage_name_ == "power_delivery" || stage_name_ == "current_demand";
     }
 
     bool should_latch_active_stage(const PlcLiveState& live, int64_t now_ms) const {
@@ -2038,7 +2084,8 @@ private:
             last_status_poll_ms_ = now_ms;
         }
 
-        const bool waiting_for_slac = !live.slac_matched && !live.hlc_active;
+        const bool waiting_for_slac =
+            !live.slac_matched && !live.hlc_active && !live.slac_session && !live.session_started;
         const bool at_b1 = live.cp_phase == "B1";
         const bool digital_comm = live.cp_phase == "B2" || live.cp_phase == "C" || live.cp_phase == "D";
         const bool slac_start_in_progress = live.session_started || digital_comm;
