@@ -1,0 +1,82 @@
+[BOOT] usb-touch reset /dev/ttyACM0
+PLC_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_cbmodules_single_module_charge_20260324_135241.log
+CAN_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_cbmodules_single_module_charge_20260324_135241_can.log
+SUMMARY_FILE=/home/jpi/Desktop/EVSE/plc_firmware/logs/controller_cbmodules_single_module_charge_20260324_135241_summary.json
+[BOOT] host module ready assigned=1 online=1 off=1 v=0.0 i=0.0
+[BOOT] plc_id=2 connector_id=2 module=PLC2_MXR_02 group=2
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=0.0 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=5.1 presentI=0.0 cp=B2 slac=0 hlc=0
+[HOSTMOD] reason=precharge en=1 reqV=500.0 reqI=2.0 ok=1 assigned=1 active=0 beforeV=5.1 beforeI=0.0 afterV=5.1 afterI=0.0 lc=Allocated tr=Idle off=1 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=5.1 snapI=0.0 beforeOff=1
+[HOSTMOD] reason=precharge en=1 reqV=500.0 reqI=2.0 ok=1 assigned=1 active=1 beforeV=5.1 beforeI=0.0 afterV=5.1 afterI=0.0 lc=Allocated tr=Idle off=1 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=5.1 snapI=0.0 beforeOff=1
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=7.7 beforeI=0.0 afterV=7.7 afterI=0.0 lc=Allocated tr=Idle off=1 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=7.7 snapI=0.0 beforeOff=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=1 reqV=500.0 reqI=50.0 presentV=7.7 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=1 reqV=500.0 reqI=50.0 presentV=25.8 presentI=0.0 ready=1
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=71.4 beforeI=0.0 afterV=71.4 afterI=0.0 lc=Allocated tr=Idle off=0 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=71.4 snapI=0.0 beforeOff=0
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=71.4 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=152.7 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=213.5 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=262.0 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=310.5 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=358.9 presentI=0.0 ready=1
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=358.9 beforeI=0.0 afterV=358.9 afterI=0.0 lc=Allocated tr=Idle off=0 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=358.9 snapI=0.0 beforeOff=0
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=439.0 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=467.2 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=488.4 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=498.6 presentI=0.0 ready=1
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=499.9 beforeI=0.0 afterV=499.9 afterI=0.0 lc=Allocated tr=Idle off=0 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=499.9 snapI=0.0 beforeOff=0
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=0 moduleOff=0 reqV=500.0 reqI=50.0 presentV=500.0 presentI=0.0 ready=1
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=500.0 beforeI=0.0 afterV=500.0 afterI=0.0 lc=Allocated tr=Idle off=0 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=500.0 snapI=0.0 beforeOff=0
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=0 reqV=500.0 reqI=50.0 presentV=500.0 presentI=0.0 ready=1
+[HOSTMOD] reason=none en=0 reqV=0.0 reqI=0.0 ok=1 assigned=1 active=1 beforeV=500.0 beforeI=0.0 afterV=500.0 afterI=0.0 lc=Allocated tr=Idle off=0 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=500.0 snapI=0.0 beforeOff=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=164.7 presentI=0.0 cp=B (2203 mV) slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=7.9 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=8.4 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=8.3 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=7.9 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=7.7 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=7.3 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=7.0 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=6.7 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=6.5 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=6.3 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=6.1 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=6.0 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.8 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.7 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.6 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.5 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.5 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.4 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.3 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.3 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.3 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.3 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.3 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.2 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.1 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.1 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.1 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.1 presentI=0.0 cp=B2 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.1 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.1 presentI=0.0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=50.0 presentV=5.1 presentI=0.0 cp=B2 slac=0 hlc=0
+[HOSTMOD] reason=precharge en=1 reqV=500.0 reqI=2.0 ok=1 assigned=1 active=0 beforeV=5.1 beforeI=0.0 afterV=5.1 afterI=0.0 lc=Allocated tr=Idle off=1 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=5.1 snapI=0.0 beforeOff=1
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=5.1 beforeI=0.0 afterV=5.1 afterI=0.0 lc=Allocated tr=Idle off=1 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=5.1 snapI=0.0 beforeOff=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=1 reqV=500.0 reqI=50.0 presentV=5.1 presentI=0.0 ready=1
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=5.1 beforeI=0.0 afterV=5.1 afterI=0.0 lc=Allocated tr=Idle off=1 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=5.1 snapI=0.0 beforeOff=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=0 moduleOff=1 reqV=500.0 reqI=50.0 presentV=5.1 presentI=0.0 ready=1
+[PROGRESS] phase=wait_for_session stage=current_demand relay1=1 targetV=500.0 targetI=50.0 presentV=9.0 presentI=0.0 cp=C (1906 mV) slac=0 hlc=0
+[HOSTMOD] reason=current_demand en=1 reqV=500.0 reqI=50.0 ok=1 assigned=1 active=1 beforeV=9.0 beforeI=0.0 afterV=9.0 afterI=0.0 lc=Allocated tr=Idle off=1 offVerified=0 lease=0 online=1 group=PLC_GROUP_2 snapV=9.0 snapI=0.0 beforeOff=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=1 reqV=500.0 reqI=50.0 presentV=9.0 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=1 reqV=500.0 reqI=50.0 presentV=23.8 presentI=0.0 ready=1
+[HOSTFB] stage=current_demand targetApplied=1 relay=1 valid=1 telemetryValid=1 sampleValid=1 sampleFresh=1 moduleOff=1 reqV=500.0 reqI=50.0 presentV=43.0 presentI=0.0 ready=1
+[HOSTMOD] reason=current_demand en=1 req

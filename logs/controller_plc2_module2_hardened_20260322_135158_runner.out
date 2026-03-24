@@ -1,0 +1,51 @@
+[RESET] rebooting PLC on /dev/ttyACM0 wait_s=14.0
+[RESET] boot log captured in logs/controller_plc2_module2_hardened_20260322_135158.log.reset.log
+PLC_LOG=logs/controller_plc2_module2_hardened_20260322_135158.log
+CAN_LOG=logs/controller_plc2_module2_hardened_20260322_135158_can.log
+SUMMARY_FILE=logs/controller_plc2_module2_hardened_20260322_135158_summary.json
+[PHASE] bootstrap
+[BOOT] mode=external_controller plc_id=2 connector_id=2 can_stack=0 module_mgr=0
+[MODULE] addr=2 grp=2 rated=30.0A status=0x00400000 flags=OFF
+[PHASE] wait_for_session
+[CTRL] remote start -> B1 to B2
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=4.8 presentI=0.0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=4.8 presentI=0.0 ready=0 cp=B2 slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.5 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.3 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.1 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.0 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.9 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.9 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.8 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.8 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.8 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.8 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.8 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=4.8 presentI=0.0 ready=0 cp=B1 slac=0 hlc=1
+Traceback (most recent call last):
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 1805, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 1801, in main
+    return runner.run()
+           ~~~~~~~~~~^^
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 1700, in run
+    self._tick_telemetry(now)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 1420, in _tick_telemetry
+    self.can.refresh(self.home_module, response_window_s=self.args.telemetry_response_s)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 458, in refresh
+    self._log(
+    ~~~~~~~~~^
+        f"TEL addr={module.address} grp={module.group} V={module.voltage_v} I={module.current_a} "
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        f"{module_status_text(module)}"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/jpi/Desktop/EVSE/plc_firmware/tools/external_controller_single_module_charge_test.py", line 394, in _log
+    self.log_fp.write(f"{ts()} {line}\n")
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

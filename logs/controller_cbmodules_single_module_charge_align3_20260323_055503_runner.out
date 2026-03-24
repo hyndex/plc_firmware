@@ -1,0 +1,4 @@
+PLC_LOG=logs/controller_cbmodules_single_module_charge_align3_20260323_055503.log
+CAN_LOG=logs/controller_cbmodules_single_module_charge_align3_20260323_055503_can.log
+SUMMARY_FILE=logs/controller_cbmodules_single_module_charge_align3_20260323_055503_summary.json
+[FAIL] timeout waiting for PLC status

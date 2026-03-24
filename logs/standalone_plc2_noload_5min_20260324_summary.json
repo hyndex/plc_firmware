@@ -1,0 +1,11 @@
+{
+  "matched": false,
+  "precharge": false,
+  "power_delivery": false,
+  "first_current_demand_s": 0.023,
+  "last_current_demand_s": 329.794,
+  "hold_from_first_current_demand_s": 329.771,
+  "cp_drop_after_current_demand": false,
+  "line_count": 8124,
+  "log": "/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_plc2_noload_5min_20260324.log"
+}

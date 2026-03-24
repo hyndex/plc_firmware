@@ -1,0 +1,15 @@
+{
+  "status_line": "[SERCTRL] STATUS mode=0(standalone) plc_id=1 connector_id=1 controller_id=1 module_addr=0x01 local_group=1 module_id=PLC1_MXR_01 can_stack=1 module_mgr=1 cp=C duty=5 hb=1 auth=255 allow_slac=1 allow_energy=1 armed=0 start=0 relay1=1 relay2=0 relay3=0 alloc_sz=1 ctrl_fb=0 stop_active=0 stop_hard=0 stop_done=0 emergency=0 led=charging led_count=10",
+  "cp": "C",
+  "slac_matched": false,
+  "precharge_seen": false,
+  "powerdelivery_seen": false,
+  "currentdemand_seen": true,
+  "currentdemand_runtime_seen": true,
+  "delivery_ready_seen": true,
+  "relay_closed_seen": false,
+  "present_v_max": 500.4,
+  "present_i_max": 41.46,
+  "last_currentdemand_runtime": "[HLC] {\"msg\":\"CurrentDemandRuntime\",\"reqV\":500.0,\"reqI\":50.0,\"appliedV\":500.0,\"appliedI\":50.00,\"allow\":1,\"delivery\":1,\"targetApplied\":1,\"ready\":1,\"hold\":0,\"presentV\":500.4,\"presentI\":41.46,\"relay1\":1,\"prechargeDone\":1,\"telemetryValid\":1,\"sampleFresh\":1,\"saturated\":0}",
+  "elapsed_s": 8.589
+}

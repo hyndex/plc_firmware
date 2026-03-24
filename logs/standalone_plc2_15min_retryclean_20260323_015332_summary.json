@@ -1,0 +1,20 @@
+{
+  "port": "/dev/ttyACM0",
+  "log_path": "logs/standalone_plc2_15min_retryclean_20260323_015332.log",
+  "result": "fail",
+  "reason": "current_demand_runtime_gap",
+  "client_rc": null,
+  "cp_drop": null,
+  "slac_match_delay_s": null,
+  "precharge_delay_s": null,
+  "power_delivery_delay_s": null,
+  "current_req_delay_s": 0.104,
+  "charge_started": true,
+  "charge_start_delay_s": 0.106,
+  "charge_duration_s": 865.135,
+  "current_demand_samples": 5160,
+  "present_v_min": 500.2,
+  "present_v_max": 500.5,
+  "present_i_min": 40.65,
+  "present_i_max": 41.45
+}

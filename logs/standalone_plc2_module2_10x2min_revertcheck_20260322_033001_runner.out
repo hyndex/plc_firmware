@@ -1,0 +1,9 @@
+RUN_BASE=logs/standalone_plc2_module2_10x2min_revertcheck_20260322_033001
+[RESET] session=01 start=2026-03-22T03:30:01
+[RUN] session=01 start=2026-03-22T03:30:02
+[DONE] session=01 result=fail end=2026-03-22T03:33:02 failure=start timeout after 180.0s
+[RESET] session=02 start=2026-03-22T03:33:32
+[RUN] session=02 start=2026-03-22T03:33:33
+[DONE] session=02 result=fail end=2026-03-22T03:36:33 failure=start timeout after 180.0s
+[RESET] session=03 start=2026-03-22T03:37:03
+[RUN] session=03 start=2026-03-22T03:37:04

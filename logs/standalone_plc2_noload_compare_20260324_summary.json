@@ -1,0 +1,15 @@
+{
+  "window_s": 360,
+  "first_current_demand": "HLC][REQ] {\"type\":\"Curr",
+  "last_current_demand": "HLC][REQ] {\"type\":\"Curr",
+  "first_present_v_ge_490": null,
+  "last_rc104": null,
+  "precharge_req_count": 0,
+  "powerdelivery_req_count": 0,
+  "currentdemand_req_count": 1981,
+  "currentdemand_runtime_count": 1972,
+  "cp_c_times": [
+    "[CP] state D -> C (1894"
+  ],
+  "cp_b_times": []
+}

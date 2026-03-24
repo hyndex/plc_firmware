@@ -1,0 +1,18 @@
+PLC_LOG=logs/controller_plc2_module2_slacbatch40_20260323_001511_session01.log
+CAN_LOG=logs/controller_plc2_module2_slacbatch40_20260323_001511_session01_can.log
+SUMMARY_FILE=logs/controller_plc2_module2_slacbatch40_20260323_001511_session01_summary.json
+[PHASE] bootstrap
+[BOOT] mode=external_controller plc_id=2 connector_id=2 can_stack=0 module_mgr=0
+[MODULE] addr=2 grp=2 rated=30.0A status=0x00400000 flags=OFF
+[PHASE] wait_for_session
+[CTRL] remote start -> B1 to B2
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=4.4 presentI=0.0 ready=0 cp=B1 slac=0 hlc=0
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=0.0 targetI=0.0 presentV=4.4 presentI=0.0 ready=0 cp=B2 slac=1 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=6.5 presentI=0.0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=6.2 presentI=0.0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.9 presentI=0.0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.6 presentI=0.0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.3 presentI=0.0 ready=0 cp=B2 slac=0 hlc=1
+[PROGRESS] phase=wait_for_session stage=none relay1=0 targetV=500.0 targetI=2.0 presentV=5.1 presentI=0.0 ready=0 cp=B2 slac=0 hlc=1
+[FAIL] session never reached sustained CurrentDemand
+[PHASE] stopping

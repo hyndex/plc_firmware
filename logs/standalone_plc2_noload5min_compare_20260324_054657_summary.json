@@ -1,0 +1,11 @@
+{
+  "result": "pass",
+  "first_current_demand_iso": "2026-03-24T05:47:00.025488",
+  "hold_s": 300.0585174560547,
+  "cd_samples": 1346,
+  "min_v": 4.0,
+  "max_v": 499.9,
+  "fail_reason": null,
+  "client_done": null,
+  "log_path": "/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_plc2_noload5min_compare_20260324_054657.log"
+}

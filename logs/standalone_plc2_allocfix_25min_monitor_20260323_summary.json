@@ -1,0 +1,21 @@
+{
+  "started_at": 1774214623.5845544,
+  "last_current_demand_ts": 1774216123.5509531,
+  "first_current_demand_ts": 1774214623.6664991,
+  "drop_detected": false,
+  "drop_reason": null,
+  "drop_line": null,
+  "cp_c_seen": false,
+  "relay1_seen": false,
+  "assigned_seen": true,
+  "allocated_seen": true,
+  "current_demand_samples": 8375,
+  "status_samples": 0,
+  "present_v_min": 500.2,
+  "present_v_max": 500.5,
+  "present_i_min": 40.7,
+  "present_i_max": 40.75,
+  "ended_at": 1774216123.6784534,
+  "duration_s": 1500.093899011612,
+  "hold_from_first_current_demand_s": 1500.0119543075562
+}

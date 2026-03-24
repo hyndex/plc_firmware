@@ -1,0 +1,46 @@
+RUN_BASE=logs/standalone_plc2_module2_10x2min_reset3s_20260322_193830
+[RESET] session=01 start=2026-03-22T19:38:30.004
+[RUN] session=01 start=2026-03-22T19:38:33.425
+[STOP] session=01 start=2026-03-22T19:41:01.398 hold_s=120.0
+[DONE] session=01 result=pass end=2026-03-22T19:41:01 failure=
+[RESET] session=02 start=2026-03-22T19:41:01.506
+[RUN] session=02 start=2026-03-22T19:41:04.930
+[STOP] session=02 start=2026-03-22T19:43:21.790 hold_s=120.0
+[DONE] session=02 result=pass end=2026-03-22T19:43:21 failure=
+[RESET] session=03 start=2026-03-22T19:43:21.896
+[RUN] session=03 start=2026-03-22T19:43:25.319
+[STOP] session=03 start=2026-03-22T19:47:24.668 hold_s=120.0
+[DONE] session=03 result=pass end=2026-03-22T19:47:24 failure=
+[RESET] session=04 start=2026-03-22T19:47:24.775
+[RUN] session=04 start=2026-03-22T19:47:28.199
+[STOP] session=04 start=2026-03-22T19:49:56.025 hold_s=120.0
+[DONE] session=04 result=pass end=2026-03-22T19:49:56 failure=
+[RESET] session=05 start=2026-03-22T19:49:56.132
+[RUN] session=05 start=2026-03-22T19:49:59.551
+[STOP] session=05 start=2026-03-22T19:55:37.756 hold_s=120.0
+[DONE] session=05 result=pass end=2026-03-22T19:55:37 failure=
+[RESET] session=06 start=2026-03-22T19:55:37.864
+[RUN] session=06 start=2026-03-22T19:55:41.286
+[STOP] session=06 start=2026-03-22T19:58:09.762 hold_s=120.0
+[DONE] session=06 result=pass end=2026-03-22T19:58:09 failure=
+[RESET] session=07 start=2026-03-22T19:58:09.870
+[RUN] session=07 start=2026-03-22T19:58:13.292
+[STOP] session=07 start=2026-03-22T20:00:35.042 hold_s=120.0
+[DONE] session=07 result=pass end=2026-03-22T20:00:35 failure=
+[RESET] session=08 start=2026-03-22T20:00:35.150
+[RUN] session=08 start=2026-03-22T20:00:38.570
+[STOP] session=08 start=2026-03-22T20:03:06.715 hold_s=120.0
+[DONE] session=08 result=pass end=2026-03-22T20:03:06 failure=
+[RESET] session=09 start=2026-03-22T20:03:06.822
+[RUN] session=09 start=2026-03-22T20:03:10.282
+[STOP] session=09 start=2026-03-22T20:05:27.127 hold_s=120.0
+[DONE] session=09 result=pass end=2026-03-22T20:05:27 failure=
+[RESET] session=10 start=2026-03-22T20:05:27.235
+[RUN] session=10 start=2026-03-22T20:05:30.656
+[STOP] session=10 start=2026-03-22T20:08:37.755 hold_s=120.0
+[DONE] session=10 result=pass end=2026-03-22T20:08:37 failure=
+[SUMMARY] base=logs/standalone_plc2_module2_10x2min_reset3s_20260322_193830 passes=10 fails=0 end=2026-03-22T20:08:37
+[ARTIFACT] aggregate_json=logs/standalone_plc2_module2_10x2min_reset3s_20260322_193830_aggregate.json
+[ARTIFACT] aggregate_csv=logs/standalone_plc2_module2_10x2min_reset3s_20260322_193830_aggregate.csv
+[ARTIFACT] timing_json=logs/standalone_plc2_module2_10x2min_reset3s_20260322_193830_timing_analysis.json
+[ARTIFACT] timing_csv=logs/standalone_plc2_module2_10x2min_reset3s_20260322_193830_timing_analysis.csv

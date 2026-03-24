@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "mode": "standalone",
+  "plc_id": 2,
+  "module_id": "PLC2_MXR_02",
+  "cp_C_seen": false,
+  "currentdemand_req_seen": true,
+  "currentdemand_runtime_seen": true,
+  "delivery_ready_seen": true,
+  "relay1_closed_seen": false,
+  "present_v_max": 329.0,
+  "present_i_max": 29.15
+}

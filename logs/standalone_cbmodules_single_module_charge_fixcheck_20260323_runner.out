@@ -1,0 +1,5 @@
+RUN_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_cbmodules_single_module_charge_20260323_080253.log
+CAN_LOG=/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_cbmodules_single_module_charge_20260323_080253_can.log
+SUMMARY_FILE=/home/jpi/Desktop/EVSE/plc_firmware/logs/standalone_cbmodules_single_module_charge_20260323_080253_summary.json
+[BOOT] host module ready assigned=1 online=1 off=1 lc=Allocated tr=Idle v=0.0 i=0.0
+[FAIL] never reached stable high-output hold

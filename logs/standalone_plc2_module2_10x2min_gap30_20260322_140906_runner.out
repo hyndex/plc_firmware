@@ -1,0 +1,7 @@
+RUN_BASE=logs/standalone_plc2_module2_10x2min_gap30_20260322_140906
+[RESET] session=01 start=2026-03-22T14:09:06
+[RUN] session=01 start=2026-03-22T14:09:20
+[DONE] session=01 result=fail end=2026-03-22T14:13:20 failure=failed_to_start
+[GAP] after_session=01 sleep_s=30 start=2026-03-22T14:13:20
+[RESET] session=02 start=2026-03-22T14:13:50
+[RUN] session=02 start=2026-03-22T14:14:04

@@ -1,0 +1,13 @@
+3: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 16 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1024
+    link/can  promiscuity 0 allmulti 0 minmtu 0 maxmtu 0 
+    can <TRIPLE-SAMPLING> state ERROR-ACTIVE restart-ms 100 
+	  bitrate 125000 sample-point 0.875
+	  tq 500 prop-seg 6 phase-seg1 7 phase-seg2 2 sjw 1 brp 2
+	  mcp251x: tseg1 3..16 tseg2 2..8 sjw 1..4 brp 1..64 brp_inc 1
+	  clock 4000000 
+	  re-started bus-errors arbit-lost error-warn error-pass bus-off
+	  0          0          0          2          0          0         numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535 tso_max_size 65536 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus spi parentdev spi0.0 
+    RX:  bytes packets errors dropped  missed   mcast           
+      52047380 6505926      2      86       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+       4920944  615118      0       0       0       0 

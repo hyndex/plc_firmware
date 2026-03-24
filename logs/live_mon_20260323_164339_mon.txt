@@ -1,0 +1,47 @@
+pid=3619436
+--- sample 1 16:43:39.799 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 S          00:00 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+--- sample 2 16:43:40.985 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 S          00:01 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+--- sample 3 16:43:42.153 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:02 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0
+--- sample 4 16:43:43.324 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:03 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0
+--- sample 5 16:43:44.488 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:04 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0
+--- sample 6 16:43:45.665 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:05 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0
+--- sample 7 16:43:46.855 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:07 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0
+--- sample 8 16:43:48.031 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:08 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0
+--- sample 9 16:43:49.204 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:09 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0
+--- sample 10 16:43:50.364 ---
+    PID    PPID STAT     ELAPSED CMD
+3619436 3619424 Sl         00:10 ./tools/controller_cbmodules_single_module_charge --plc-port /dev/ttyACM0 --can-iface can0 --home-addr 2 --home-group 2 --session-start-timeout-s 20 --current-demand-hold-s 5
+COMMAND       PID USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+controlle 3619436  jpi 5u   CHR  166,0      0t0  649 /dev/ttyACM0

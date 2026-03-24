@@ -63,6 +63,12 @@ ACK_CMD_SLAC = 0x12
 ACK_CMD_FEEDBACK = 0x1A
 DEFAULT_ESP_RESET_PULSE_S = 0.2
 DEFAULT_ESP_RESET_WAIT_S = 14.0
+SERIAL_READ_TIMEOUT_S = 0.02
+SERIAL_INTER_BYTE_TIMEOUT_S = 0.002
+SERIAL_WRITE_TIMEOUT_S = 0.2
+SERIAL_MAX_PENDING_BYTES = 65536
+SERIAL_MAX_LINE_BYTES = 4096
+MXR_DEFAULT_OUTPUT_POWER_KW = 30.0
 
 
 STATUS_RE = re.compile(
@@ -182,20 +188,20 @@ class SerialLink:
         self.reconnect_lock = threading.Lock()
         self.last_write_ts = 0.0
         self.pending_status_line = ""
+        self.rx_buffer = bytearray()
 
     def _build_serial(self) -> serial.Serial:
         kwargs = {
             "port": self.port,
             "baudrate": self.baud,
-            "timeout": 0.05,
-            "write_timeout": 0.5,
+            "timeout": SERIAL_READ_TIMEOUT_S,
+            "write_timeout": SERIAL_WRITE_TIMEOUT_S,
+            "inter_byte_timeout": SERIAL_INTER_BYTE_TIMEOUT_S,
         }
         try:
             ser = serial.Serial(exclusive=True, **kwargs)
         except TypeError:
             ser = serial.Serial(**kwargs)
-        ser.reset_input_buffer()
-        ser.reset_output_buffer()
         return ser
 
     def _close_serial_locked(self) -> None:
@@ -228,6 +234,7 @@ class SerialLink:
                     self.last_write_ts = 0.0
                 self.reader_error = None
                 self.pending_status_line = ""
+                self.rx_buffer = bytearray()
                 self._log(f"{ts()} [HOST] reconnected {self.port}")
                 return True
             detail = f"{reason}: {last_exc}" if last_exc else reason
@@ -246,6 +253,11 @@ class SerialLink:
 
     def close(self) -> None:
         self.stop_event.set()
+        if self.ser:
+            try:
+                self.ser.cancel_read()
+            except Exception:
+                pass
         if self.reader_thread and self.reader_thread.is_alive():
             self.reader_thread.join(timeout=2.0)
         with self.write_lock:
@@ -264,7 +276,7 @@ class SerialLink:
         with self.write_lock:
             if not self.ser:
                 raise RuntimeError("serial port not open")
-            wait_s = 0.04 - (time.time() - self.last_write_ts)
+            wait_s = 0.01 - (time.time() - self.last_write_ts)
             if wait_s > 0:
                 time.sleep(wait_s)
             payload = (cmd.strip() + "\n").encode("utf-8", errors="ignore")
@@ -284,7 +296,8 @@ class SerialLink:
     def _reader_loop(self) -> None:
         while not self.stop_event.is_set():
             try:
-                raw = self.ser.readline() if self.ser else b""
+                ser = self.ser
+                raw = ser.read(ser.in_waiting or 1) if ser else b""
             except Exception as exc:
                 self._log(f"{ts()} [HOST] read failed: {exc}")
                 if self._reconnect(f"read failed: {exc}"):
@@ -292,21 +305,37 @@ class SerialLink:
                 break
             if not raw:
                 continue
-            line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
-            self._log(f"{ts()} {line}")
-            for fragment in split_log_fragments(line):
-                if self.pending_status_line:
-                    if fragment and not fragment.startswith("["):
-                        combined = self.pending_status_line + fragment
+            self.rx_buffer.extend(raw)
+            if len(self.rx_buffer) > SERIAL_MAX_PENDING_BYTES:
+                self._log(f"{ts()} [HOST] dropping oversized RX buffer on {self.port}")
+                self.rx_buffer.clear()
+                self.pending_status_line = ""
+                continue
+            while True:
+                newline_idx = self.rx_buffer.find(b"\n")
+                if newline_idx < 0:
+                    if len(self.rx_buffer) > SERIAL_MAX_LINE_BYTES:
+                        self._log(f"{ts()} [HOST] dropping oversized partial line on {self.port}")
+                        self.rx_buffer.clear()
                         self.pending_status_line = ""
-                        self.parse_line(combined)
+                    break
+                raw_line = bytes(self.rx_buffer[:newline_idx])
+                del self.rx_buffer[: newline_idx + 1]
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\r")
+                self._log(f"{ts()} {line}")
+                for fragment in split_log_fragments(line):
+                    if self.pending_status_line:
+                        if fragment and not fragment.startswith("["):
+                            combined = self.pending_status_line + fragment
+                            self.pending_status_line = ""
+                            self.parse_line(combined)
+                            continue
+                        self.parse_line(self.pending_status_line)
+                        self.pending_status_line = ""
+                    if fragment.startswith("[SERCTRL] STATUS") and "stop_done=" not in fragment:
+                        self.pending_status_line = fragment
                         continue
-                    self.parse_line(self.pending_status_line)
-                    self.pending_status_line = ""
-                if fragment.startswith("[SERCTRL] STATUS") and "stop_done=" not in fragment:
-                    self.pending_status_line = fragment
-                    continue
-                self.parse_line(fragment)
+                    self.parse_line(fragment)
 
 
 class DirectMaxwellCan:
@@ -322,7 +351,6 @@ class DirectMaxwellCan:
         self.sock = None
         self.log_fp = None
         self.started: set[tuple[int, int]] = set()
-        self.last_on_attempt_at: dict[tuple[int, int], float] = {}
         self.last_input_mode: dict[tuple[int, int], int] = {}
 
     def open(self) -> None:
@@ -425,23 +453,15 @@ class DirectMaxwellCan:
         key = (module.address, module.group)
         self.last_input_mode[key] = desired_mode
         self.started.discard(key)
-        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, 0)
-        time.sleep(0.02)
         self._log(f"RESET addr={module.address} grp={module.group} input_mode={desired_mode}")
-        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00010000)
-        time.sleep(0.04)
-        mxr.send_set_int(self.sock, module.address, module.group, 0x0031, 0x00010000)
+        mxr.soft_reset_defaults(self.sock, module, input_mode=desired_mode)
         time.sleep(0.02)
-        mxr.send_set_int(self.sock, module.address, module.group, 0x0031, 0x00000000)
+        mxr.send_set_float(self.sock, module.address, module.group, 0x0020, MXR_DEFAULT_OUTPUT_POWER_KW)
+        self._log(
+            f"RESET-POWER addr={module.address} grp={module.group} output_power_kw={MXR_DEFAULT_OUTPUT_POWER_KW:.1f}"
+        )
         time.sleep(0.02)
-        mxr.send_set_int(self.sock, module.address, module.group, 0x0044, 0x00010000)
-        time.sleep(0.02)
-        mxr.send_set_int(self.sock, module.address, module.group, 0x0044, 0x00000000)
-        time.sleep(0.02)
-        mxr.send_set_int(self.sock, module.address, module.group, 0x0046, desired_mode)
-        time.sleep(0.04)
-        self.last_on_attempt_at.pop(key, None)
-        self.refresh(module, response_window_s=0.4)
+        self.refresh(module, response_window_s=0.5)
 
     def set_output(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> None:
         if not self.sock:
@@ -451,43 +471,23 @@ class DirectMaxwellCan:
         current_raw = int(round(max(0.0, safe_current_a) * self.abs_current_scale))
         current_raw = max(0, min(current_raw, 0xFFFFFFFF))
         key = (module.address, module.group)
-        now = time.monotonic()
         if key not in self.started:
             self._log(
                 f"START addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
             )
-            time.sleep(0.01)
-            mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00000000)
-            time.sleep(0.01)
-            mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, safe_voltage_v)
-            time.sleep(0.01)
-            mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, current_raw)
-            self.started.add(key)
-            self.last_on_attempt_at[key] = now
-            return
-        self._log(
-            f"SET addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
-        )
-        if safe_current_a > 0.05 and module_is_off(module) and (now - self.last_on_attempt_at.get(key, 0.0)) >= 0.25:
+        else:
             self._log(
-                f"RE-ON addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
+                f"SET addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
             )
-            mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00000000)
-            time.sleep(0.01)
-            self.last_on_attempt_at[key] = now
-        mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, safe_voltage_v)
-        time.sleep(0.005)
-        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, current_raw)
+        mxr.module_on_absolute(self.sock, module, safe_voltage_v, safe_current_a, self.abs_current_scale)
+        self.started.add(key)
 
     def stop_output(self, module: mxr.ModuleInfo) -> None:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
         self._log(f"STOP addr={module.address} grp={module.group}")
-        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, 0)
-        time.sleep(0.01)
-        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_ONOFF, 0x00010000)
+        mxr.module_off(self.sock, module)
         self.started.discard((module.address, module.group))
-        self.last_on_attempt_at.pop((module.address, module.group), None)
 
 
 def safe_float(value: object, fallback: float = 0.0) -> float:
@@ -791,9 +791,9 @@ class SingleModuleChargeRunner:
         self.args = args
         self.live = PlcLiveState("plc")
         self.live_lock = threading.RLock()
-
         self.status_queue: Deque[PlcStatus] = deque()
         self.ack_queue: Deque[Ack] = deque()
+        self.queue_cv = threading.Condition()
 
         self.link = SerialLink(args.plc_port, args.baud, args.plc_log, self._parse_line)
         self.can = DirectMaxwellCan(
@@ -885,21 +885,25 @@ class SingleModuleChargeRunner:
                 self.live.relay_states[2] = status.relay2 != 0
                 self.live.relay_states[3] = status.relay3 != 0
                 self.last_status_rx = now
-            self.status_queue.append(status)
+            with self.queue_cv:
+                self.status_queue.append(status)
+                self.queue_cv.notify_all()
             return
 
         ack_match = ACK_RE.search(line)
         if ack_match:
-            self.ack_queue.append(
-                Ack(
-                    cmd_hex=int(ack_match.group(1), 16),
-                    seq=int(ack_match.group(2)),
-                    status=int(ack_match.group(3)),
-                    detail0=int(ack_match.group(4)),
-                    detail1=int(ack_match.group(5)),
-                    received_at=now,
+            with self.queue_cv:
+                self.ack_queue.append(
+                    Ack(
+                        cmd_hex=int(ack_match.group(1), 16),
+                        seq=int(ack_match.group(2)),
+                        status=int(ack_match.group(3)),
+                        detail0=int(ack_match.group(4)),
+                        detail1=int(ack_match.group(5)),
+                        received_at=now,
+                    )
                 )
-            )
+                self.queue_cv.notify_all()
             return
 
         relay_match = RELAY_EVT_RE.search(line)
@@ -1025,13 +1029,16 @@ class SingleModuleChargeRunner:
 
     def _wait_for_status(self, timeout_s: float = 2.0) -> PlcStatus:
         deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            if self.status_queue:
-                return self.status_queue.popleft()
-            if self.link.reader_error:
-                raise RuntimeError(f"serial reader failed: {self.link.reader_error}")
-            time.sleep(0.02)
-        raise RuntimeError("timeout waiting for PLC status")
+        with self.queue_cv:
+            while True:
+                if self.status_queue:
+                    return self.status_queue.popleft()
+                if self.link.reader_error:
+                    raise RuntimeError(f"serial reader failed: {self.link.reader_error}")
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise RuntimeError("timeout waiting for PLC status")
+                self.queue_cv.wait(timeout=min(0.05, remaining))
 
     def _recent_status_fallback(self, max_age_s: float) -> Optional[PlcStatus]:
         with self.live_lock:
@@ -1060,8 +1067,8 @@ class SingleModuleChargeRunner:
         sent_after: float = 0.0,
     ) -> Ack:
         deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            if self.ack_queue:
+        with self.queue_cv:
+            while True:
                 pending = list(self.ack_queue)
                 self.ack_queue.clear()
                 match: Optional[Ack] = None
@@ -1081,10 +1088,12 @@ class SingleModuleChargeRunner:
                 if match is not None:
                     self._sync_tx_seq(cmd_hex, match.seq)
                     return match
-            if self.link.reader_error:
-                raise RuntimeError(f"serial reader failed: {self.link.reader_error}")
-            time.sleep(0.02)
-        raise RuntimeError(f"timeout waiting for ack 0x{cmd_hex:02X}")
+                if self.link.reader_error:
+                    raise RuntimeError(f"serial reader failed: {self.link.reader_error}")
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise RuntimeError(f"timeout waiting for ack 0x{cmd_hex:02X}")
+                self.queue_cv.wait(timeout=min(0.05, remaining))
 
     def _send_expect_ack(self, cmd: str, cmd_hex: int, timeout_s: float = 5.0, retries: int = 1) -> Ack:
         attempts = max(1, retries + 1)
@@ -1269,7 +1278,8 @@ class SingleModuleChargeRunner:
                 raise RuntimeError(f"CTRL HB rejected status={ack.status}")
             self.last_hb = now
 
-        if (now - self.last_auth) >= 1.0:
+        auth_refresh_s = max(1.0, min(self.args.auth_ttl_ms / 2000.0, (self.args.auth_ttl_ms - 1500) / 1000.0))
+        if (now - self.last_auth) >= auth_refresh_s:
             ack = self._send_expect_ack(
                 f"CTRL AUTH grant {self.args.auth_ttl_ms}",
                 ACK_CMD_AUTH,
@@ -1280,7 +1290,9 @@ class SingleModuleChargeRunner:
                 raise RuntimeError(f"CTRL AUTH grant rejected status={ack.status}")
             self.last_auth = now
 
-        if (now - self.last_status_poll) >= self.args.status_interval_s:
+        explicit_status_due = (now - self.last_status_poll) >= self.args.status_interval_s
+        status_stale = self.last_status_rx <= 0.0 or (now - self.last_status_rx) >= max(1.0, self.args.status_interval_s)
+        if explicit_status_due and status_stale:
             try:
                 self._query_status(
                     timeout_s=min(1.0, self.args.status_interval_s),
@@ -1289,6 +1301,8 @@ class SingleModuleChargeRunner:
                 )
             except Exception as exc:
                 self._note_once(f"status poll degraded during {self.phase}: {exc}")
+            self.last_status_poll = now
+        elif explicit_status_due:
             self.last_status_poll = now
 
         with self.live_lock:
@@ -1634,11 +1648,11 @@ class SingleModuleChargeRunner:
 
                 stage, target_v, requested_i = self._update_plan_from_stage()
                 now = time.time()
-                self._tick_contract(now)
                 self._tick_relay(now)
                 self._tick_module_output(now)
                 self._tick_telemetry(now)
                 ready = self._tick_feedback(now, stage, target_v, requested_i)
+                self._tick_contract(now)
                 self._tick_progress(now, stage, ready)
 
                 if self._current_demand_ready(stage, ready):
@@ -1650,7 +1664,7 @@ class SingleModuleChargeRunner:
                     )
                     print(f"[PASS] sustained CurrentDemand reached with {module_desc}", flush=True)
                     break
-                time.sleep(0.02)
+                time.sleep(0.01)
 
             if result != "pass":
                 self.failures.append("session never reached sustained CurrentDemand")
@@ -1702,13 +1716,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--feedback-interval-s", type=float, default=0.10)
     parser.add_argument("--telemetry-interval-s", type=float, default=0.10)
     parser.add_argument("--telemetry-response-s", type=float, default=0.10)
-    parser.add_argument("--status-interval-s", type=float, default=2.0)
-    parser.add_argument("--heartbeat-ms", type=int, default=800)
-    parser.add_argument("--heartbeat-timeout-ms", type=int, default=3000)
-    parser.add_argument("--auth-ttl-ms", type=int, default=6000)
+    parser.add_argument("--status-interval-s", type=float, default=5.0)
+    parser.add_argument("--heartbeat-ms", type=int, default=1500)
+    parser.add_argument("--heartbeat-timeout-ms", type=int, default=6400)
+    parser.add_argument("--auth-ttl-ms", type=int, default=12000)
     parser.add_argument("--arm-ms", type=int, default=45000)
-    parser.add_argument("--relay-hold-ms", type=int, default=5000)
-    parser.add_argument("--relay-refresh-s", type=float, default=0.6)
+    parser.add_argument("--relay-hold-ms", type=int, default=15000)
+    parser.add_argument("--relay-refresh-s", type=float, default=3.0)
     parser.add_argument("--feedback-voltage-tolerance-v", type=float, default=15.0)
     parser.add_argument("--precharge-ready-min-voltage-v", type=float, default=5.0)
     parser.add_argument("--precharge-ready-min-current-ratio", type=float, default=0.25)

@@ -1,0 +1,16 @@
+{
+  "port": "/dev/ttyACM0",
+  "log_path": "logs/standalone_plc2_15min_check_20260323_014041.log",
+  "result": "failed_to_start",
+  "reason": "timeout_before_current_demand",
+  "client_rc": null,
+  "cp_drop": null,
+  "charge_started": false,
+  "charge_start_delay_s": null,
+  "charge_duration_s": null,
+  "current_demand_samples": 0,
+  "present_v_min": null,
+  "present_v_max": null,
+  "present_i_min": null,
+  "present_i_max": null
+}
