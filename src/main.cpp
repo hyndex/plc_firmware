@@ -80,6 +80,7 @@ void ensure_serial_mutex() {
 
 bool mode_controller_routes_power_externally_over_uart();
 bool controller_serial_quiet_window();
+bool hlc_runtime_quiet_window();
 
 class LockedSerialProxy {
 public:
@@ -535,22 +536,67 @@ constexpr float PRECHARGE_VOLTAGE_TOLERANCE_V = 20.0f;
 constexpr float PRECHARGE_START_ACCEPT_MIN_RATIO = 0.05f;
 constexpr float PRECHARGE_START_ACCEPT_MIN_V = 5.0f;
 constexpr float PRECHARGE_START_ACCEPT_MIN_CURRENT_A = 0.50f;
+constexpr float CURRENT_DEMAND_ZERO_REQUEST_READY_DECAY_MAX_A = 4.0f;
 constexpr uint32_t PRECHARGE_RELAX_MIN_COUNT = 2u;
-constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_TIMEOUT_MS = 120u;
-constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_POLL_MS = 5u;
+constexpr float STANDALONE_DELIVERY_RECOVERY_MIN_VOLTAGE_RATIO = 0.90f;
+constexpr float STANDALONE_DELIVERY_RECOVERY_VOLTAGE_MARGIN_V = 8.0f;
+constexpr float STANDALONE_DELIVERY_RECOVERY_RESET_DELTA_V = 12.0f;
+constexpr float STANDALONE_DELIVERY_RECOVERY_OFF_VOLTAGE_MAX_V = 25.0f;
+constexpr float STANDALONE_DELIVERY_RECOVERY_OFF_CURRENT_MAX_A = 0.20f;
+constexpr uint32_t STANDALONE_DELIVERY_RECOVERY_GRACE_MS = 2500u;
+constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_TIMEOUT_MS = 80u;
+constexpr uint32_t CURRENT_DEMAND_FRESH_SAMPLE_POLL_MS = 2u;
+constexpr uint32_t CURRENT_DEMAND_RESPONSE_TELEMETRY_MAX_AGE_MS = 500u;
+constexpr uint32_t WELDING_VOLTAGE_PREFERRED_MAX_AGE_MS = 1500u;
+constexpr uint32_t WELDING_VOLTAGE_SETTLE_WINDOW_MS = 180u;
+constexpr uint32_t WELDING_VOLTAGE_SETTLE_POLL_MS = 30u;
+constexpr float STANDALONE_FAKE_WELDING_RESIDUAL_V = 15.0f;
+constexpr uint8_t STANDALONE_FAKE_WELDING_RESIDUAL_RESPONSES = 1u;
+constexpr uint32_t CABLE_CHECK_MONITOR_MIN_MS = 350u;
 constexpr uint32_t PRECHARGE_POST_TARGET_SAMPLE_TIMEOUT_MS = 600u;
 constexpr uint32_t POWER_DELIVERY_CONVERGENCE_WAIT_MS = 700u;
 constexpr uint32_t CONTROLLER_FEEDBACK_POST_TARGET_WAIT_MS = 20u;
 constexpr uint32_t HLC_UNEXPECTED_DISCONNECT_HOLD_MS = 10000u;
+constexpr float POST_SESSION_RESTART_SAFE_VOLTAGE_V = 60.0f;
+constexpr uint32_t POST_SESSION_RESTART_MIN_HOLD_MS = 1000u;
+constexpr uint32_t POST_SESSION_RESTART_SAMPLE_MS = 250u;
 constexpr float MODULE_MAX_VOLTAGE_V = 1000.0f;
 constexpr float MODULE_MAX_CURRENT_A = 100.0f;
+constexpr float MODULE_DEFAULT_RATED_CURRENT_A = 30.0f;
 constexpr float MODULE_MAX_POWER_KW = 30.0f;
+constexpr float MAXWELL_OUTPUT_POWER_LIMIT_POINT_MAX = 1.0f;
+constexpr uint32_t STANDALONE_OUTPUT_LIMIT_GRACE_MS = 900u;
+constexpr float STANDALONE_OUTPUT_LIMIT_CURRENT_MIN_A = 1.0f;
+constexpr float STANDALONE_OUTPUT_LIMIT_POWER_MARGIN_KW = 1.5f;
+constexpr float STANDALONE_OUTPUT_LIMIT_VOLTAGE_MARGIN_V = 12.0f;
+constexpr uint8_t MAXWELL_FUNC_SET = 0x03u;
+constexpr uint8_t MAXWELL_CONTROLLER_ADDR = 0xF0u;
+constexpr uint16_t MAXWELL_REG_ALTITUDE = 0x0017u;
+constexpr uint16_t MAXWELL_REG_OUTPUT_POWER = 0x0020u;
+constexpr uint16_t MAXWELL_REG_OUTPUT_VOLTAGE = 0x0021u;
+constexpr uint16_t MAXWELL_REG_CURRENT_LIMIT = 0x0022u;
+constexpr uint16_t MAXWELL_REG_VOLTAGE_UPPER_LIMIT = 0x0023u;
+constexpr uint16_t MAXWELL_REG_ONOFF = 0x0030u;
+constexpr uint16_t MAXWELL_REG_OV_RESET = 0x0031u;
+constexpr uint16_t MAXWELL_REG_OVP_RELEVANCE = 0x003Eu;
+constexpr uint16_t MAXWELL_REG_SHORT_RESET = 0x0044u;
+constexpr uint16_t MAXWELL_REG_INPUT_MODE = 0x0046u;
+constexpr uint32_t MAXWELL_DEFAULT_ALTITUDE_M = 1000u;
+// Maxwell register 0x0046 is the module electrical-input mode, not the PLC
+// runtime operating mode. This codebase uses 3 to match the deployed MXR stack
+// and the rest of our Maxwell tooling/logs, which consistently report/work in
+// three-phase AC input mode.
+constexpr uint32_t MAXWELL_MODULE_DEFAULT_INPUT_MODE = 3u;
+constexpr uint32_t MAXWELL_PREPARE_OFF_DELAY_MS = 80u;
+constexpr uint32_t MAXWELL_PREPARE_STEP_DELAY_MS = 20u;
+constexpr uint32_t MAXWELL_PREPARE_FINAL_DELAY_MS = 40u;
 constexpr uint32_t MODULE_ALLOWLIST_LEASE_MS = 3000;
 constexpr uint32_t MODULE_TELEMETRY_FRESH_MS = 10000;
 constexpr uint32_t MODULE_RUNTIME_LOG_INTERVAL_MS = 1000;
 constexpr uint32_t MODULE_SERVICE_INTERVAL_MS = 10;
 constexpr uint32_t MODULE_SERVICE_SLAC_CRITICAL_MS = 50;
 constexpr uint32_t MODULE_ASSIGNMENT_REPAIR_INTERVAL_MS = 500;
+constexpr uint32_t MODULE_MANAGER_RECOVERY_RETRY_MS = 2000;
 
 constexpr int RELAY_I2C_SDA = 12;
 constexpr int RELAY_I2C_SCL = 11;
@@ -572,16 +618,29 @@ constexpr int CAN_INT_PIN = 40;
 constexpr int CAN_SPI_SCK = 48;
 constexpr int CAN_SPI_MISO = 21;
 constexpr int CAN_SPI_MOSI = 47;
-constexpr uint32_t CAN_SPI_HZ = 8000000UL;
+constexpr uint32_t CAN_SPI_HZ = 2000000UL;
 constexpr uint32_t CAN_BITRATE_KBPS = 125;
+constexpr uint8_t CAN_INIT_ATTEMPTS = 3u;
+constexpr uint32_t CAN_SPI_REINIT_DELAY_MS = 5u;
 constexpr uint32_t EMERGENCY_POLL_MS = 25u;
 constexpr uint32_t EMERGENCY_DEBOUNCE_MS = 50u;
 constexpr uint32_t LED_REFRESH_MS = 40u;
 constexpr uint32_t RUNTIME_STATS_PERIOD_MS = 15000u;
 constexpr size_t PSRAM_BULK_ALLOC_THRESHOLD_BYTES = 4096u;
+constexpr float DEFAULT_MODULE_VOLTAGE_HEADROOM_V = 10.0f;
+constexpr float LEGACY_DEFAULT_MODULE_CURRENT_HEADROOM_A = 0.5f;
+constexpr float DEFAULT_MODULE_CURRENT_HEADROOM_A = 1.0f;
+constexpr float MAX_MODULE_VOLTAGE_HEADROOM_V = 100.0f;
+constexpr float MAX_MODULE_CURRENT_HEADROOM_A = 20.0f;
+constexpr bool DEFAULT_DIN_ZERO_LIMITS_COMPAT = true;
+constexpr float DEFAULT_STANDALONE_PREARM_SEED_V = 0.0f;
+constexpr float LEGACY_DEFAULT_STANDALONE_PREARM_SEED_V = 380.0f;
+constexpr float MAX_STANDALONE_PREARM_SEED_V = 500.0f;
+constexpr float DIN_ZERO_LIMIT_FALLBACK_MAX_V = 1000.0f;
+constexpr float DIN_ZERO_LIMIT_FALLBACK_MAX_I = 200.0f;
 
 constexpr uint32_t CFG_MAGIC = 0x4342504Cu; // "CBPL"
-constexpr uint16_t CFG_VERSION = 6u;
+constexpr uint16_t CFG_VERSION = 12u;
 
 #ifndef CBPLC_DEFAULT_MODE
 #ifdef CBPLC_DEFAULT_STANDALONE_MODE
@@ -620,6 +679,11 @@ enum class OperatingMode : uint8_t {
     ExternalController = 1u,
 };
 
+enum class StandaloneWeldingVoltageMode : uint8_t {
+    Measured = 0u,
+    FakeZero = 1u,
+};
+
 enum class LedPreset : uint8_t {
     Booting = 0u,
     Available = 1u,
@@ -635,6 +699,9 @@ constexpr OperatingMode DEFAULT_MODE =
     (DEFAULT_MODE_RAW == static_cast<uint8_t>(OperatingMode::Standalone))
         ? OperatingMode::Standalone
         : OperatingMode::ExternalController;
+constexpr uint8_t DEFAULT_STANDALONE_WELDING_VOLTAGE_MODE_RAW =
+    static_cast<uint8_t>(StandaloneWeldingVoltageMode::FakeZero);
+constexpr bool DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS = true;
 constexpr bool DEFAULT_SLAC_REQUIRES_CONTROLLER_START = (CBPLC_DEFAULT_SLAC_REQUIRES_CONTROLLER_START != 0);
 constexpr uint8_t DEFAULT_PLC_ID = static_cast<uint8_t>(CBPLC_DEFAULT_PLC_ID);
 constexpr uint8_t DEFAULT_CONNECTOR_ID = static_cast<uint8_t>(CBPLC_DEFAULT_CONNECTOR_ID);
@@ -735,7 +802,11 @@ bool lock_modules(uint32_t timeout_ms);
 void unlock_modules();
 void stop_hlc_stack();
 void stop_session(uint32_t now_ms);
+void clear_post_session_restart_wait();
 float snapshot_present_group_voltage_v();
+uint32_t latest_local_group_telemetry_ms();
+bool meter_sample_recent(uint32_t now_ms, uint32_t max_age_ms);
+bool module_telemetry_fresh(const cbmodules::ModuleStateView& s, uint32_t now_ms);
 void controller_force_safe_stop(const char* reason);
 bool read_emergency_pressed();
 void service_emergency_stop(uint32_t now_ms);
@@ -749,6 +820,9 @@ void service_runtime_stats(uint32_t now_ms);
 class Mcp2515Transport : public cbmodules::CanTransport {
 public:
     bool begin() {
+        if (inited_) {
+            return true;
+        }
         if (!g_can_mutex) {
             g_can_mutex = xSemaphoreCreateMutex();
             if (!g_can_mutex) {
@@ -769,11 +843,21 @@ public:
         hal_.millis = &Mcp2515Transport::hal_millis;
 
         const uint8_t osc_candidates[] = {8, 16};
-        for (uint8_t osc : osc_candidates) {
-            if (!configure(osc)) continue;
-            active_osc_mhz_ = osc;
-            inited_ = true;
-            return true;
+        inited_ = false;
+        active_osc_mhz_ = 0u;
+        for (uint8_t attempt = 1u; attempt <= CAN_INIT_ATTEMPTS; ++attempt) {
+            g_can_spi.end();
+            delay(CAN_SPI_REINIT_DELAY_MS);
+            digitalWrite(CAN_CS_PIN, HIGH);
+            delay(1);
+            g_can_spi.begin(CAN_SPI_SCK, CAN_SPI_MISO, CAN_SPI_MOSI, CAN_CS_PIN);
+            delay(CAN_SPI_REINIT_DELAY_MS);
+            for (uint8_t osc : osc_candidates) {
+                if (!configure(osc, attempt)) continue;
+                active_osc_mhz_ = osc;
+                inited_ = true;
+                return true;
+            }
         }
         return false;
     }
@@ -866,22 +950,25 @@ private:
         return millis();
     }
 
-    bool configure(uint8_t osc_mhz) {
+    bool configure(uint8_t osc_mhz, uint8_t attempt) {
         dev_ = {};
         if (!g_can_mutex) return false;
         if (xSemaphoreTake(g_can_mutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
-        if (mcp2515_init(&dev_, &hal_, osc_mhz) != ENR_OK) {
+        auto fail = [&](const char* stage) {
             xSemaphoreGive(g_can_mutex);
+            Serial.printf("[MOD] MCP2515 %s failed osc=%u attempt=%u spi_hz=%lu\n",
+                          stage ? stage : "configure",
+                          static_cast<unsigned>(osc_mhz),
+                          static_cast<unsigned>(attempt),
+                          static_cast<unsigned long>(CAN_SPI_HZ));
             return false;
+        };
+        if (mcp2515_init(&dev_, &hal_, osc_mhz) != ENR_OK) {
+            return fail("init");
         }
         dev_.spi_hz = CAN_SPI_HZ;
         if (mcp2515_begin(&dev_, true, false) != ENR_OK) {
-            xSemaphoreGive(g_can_mutex);
-            return false;
-        }
-        if (mcp2515_set_bitrate_kbps(&dev_, CAN_BITRATE_KBPS) != ENR_OK) {
-            xSemaphoreGive(g_can_mutex);
-            return false;
+            return fail("begin");
         }
         // Leave the MCP2515 in accept-all extended-frame mode because this bus
         // carries shared module telemetry and ownership frames in standalone
@@ -890,8 +977,7 @@ private:
         const uint32_t accept_all_mask = 0u;
         const uint32_t accept_all_filter = 0u;
         if (mcp2515_set_filters_ext(&dev_, accept_all_mask, &accept_all_filter, 1) != ENR_OK) {
-            xSemaphoreGive(g_can_mutex);
-            return false;
+            return fail("filters");
         }
         xSemaphoreGive(g_can_mutex);
         return true;
@@ -2168,6 +2254,87 @@ struct RuntimeConfig {
     uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
     uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
     uint8_t led_count{DEFAULT_LED_COUNT};
+    float module_voltage_headroom_v{DEFAULT_MODULE_VOLTAGE_HEADROOM_V};
+    float module_current_headroom_a{DEFAULT_MODULE_CURRENT_HEADROOM_A};
+    bool hlc_follow_vehicle_targets{DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS};
+    bool din_zero_limits_compat{DEFAULT_DIN_ZERO_LIMITS_COMPAT};
+    float standalone_prearm_seed_voltage_v{DEFAULT_STANDALONE_PREARM_SEED_V};
+    uint8_t standalone_welding_voltage_mode{DEFAULT_STANDALONE_WELDING_VOLTAGE_MODE_RAW};
+};
+
+struct RuntimeConfigV10 {
+    uint32_t magic{CFG_MAGIC};
+    uint16_t version{10u};
+    uint8_t mode{static_cast<uint8_t>(DEFAULT_MODE)};
+    bool slac_requires_controller_start{DEFAULT_SLAC_REQUIRES_CONTROLLER_START};
+    uint8_t plc_id{DEFAULT_PLC_ID};
+    uint8_t connector_id{DEFAULT_CONNECTOR_ID};
+    uint8_t controller_id{DEFAULT_CONTROLLER_ID};
+    uint8_t local_module_address{DEFAULT_LOCAL_MODULE_ADDRESS};
+    uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
+    uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
+    uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
+    uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
+    uint8_t led_count{DEFAULT_LED_COUNT};
+    float module_voltage_headroom_v{DEFAULT_MODULE_VOLTAGE_HEADROOM_V};
+    float module_current_headroom_a{DEFAULT_MODULE_CURRENT_HEADROOM_A};
+    bool din_zero_limits_compat{DEFAULT_DIN_ZERO_LIMITS_COMPAT};
+    float standalone_prearm_seed_voltage_v{DEFAULT_STANDALONE_PREARM_SEED_V};
+    uint8_t standalone_welding_voltage_mode{DEFAULT_STANDALONE_WELDING_VOLTAGE_MODE_RAW};
+};
+
+struct RuntimeConfigV8 {
+    uint32_t magic{CFG_MAGIC};
+    uint16_t version{8u};
+    uint8_t mode{static_cast<uint8_t>(DEFAULT_MODE)};
+    bool slac_requires_controller_start{DEFAULT_SLAC_REQUIRES_CONTROLLER_START};
+    uint8_t plc_id{DEFAULT_PLC_ID};
+    uint8_t connector_id{DEFAULT_CONNECTOR_ID};
+    uint8_t controller_id{DEFAULT_CONTROLLER_ID};
+    uint8_t local_module_address{DEFAULT_LOCAL_MODULE_ADDRESS};
+    uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
+    uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
+    uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
+    uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
+    uint8_t led_count{DEFAULT_LED_COUNT};
+    float module_voltage_headroom_v{DEFAULT_MODULE_VOLTAGE_HEADROOM_V};
+    float module_current_headroom_a{DEFAULT_MODULE_CURRENT_HEADROOM_A};
+    bool din_zero_limits_compat{DEFAULT_DIN_ZERO_LIMITS_COMPAT};
+    float standalone_prearm_seed_voltage_v{DEFAULT_STANDALONE_PREARM_SEED_V};
+};
+
+struct RuntimeConfigV7 {
+    uint32_t magic{CFG_MAGIC};
+    uint16_t version{7u};
+    uint8_t mode{static_cast<uint8_t>(DEFAULT_MODE)};
+    bool slac_requires_controller_start{DEFAULT_SLAC_REQUIRES_CONTROLLER_START};
+    uint8_t plc_id{DEFAULT_PLC_ID};
+    uint8_t connector_id{DEFAULT_CONNECTOR_ID};
+    uint8_t controller_id{DEFAULT_CONTROLLER_ID};
+    uint8_t local_module_address{DEFAULT_LOCAL_MODULE_ADDRESS};
+    uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
+    uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
+    uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
+    uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
+    uint8_t led_count{DEFAULT_LED_COUNT};
+    float module_voltage_headroom_v{DEFAULT_MODULE_VOLTAGE_HEADROOM_V};
+    float module_current_headroom_a{DEFAULT_MODULE_CURRENT_HEADROOM_A};
+};
+
+struct RuntimeConfigV6 {
+    uint32_t magic{CFG_MAGIC};
+    uint16_t version{6u};
+    uint8_t mode{static_cast<uint8_t>(DEFAULT_MODE)};
+    bool slac_requires_controller_start{DEFAULT_SLAC_REQUIRES_CONTROLLER_START};
+    uint8_t plc_id{DEFAULT_PLC_ID};
+    uint8_t connector_id{DEFAULT_CONNECTOR_ID};
+    uint8_t controller_id{DEFAULT_CONTROLLER_ID};
+    uint8_t local_module_address{DEFAULT_LOCAL_MODULE_ADDRESS};
+    uint8_t can_node_id{DEFAULT_CAN_NODE_ID};
+    uint32_t controller_heartbeat_timeout_ms{DEFAULT_CONTROLLER_HEARTBEAT_TIMEOUT_MS};
+    uint32_t controller_auth_ttl_ms{DEFAULT_CONTROLLER_AUTH_TTL_MS};
+    uint32_t controller_slac_arm_timeout_ms{DEFAULT_SLAC_ARM_TIMEOUT_MS};
+    uint8_t led_count{DEFAULT_LED_COUNT};
 };
 
 struct RuntimeConfigV5 {
@@ -2299,6 +2466,7 @@ Preferences g_cfg_prefs{};
 std::string g_local_group_id = "PLC_GROUP_1";
 std::string g_local_module_id = "PLC1_MXR_01";
 uint8_t g_local_module_group = 1u;
+bool g_local_module_defaults_applied = false;
 std::map<uint8_t, std::string> g_known_module_ids{};
 std::map<uint8_t, uint8_t> g_known_module_can_groups{};
 
@@ -2329,6 +2497,17 @@ uint32_t g_slac_hold_until_ms = 0;
 slac::evse::State g_last_fsm_state = slac::evse::State::Reset;
 uint32_t g_next_qca_init_ms = 0;
 bool g_emergency_stop_active = false;
+bool g_post_session_restart_wait_active = false;
+uint32_t g_post_session_restart_wait_started_ms = 0u;
+uint32_t g_post_session_restart_wait_next_sample_ms = 0u;
+uint32_t g_post_session_restart_wait_last_log_ms = 0u;
+uint8_t g_standalone_fake_welding_response_count = 0u;
+
+enum class StandaloneDeliveryRecoveryPhase : uint8_t {
+    Idle = 0,
+    WaitingForOff,
+    WaitingForRestart,
+};
 
 typedef struct {
     jpv2g_secc_t* secc;
@@ -2338,9 +2517,19 @@ typedef struct {
     bool precharge_converged;
     bool precharge_prearmed;
     bool power_delivery_enabled;
+    bool delivery_current_seen;
     bool stop_requested;
+    bool delivery_recovery_active;
+    bool delivery_recovery_attempted;
+    StandaloneDeliveryRecoveryPhase delivery_recovery_phase;
     uint32_t precharge_count;
+    uint32_t cable_check_started_ms;
+    uint32_t delivery_recovery_started_ms;
+    uint32_t output_limit_shortfall_since_ms;
     uint8_t sa_schedule_tuple_id;
+    float delivery_recovery_target_v;
+    float output_limit_target_v;
+    float output_limit_target_i;
     float negotiated_ev_max_v;
     float negotiated_ev_max_i;
 } HlcAppContext;
@@ -2591,18 +2780,21 @@ bool g_relay3_closed = false;
 uint32_t g_relay1_deadline_ms = 0;
 uint32_t g_relay2_deadline_ms = 0;
 uint32_t g_relay3_deadline_ms = 0;
-float g_last_module_target_v = 380.0f;
-float g_last_module_target_i = PRECHARGE_CURRENT_LIMIT_A;
-float g_last_requested_target_v = 380.0f;
-float g_last_requested_target_i = PRECHARGE_CURRENT_LIMIT_A;
+float g_last_module_target_v = 0.0f;
+float g_last_module_target_i = 0.0f;
+float g_last_requested_target_v = 0.0f;
+float g_last_requested_target_i = 0.0f;
 float g_assignment_power_limit_kw = 0.0f;
 bool g_module_output_enabled = false;
 std::vector<std::string> g_module_allowlist{};
 std::map<std::string, float> g_active_module_power_limits_kw{};
+uint32_t g_module_recovery_retry_at_ms = 0u;
 double g_meter_wh_real = 0.0;
 uint32_t g_meter_last_sample_ms = 0;
 float g_last_measured_v = 0.0f;
 float g_last_measured_i = 0.0f;
+uint32_t g_last_controller_feedback_sample_ms = 0u;
+float g_last_controller_feedback_voltage_v = 0.0f;
 float g_last_bms_requested_v = 0.0f;
 float g_last_bms_requested_i = 0.0f;
 uint8_t g_last_bms_hlc_stage = 0u;
@@ -2624,6 +2816,8 @@ void reset_session_measurements() {
     g_meter_last_sample_ms = 0u;
     g_last_measured_v = 0.0f;
     g_last_measured_i = 0.0f;
+    g_last_controller_feedback_sample_ms = 0u;
+    g_last_controller_feedback_voltage_v = 0.0f;
 }
 uint32_t g_last_module_runtime_log_ms = 0;
 
@@ -2697,7 +2891,8 @@ void* alloc_bulk_storage(size_t size, const char* tag) {
 }
 
 void log_runtime_stats(const char* reason) {
-    if (controller_serial_quiet_window() && reason && strcmp(reason, "periodic") == 0) {
+    if ((controller_serial_quiet_window() || hlc_runtime_quiet_window()) &&
+        reason && strcmp(reason, "periodic") == 0) {
         return;
     }
     const HeapSnapshot internal_heap = capture_heap_snapshot(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -2825,6 +3020,37 @@ OperatingMode normalize_mode(uint8_t mode_raw) {
     }
 }
 
+StandaloneWeldingVoltageMode normalize_standalone_welding_voltage_mode(uint8_t mode_raw) {
+    switch (mode_raw) {
+        case static_cast<uint8_t>(StandaloneWeldingVoltageMode::Measured):
+            return StandaloneWeldingVoltageMode::Measured;
+        case static_cast<uint8_t>(StandaloneWeldingVoltageMode::FakeZero):
+        default:
+            return StandaloneWeldingVoltageMode::FakeZero;
+    }
+}
+
+const char* standalone_welding_voltage_mode_name(StandaloneWeldingVoltageMode mode) {
+    switch (mode) {
+        case StandaloneWeldingVoltageMode::Measured:
+            return "measured";
+        case StandaloneWeldingVoltageMode::FakeZero:
+            return "fake_zero";
+        default:
+            return "unknown";
+    }
+}
+
+bool prearm_seed_uses_legacy_default(float seed_v) {
+    return std::isfinite(seed_v) &&
+           std::fabs(seed_v - LEGACY_DEFAULT_STANDALONE_PREARM_SEED_V) <= 0.5f;
+}
+
+bool current_headroom_uses_legacy_default(float current_a) {
+    return std::isfinite(current_a) &&
+           std::fabs(current_a - LEGACY_DEFAULT_MODULE_CURRENT_HEADROOM_A) <= 0.05f;
+}
+
 OperatingMode runtime_mode() {
     return normalize_mode(g_runtime_cfg.mode);
 }
@@ -2837,9 +3063,14 @@ bool mode_requires_controller_contract() {
     return runtime_mode() == OperatingMode::ExternalController;
 }
 
+bool standalone_welding_fake_zero_enabled() {
+    return mode_is_local_autonomous() &&
+           normalize_standalone_welding_voltage_mode(g_runtime_cfg.standalone_welding_voltage_mode) ==
+               StandaloneWeldingVoltageMode::FakeZero;
+}
+
 bool mode_controller_routes_power_externally_over_uart(OperatingMode mode) {
-    (void)mode;
-    return false;
+    return mode == OperatingMode::ExternalController;
 }
 
 bool mode_controller_routes_power_externally_over_uart() {
@@ -2887,12 +3118,18 @@ bool mode_uart_status_stream_active() {
 }
 
 bool mode_controller_has_final_decision() {
-    return mode_controller_owns_power_path();
+    // ExternalController owns the relay/feedback interface, but the PLC still
+    // keeps local fail-safe authority for heartbeat loss, unplug, and EV-driven
+    // stop paths.
+    return false;
+}
+
+bool hlc_runtime_quiet_window() {
+    return g_session_started || g_session_matched || g_hlc_ready || g_hlc_active || g_last_bms_hlc_stage != 0u;
 }
 
 bool controller_serial_quiet_window() {
-    return mode_uart_status_stream_active() &&
-           (g_session_started || g_session_matched || g_hlc_ready || g_hlc_active || g_last_bms_hlc_stage != 0u);
+    return mode_uart_status_stream_active() && hlc_runtime_quiet_window();
 }
 
 const char* runtime_mode_name(OperatingMode mode) {
@@ -2961,6 +3198,127 @@ uint8_t module_addr_from_id(const std::string& module_id) {
     return 0u;
 }
 
+cbmodules::ModuleSpec build_module_spec_for_addr(uint8_t module_addr);
+
+uint32_t maxwell_encode_float_be(float value) {
+    uint32_t raw = 0u;
+    memcpy(&raw, &value, sizeof(raw));
+    return raw;
+}
+
+void maxwell_write_u32_be(uint32_t value, uint8_t* out) {
+    if (!out) return;
+    out[0] = static_cast<uint8_t>((value >> 24) & 0xFFu);
+    out[1] = static_cast<uint8_t>((value >> 16) & 0xFFu);
+    out[2] = static_cast<uint8_t>((value >> 8) & 0xFFu);
+    out[3] = static_cast<uint8_t>(value & 0xFFu);
+}
+
+bool send_maxwell_set_u32(uint8_t module_addr, uint8_t module_group, uint16_t reg, uint32_t value) {
+    cbmodules::CanFrame frame{};
+    frame.extended = true;
+    frame.dlc = 8;
+    uint32_t id = 0u;
+    id |= (static_cast<uint32_t>(0x060u & 0x1FFu) << 20);
+    id |= (static_cast<uint32_t>(1u) << 19);
+    id |= (static_cast<uint32_t>(module_addr) << 11);
+    id |= (static_cast<uint32_t>(MAXWELL_CONTROLLER_ADDR) << 3);
+    id |= static_cast<uint32_t>(module_group & 0x07u);
+    frame.id = id;
+    frame.data[0] = MAXWELL_FUNC_SET;
+    frame.data[1] = 0x00u;
+    frame.data[2] = static_cast<uint8_t>((reg >> 8) & 0xFFu);
+    frame.data[3] = static_cast<uint8_t>(reg & 0xFFu);
+    maxwell_write_u32_be(value, &frame.data[4]);
+    return g_can.send(frame);
+}
+
+bool send_maxwell_set_u32_retry(uint8_t module_addr,
+                                uint8_t module_group,
+                                uint16_t reg,
+                                uint32_t value,
+                                const char* tag) {
+    for (uint8_t attempt = 0; attempt < 3u; ++attempt) {
+        if (send_maxwell_set_u32(module_addr, module_group, reg, value)) {
+            return true;
+        }
+        delay(10);
+    }
+    Serial.printf("[MOD] Maxwell set failed (%s) reg=0x%04X value=0x%08lX\n",
+                  tag ? tag : "-",
+                  static_cast<unsigned>(reg),
+                  static_cast<unsigned long>(value));
+    return false;
+}
+
+bool send_maxwell_set_float(uint8_t module_addr, uint8_t module_group, uint16_t reg, float value) {
+    return send_maxwell_set_u32(module_addr, module_group, reg, maxwell_encode_float_be(value));
+}
+
+bool apply_local_module_maxwell_defaults(const char* reason) {
+    if (!g_module_ready || g_runtime_cfg.local_module_address == 0u) {
+        return false;
+    }
+    const uint8_t module_addr = g_runtime_cfg.local_module_address;
+    const uint8_t module_group = build_module_spec_for_addr(module_addr).group;
+    const char* tag = reason ? reason : "Allowlist";
+    bool ok = true;
+
+    Serial.printf("[MOD] applying Maxwell defaults (%s) addr=0x%02X group=%u\n",
+                  tag,
+                  static_cast<unsigned>(module_addr),
+                  static_cast<unsigned>(module_group));
+
+    ok = send_maxwell_set_u32_retry(module_addr, module_group, MAXWELL_REG_ONOFF, 0x00010000u, tag) && ok;
+    delay(MAXWELL_PREPARE_OFF_DELAY_MS);
+
+    ok = send_maxwell_set_u32_retry(module_addr, module_group, MAXWELL_REG_OV_RESET, 0x00010000u, tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+    ok = send_maxwell_set_u32_retry(module_addr, module_group, MAXWELL_REG_OV_RESET, 0x00000000u, tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+
+    ok = send_maxwell_set_u32_retry(module_addr, module_group, MAXWELL_REG_SHORT_RESET, 0x00010000u, tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+    ok = send_maxwell_set_u32_retry(module_addr, module_group, MAXWELL_REG_SHORT_RESET, 0x00000000u, tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+
+    ok = send_maxwell_set_u32_retry(module_addr, module_group, MAXWELL_REG_OVP_RELEVANCE, 0x00000000u, tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+    ok = send_maxwell_set_u32_retry(module_addr, module_group, MAXWELL_REG_ALTITUDE, MAXWELL_DEFAULT_ALTITUDE_M, tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+    ok = send_maxwell_set_u32_retry(module_addr,
+                                    module_group,
+                                    MAXWELL_REG_INPUT_MODE,
+                                    MAXWELL_MODULE_DEFAULT_INPUT_MODE,
+                                    tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+    ok = send_maxwell_set_u32_retry(module_addr,
+                                    module_group,
+                                    MAXWELL_REG_OUTPUT_POWER,
+                                    maxwell_encode_float_be(MAXWELL_OUTPUT_POWER_LIMIT_POINT_MAX),
+                                    tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+    ok = send_maxwell_set_u32_retry(module_addr,
+                                    module_group,
+                                    MAXWELL_REG_VOLTAGE_UPPER_LIMIT,
+                                    maxwell_encode_float_be(MODULE_MAX_VOLTAGE_V),
+                                    tag) && ok;
+    delay(MAXWELL_PREPARE_STEP_DELAY_MS);
+    ok = send_maxwell_set_u32_retry(module_addr,
+                                    module_group,
+                                    MAXWELL_REG_CURRENT_LIMIT,
+                                    maxwell_encode_float_be(0.0f),
+                                    tag) && ok;
+    delay(MAXWELL_PREPARE_FINAL_DELAY_MS);
+
+    if (ok) {
+        g_local_module_defaults_applied = true;
+    } else {
+        Serial.printf("[MOD] Maxwell defaults apply failed (%s)\n", tag);
+    }
+    return ok;
+}
+
 cbmodules::ModuleSpec build_module_spec_for_addr(uint8_t module_addr) {
     cbmodules::ModuleSpec spec;
     spec.id = runtime_module_id_for_addr(module_addr);
@@ -2978,8 +3336,10 @@ cbmodules::ModuleSpec build_module_spec_for_addr(uint8_t module_addr) {
         }
     }
     spec.group = module_can_group;
-    spec.rated_current_a = MODULE_MAX_CURRENT_A;
+    spec.input_mode = static_cast<int8_t>(MAXWELL_MODULE_DEFAULT_INPUT_MODE);
+    spec.rated_current_a = MODULE_DEFAULT_RATED_CURRENT_A;
     spec.rated_power_kw = MODULE_MAX_POWER_KW;
+    spec.max_current_a = MODULE_MAX_CURRENT_A;
     spec.min_operating_voltage_v = 200.0f;
     spec.max_operating_voltage_v = MODULE_MAX_VOLTAGE_V;
     return spec;
@@ -3196,6 +3556,8 @@ void controller_clear_managed_feedback_cache() {
     portENTER_CRITICAL(&g_ctrl_feedback_mux);
     g_ctrl_feedback = ControllerManagedFeedbackState{};
     portEXIT_CRITICAL(&g_ctrl_feedback_mux);
+    g_last_controller_feedback_sample_ms = 0u;
+    g_last_controller_feedback_voltage_v = 0.0f;
 }
 
 ControllerManagedFeedbackState controller_feedback_snapshot() {
@@ -3206,25 +3568,23 @@ ControllerManagedFeedbackState controller_feedback_snapshot() {
     return snapshot;
 }
 
+uint32_t controller_feedback_timeout_ms() {
+    return std::min<uint32_t>(5000u,
+                              std::max<uint32_t>(CONTROLLER_FEEDBACK_TIMEOUT_MS,
+                                                 effective_controller_heartbeat_timeout_ms() + 500u));
+}
+
 bool controller_feedback_fresh(uint32_t now_ms, const ControllerManagedFeedbackState& feedback) {
     if (!feedback.seen || now_ms < feedback.last_update_ms) {
         return false;
     }
     if (mode_controller_routes_power_externally_over_uart()) {
-        const uint32_t timeout_ms =
-            std::min<uint32_t>(5000u,
-                               std::max<uint32_t>(CONTROLLER_FEEDBACK_TIMEOUT_MS,
-                                                  effective_controller_heartbeat_timeout_ms() + 500u));
-        return (now_ms - feedback.last_update_ms) <= timeout_ms;
+        return (now_ms - feedback.last_update_ms) <= controller_feedback_timeout_ms();
     }
     if (mode_controller_has_final_decision()) {
         return true;
     }
-    const uint32_t timeout_ms =
-        std::min<uint32_t>(5000u,
-                           std::max<uint32_t>(CONTROLLER_FEEDBACK_TIMEOUT_MS,
-                                              effective_controller_heartbeat_timeout_ms() + 500u));
-    return (now_ms - feedback.last_update_ms) <= timeout_ms;
+    return (now_ms - feedback.last_update_ms) <= controller_feedback_timeout_ms();
 }
 
 bool controller_feedback_fresh(uint32_t now_ms) {
@@ -3290,7 +3650,7 @@ bool controller_allows_energy(uint32_t now_ms) {
     if (g_emergency_stop_active) return false;
     if (!mode_requires_controller_contract()) return true;
     if (mode_controller_routes_power_externally_over_uart()) {
-        const bool granted = controller_auth_granted(now_ms);
+        const bool granted = controller_heartbeat_alive(now_ms) && controller_auth_granted(now_ms);
         if (granted) {
             g_ctrl.last_energy_allowed_ms = now_ms;
         }
@@ -3329,12 +3689,175 @@ bool precharge_voltage_converged(float requested_v, float present_v) {
     return std::fabs(measured_v - target_v) <= tolerance_v || measured_v >= (target_v - tolerance_v);
 }
 
+bool current_demand_current_converged(float requested_i, float present_i) {
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    const float measured_i = std::isfinite(present_i) ? std::max(0.0f, present_i) : 0.0f;
+    if (target_i <= 0.05f) {
+        return measured_i <= 0.75f;
+    }
+    const float tolerance_a = std::max(2.0f, target_i * 0.15f);
+    return std::fabs(measured_i - target_i) <= tolerance_a;
+}
+
+bool current_demand_current_ready_safe(float requested_i, float present_i) {
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    const float measured_i = std::isfinite(present_i) ? std::max(0.0f, present_i) : 0.0f;
+    if (target_i <= 0.05f) {
+        // During the zero-current tail before PowerDelivery(stop), some EVs
+        // briefly keep drawing a few amps while the current decays. The power
+        // path is already commanded to 0 A at this point, so keep reporting
+        // EVSE ready through a normal rundown range instead of stalling the
+        // stop transition waiting for sub-amp current.
+        return measured_i <= CURRENT_DEMAND_ZERO_REQUEST_READY_DECAY_MAX_A;
+    }
+    const float overshoot_tolerance_a = std::max(2.0f, target_i * 0.15f);
+    return measured_i <= (target_i + overshoot_tolerance_a);
+}
+
+bool current_demand_current_ready_for_response(float requested_i,
+                                               bool current_ready_safe,
+                                               bool current_converged,
+                                               bool require_convergence) {
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    if (!require_convergence) {
+        return current_ready_safe;
+    }
+    if (target_i <= PRECHARGE_START_ACCEPT_MIN_CURRENT_A) {
+        return current_ready_safe;
+    }
+    return current_ready_safe && current_converged;
+}
+
+bool current_demand_voltage_ready_safe(float requested_v, float applied_v, float present_v) {
+    float target_v = std::isfinite(applied_v) ? std::max(0.0f, applied_v) : 0.0f;
+    if (target_v < 50.0f) {
+        target_v = std::isfinite(requested_v) ? std::max(0.0f, requested_v) : 0.0f;
+    }
+    const float measured_v = std::isfinite(present_v) ? std::max(0.0f, present_v) : 0.0f;
+    if (target_v <= 1.0f) {
+        return measured_v <= PRECHARGE_VOLTAGE_TOLERANCE_V;
+    }
+    const float overshoot_tolerance_v = std::max(20.0f, target_v * 0.05f);
+    return measured_v <= (target_v + overshoot_tolerance_v);
+}
+
+enum class EvseIsolationAssessment : uint8_t {
+    Invalid = 0,
+    Valid,
+    Warning,
+    Fault,
+};
+
+const char* evse_isolation_assessment_name(EvseIsolationAssessment assessment) {
+    switch (assessment) {
+        case EvseIsolationAssessment::Valid: return "valid";
+        case EvseIsolationAssessment::Warning: return "warning";
+        case EvseIsolationAssessment::Fault: return "fault";
+        default: return "invalid";
+    }
+}
+
+EvseIsolationAssessment best_effort_evse_isolation_assessment(uint32_t now_ms) {
+    if (!g_module_ready) {
+        return EvseIsolationAssessment::Invalid;
+    }
+
+    const auto states = g_module_mgr.module_states();
+    bool any_local = false;
+    bool any_fresh_online = false;
+    bool any_warning = false;
+    for (const auto& s : states) {
+        const bool local_module = s.id == runtime_local_module_id();
+        const bool local_group = s.group_id == runtime_local_group_id();
+        if (!local_module && !local_group) {
+            continue;
+        }
+        any_local = true;
+        if (s.isolation_latched || s.lifecycle == cbmodules::ModuleLifecycle::Faulted ||
+            s.lifecycle == cbmodules::ModuleLifecycle::Quarantined || s.telemetry.faulted) {
+            return EvseIsolationAssessment::Fault;
+        }
+        const bool fresh = module_telemetry_fresh(s, now_ms);
+        if (s.telemetry.online && fresh) {
+            any_fresh_online = true;
+        } else {
+            any_warning = true;
+        }
+    }
+
+    if (any_fresh_online) {
+        return EvseIsolationAssessment::Valid;
+    }
+    if (any_local || any_warning) {
+        return EvseIsolationAssessment::Warning;
+    }
+    return EvseIsolationAssessment::Invalid;
+}
+
+void standalone_clear_output_limit_shortfall(HlcAppContext* ctx) {
+    if (!ctx) return;
+    ctx->output_limit_shortfall_since_ms = 0u;
+    ctx->output_limit_target_v = 0.0f;
+    ctx->output_limit_target_i = 0.0f;
+}
+
+bool standalone_sustained_output_shortfall(HlcAppContext* ctx,
+                                           bool delivery_active,
+                                           bool response_sample_ready,
+                                           float requested_v,
+                                           float requested_i,
+                                           float present_v,
+                                           float present_i,
+                                           uint32_t now_ms) {
+    if (!ctx || !delivery_active || !response_sample_ready || !g_relay1_closed) {
+        standalone_clear_output_limit_shortfall(ctx);
+        return false;
+    }
+
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    const float target_v = std::isfinite(requested_v) ? std::max(0.0f, requested_v) : 0.0f;
+    const float measured_i = std::isfinite(present_i) ? std::max(0.0f, present_i) : 0.0f;
+    const float measured_v = std::isfinite(present_v) ? std::max(0.0f, present_v) : 0.0f;
+    if (target_i < STANDALONE_OUTPUT_LIMIT_CURRENT_MIN_A || target_v <= 50.0f) {
+        standalone_clear_output_limit_shortfall(ctx);
+        return false;
+    }
+
+    const float current_shortfall_a = target_i - measured_i;
+    const float current_shortfall_margin_a = std::max(1.0f, target_i * 0.15f);
+    const bool voltage_is_up = measured_v >= std::max(50.0f, target_v - STANDALONE_OUTPUT_LIMIT_VOLTAGE_MARGIN_V);
+    const float requested_power_kw = (target_v * target_i) / 1000.0f;
+    const float present_power_kw = (measured_v * measured_i) / 1000.0f;
+    const bool power_shortfall =
+        requested_power_kw > (present_power_kw + STANDALONE_OUTPUT_LIMIT_POWER_MARGIN_KW);
+    const bool active_shortfall =
+        current_shortfall_a > current_shortfall_margin_a && (voltage_is_up || power_shortfall);
+
+    if (!active_shortfall) {
+        standalone_clear_output_limit_shortfall(ctx);
+        return false;
+    }
+
+    if (ctx->output_limit_shortfall_since_ms == 0u ||
+        now_ms < ctx->output_limit_shortfall_since_ms ||
+        std::fabs(ctx->output_limit_target_v - target_v) > 8.0f ||
+        std::fabs(ctx->output_limit_target_i - target_i) > 4.0f) {
+        ctx->output_limit_shortfall_since_ms = now_ms;
+        ctx->output_limit_target_v = target_v;
+        ctx->output_limit_target_i = target_i;
+        return false;
+    }
+
+    return (now_ms - ctx->output_limit_shortfall_since_ms) >= STANDALONE_OUTPUT_LIMIT_GRACE_MS;
+}
+
 bool snapshot_live_present_values(cbmodules::GroupStatus* out_st,
                                   float* out_present_v,
                                   float* out_present_i);
 bool snapshot_precharge_present_values(cbmodules::GroupStatus* out_st,
                                        float* out_present_v,
                                        float* out_present_i);
+bool relay1_set(bool closed, const char* reason);
 
 bool standalone_precharge_start_ready(HlcAppContext* ctx, float requested_v) {
     if (!ctx || mode_requires_controller_contract()) {
@@ -3352,11 +3875,11 @@ bool standalone_precharge_start_ready(HlcAppContext* ctx, float requested_v) {
     return precharge_voltage_converged(requested_v, present_v);
 }
 
-bool standalone_din_handoff_ready(HlcAppContext* ctx,
-                                  float requested_v,
-                                  float* out_present_v,
-                                  float* out_present_i,
-                                  float* out_accept_floor_v) {
+bool standalone_relaxed_handoff_ready(HlcAppContext* ctx,
+                                      float requested_v,
+                                      float* out_present_v,
+                                      float* out_present_i,
+                                      float* out_accept_floor_v) {
     if (!ctx || mode_controller_uses_external_feedback()) {
         return false;
     }
@@ -3381,9 +3904,258 @@ bool standalone_din_handoff_ready(HlcAppContext* ctx,
     const float accept_floor_v = std::max(PRECHARGE_START_ACCEPT_MIN_V, target_v * PRECHARGE_START_ACCEPT_MIN_RATIO);
     if (out_accept_floor_v) *out_accept_floor_v = accept_floor_v;
 
-    const bool current_flow_ready = ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT &&
-                                    present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A;
-    return current_flow_ready && present_v >= accept_floor_v;
+    const bool current_flow_visible = present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A;
+    const bool multi_sample_ready = ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT;
+    // Some EVs advance from PreCharge to PowerDelivery/CurrentDemand after a
+    // single request once the EVSE has established a meaningful precharge
+    // current. Requiring full voltage convergence in that case leaves
+    // standalone mode stuck in the precharge-current hold even though the
+    // vehicle has already advanced the session.
+    const bool strong_single_sample_ready =
+        ctx->precharge_count >= 1u && present_i >= (PRECHARGE_CURRENT_LIMIT_A * 0.75f);
+    return current_flow_visible && present_v >= accept_floor_v &&
+           (multi_sample_ready || strong_single_sample_ready);
+}
+
+enum class ModuleTargetHeadroomPolicy : uint8_t {
+    Auto = 0u,
+    ApplyConfigured = 1u,
+};
+
+bool modules_apply_target(bool enable,
+                          float target_v,
+                          float target_i,
+                          const char* reason,
+                          ModuleTargetHeadroomPolicy headroom_policy = ModuleTargetHeadroomPolicy::Auto);
+
+void standalone_clear_delivery_recovery(HlcAppContext* ctx) {
+    if (!ctx) {
+        return;
+    }
+    ctx->delivery_recovery_active = false;
+    ctx->delivery_recovery_attempted = false;
+    ctx->delivery_recovery_phase = StandaloneDeliveryRecoveryPhase::Idle;
+    ctx->delivery_recovery_started_ms = 0u;
+    ctx->delivery_recovery_target_v = 0.0f;
+}
+
+void standalone_refresh_delivery_recovery_window(HlcAppContext* ctx, float requested_v, float requested_i) {
+    if (!ctx || mode_controller_uses_external_feedback()) {
+        return;
+    }
+    const float sane_v = (std::isfinite(requested_v) && requested_v > 0.0f) ? requested_v : 0.0f;
+    const float sane_i = (std::isfinite(requested_i) && requested_i > 0.0f) ? requested_i : 0.0f;
+    if (sane_v <= 0.1f || sane_i <= (PRECHARGE_CURRENT_LIMIT_A + 0.05f)) {
+        standalone_clear_delivery_recovery(ctx);
+        return;
+    }
+    if (!ctx->delivery_recovery_attempted) {
+        return;
+    }
+    if (std::fabs(ctx->delivery_recovery_target_v - sane_v) > STANDALONE_DELIVERY_RECOVERY_RESET_DELTA_V) {
+        standalone_clear_delivery_recovery(ctx);
+    }
+}
+
+bool standalone_delivery_recovery_should_start(HlcAppContext* ctx,
+                                               float requested_v,
+                                               float requested_i,
+                                               float present_v,
+                                               float present_i,
+                                               uint32_t now_ms) {
+    if (!ctx || mode_controller_uses_external_feedback()) {
+        return false;
+    }
+    if (!ctx->delivery_current_seen) {
+        return false;
+    }
+    if (ctx->delivery_recovery_active || ctx->delivery_recovery_attempted) {
+        return false;
+    }
+    if (!g_relay1_closed || !g_module_output_enabled || g_module_allowlist.empty()) {
+        return false;
+    }
+    const float sane_req_v = (std::isfinite(requested_v) && requested_v > 0.0f) ? requested_v : 0.0f;
+    const float sane_req_i = (std::isfinite(requested_i) && requested_i > 0.0f) ? requested_i : 0.0f;
+    const float sane_present_v = (std::isfinite(present_v) && present_v > 0.0f) ? present_v : 0.0f;
+    const float sane_present_i = (std::isfinite(present_i) && present_i > 0.0f) ? present_i : 0.0f;
+    if (sane_req_v <= 50.0f || sane_req_i <= (PRECHARGE_CURRENT_LIMIT_A + 0.05f)) {
+        ctx->delivery_recovery_started_ms = 0u;
+        ctx->delivery_recovery_target_v = 0.0f;
+        return false;
+    }
+    if (sane_present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A) {
+        ctx->delivery_recovery_started_ms = 0u;
+        ctx->delivery_recovery_target_v = 0.0f;
+        return false;
+    }
+
+    const float recovery_floor_v =
+        std::max(50.0f, sane_req_v * STANDALONE_DELIVERY_RECOVERY_MIN_VOLTAGE_RATIO);
+    const bool stalled_voltage =
+        sane_present_v >= recovery_floor_v &&
+        sane_present_v < (sane_req_v - STANDALONE_DELIVERY_RECOVERY_VOLTAGE_MARGIN_V);
+    if (!stalled_voltage) {
+        ctx->delivery_recovery_started_ms = 0u;
+        ctx->delivery_recovery_target_v = 0.0f;
+        return false;
+    }
+    if (ctx->delivery_recovery_target_v > 0.0f &&
+        std::fabs(ctx->delivery_recovery_target_v - sane_req_v) > STANDALONE_DELIVERY_RECOVERY_RESET_DELTA_V) {
+        ctx->delivery_recovery_started_ms = 0u;
+    }
+    if (ctx->delivery_recovery_started_ms == 0u || now_ms < ctx->delivery_recovery_started_ms) {
+        ctx->delivery_recovery_started_ms = now_ms;
+        ctx->delivery_recovery_target_v = sane_req_v;
+        return false;
+    }
+    return (now_ms - ctx->delivery_recovery_started_ms) >= STANDALONE_DELIVERY_RECOVERY_GRACE_MS;
+}
+
+bool snapshot_local_group_output_off(float* out_present_v, float* out_present_i) {
+    if (!g_module_ready) {
+        return false;
+    }
+    if (!lock_modules(30)) {
+        return false;
+    }
+
+    const uint32_t tick_ms = millis();
+    g_module_mgr.poll_rx(24);
+    g_module_mgr.tick(tick_ms);
+    const uint32_t now_ms = millis();
+    const auto states = g_module_mgr.module_states();
+
+    float max_v = 0.0f;
+    float sum_i = 0.0f;
+    bool any = false;
+    bool all_off = true;
+    for (const auto& s : states) {
+        if (s.group_id != runtime_local_group_id()) continue;
+        if (s.lease_active || s.isolation_latched) continue;
+        if (s.telemetry.faulted || !s.telemetry.online) continue;
+        if (s.telemetry.last_update_ms == 0 || now_ms < s.telemetry.last_update_ms) continue;
+        if ((now_ms - s.telemetry.last_update_ms) > MODULE_TELEMETRY_FRESH_MS) continue;
+
+        any = true;
+        const float v =
+            (std::isfinite(s.telemetry.voltage_v) && s.telemetry.voltage_v > 0.0f) ? s.telemetry.voltage_v : 0.0f;
+        const float i =
+            (std::isfinite(s.telemetry.current_a) && s.telemetry.current_a > 0.0f) ? s.telemetry.current_a : 0.0f;
+        max_v = std::max(max_v, v);
+        sum_i += i;
+
+        const bool module_off =
+            s.telemetry.module_off ||
+            (v <= STANDALONE_DELIVERY_RECOVERY_OFF_VOLTAGE_MAX_V &&
+             i <= STANDALONE_DELIVERY_RECOVERY_OFF_CURRENT_MAX_A);
+        if (!module_off) {
+            all_off = false;
+        }
+    }
+    unlock_modules();
+
+    if (out_present_v) *out_present_v = max_v;
+    if (out_present_i) *out_present_i = sum_i;
+    return any && all_off;
+}
+
+bool standalone_service_delivery_recovery(HlcAppContext* ctx,
+                                          float requested_v,
+                                          float requested_i,
+                                          float* out_present_v,
+                                          float* out_present_i) {
+    if (!ctx || !ctx->delivery_recovery_active || mode_controller_uses_external_feedback()) {
+        return false;
+    }
+
+    cbmodules::GroupStatus st{};
+    float present_v = 0.0f;
+    float present_i = 0.0f;
+    (void)snapshot_precharge_present_values(&st, &present_v, &present_i);
+    if (out_present_v) *out_present_v = present_v;
+    if (out_present_i) *out_present_i = present_i;
+
+    const uint32_t now_ms = millis();
+    if (ctx->delivery_recovery_phase == StandaloneDeliveryRecoveryPhase::WaitingForOff) {
+        float off_present_v = present_v;
+        float off_present_i = present_i;
+        const bool output_off = snapshot_local_group_output_off(&off_present_v, &off_present_i);
+        (void)modules_apply_target(false, 0.0f, 0.0f, "CurrentDemandRecoveryOff");
+        if (out_present_v) *out_present_v = off_present_v;
+        if (out_present_i) *out_present_i = off_present_i;
+        if (output_off) {
+            ctx->delivery_recovery_phase = StandaloneDeliveryRecoveryPhase::WaitingForRestart;
+            ctx->delivery_recovery_started_ms = now_ms;
+            Serial.printf("[HLC] {\"msg\":\"CurrentDemandRecoveryOffConfirmed\",\"targetV\":%.1f,"
+                          "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d}\n",
+                          requested_v,
+                          off_present_v,
+                          off_present_i,
+                          g_relay1_closed ? 1 : 0);
+            present_v = off_present_v;
+            present_i = off_present_i;
+        } else {
+            Serial.printf("[HLC] {\"msg\":\"CurrentDemandRecoveryWaitingOff\",\"targetV\":%.1f,"
+                          "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"elapsedMs\":%lu}\n",
+                          requested_v,
+                          off_present_v,
+                          off_present_i,
+                          g_relay1_closed ? 1 : 0,
+                          (ctx->delivery_recovery_started_ms != 0u && now_ms >= ctx->delivery_recovery_started_ms)
+                              ? static_cast<unsigned long>(now_ms - ctx->delivery_recovery_started_ms)
+                              : 0ul);
+            return true;
+        }
+    }
+
+    if (ctx->delivery_recovery_phase == StandaloneDeliveryRecoveryPhase::WaitingForRestart) {
+        (void)modules_apply_target(true,
+                                   requested_v,
+                                   requested_i,
+                                   "CurrentDemandRecoveryRestart",
+                                   ModuleTargetHeadroomPolicy::ApplyConfigured);
+        (void)snapshot_precharge_present_values(&st, &present_v, &present_i);
+        if (out_present_v) *out_present_v = present_v;
+        if (out_present_i) *out_present_i = present_i;
+        const bool target_ready =
+            !g_module_allowlist.empty() && st.assigned_modules > 0u && precharge_voltage_converged(requested_v, present_v);
+        if (target_ready) {
+            const bool relay_closed = relay1_set(true, "CurrentDemandRecoveryClose");
+            standalone_clear_delivery_recovery(ctx);
+            ctx->precharge_converged = relay_closed;
+            ctx->power_delivery_enabled = relay_closed;
+            Serial.printf("[HLC] {\"msg\":\"CurrentDemandRecoveryRecovered\",\"targetV\":%.1f,"
+                          "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d}\n",
+                          requested_v,
+                          present_v,
+                          present_i,
+                          g_relay1_closed ? 1 : 0);
+            return false;
+        }
+
+        Serial.printf("[HLC] {\"msg\":\"CurrentDemandRecoveryWaitingRestart\",\"targetV\":%.1f,"
+                      "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"elapsedMs\":%lu}\n",
+                      requested_v,
+                      present_v,
+                      present_i,
+                      g_relay1_closed ? 1 : 0,
+                      (ctx->delivery_recovery_started_ms != 0u && now_ms >= ctx->delivery_recovery_started_ms)
+                          ? static_cast<unsigned long>(now_ms - ctx->delivery_recovery_started_ms)
+                          : 0ul);
+        return true;
+    }
+
+    Serial.printf("[HLC] {\"msg\":\"CurrentDemandRecoveryWaiting\",\"targetV\":%.1f,"
+                  "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"elapsedMs\":%lu}\n",
+                  requested_v,
+                  present_v,
+                  present_i,
+                  g_relay1_closed ? 1 : 0,
+                  (ctx->delivery_recovery_started_ms != 0u && now_ms >= ctx->delivery_recovery_started_ms)
+                      ? static_cast<unsigned long>(now_ms - ctx->delivery_recovery_started_ms)
+                      : 0ul);
+    return true;
 }
 
 bool controller_precharge_start_ready(HlcAppContext* ctx,
@@ -3410,9 +4182,6 @@ void send_ctrl_ack(uint8_t cmd_type, uint8_t seq, uint8_t status, uint8_t detail
     p[4] = status;
     p[5] = detail0;
     p[6] = detail1;
-    if (cmd_type == 0x1Au && controller_serial_quiet_window()) {
-        return;
-    }
     Serial.printf("[SERCTRL] ACK cmd=0x%02X seq=%u status=%u detail0=%u detail1=%u\n",
                   static_cast<unsigned>(cmd_type),
                   static_cast<unsigned>(seq),
@@ -3562,6 +4331,11 @@ bool standalone_energy_path_active() {
     return g_relay1_closed || g_module_output_enabled;
 }
 
+bool hlc_disconnect_hold_power_path_active() {
+    return g_hlc_ctx.power_delivery_enabled || g_relay1_closed || g_module_output_enabled ||
+           sane_non_negative(g_last_measured_i) >= 0.5f;
+}
+
 bool standalone_disconnect_hold_active(uint32_t now_ms) {
     if (g_hlc_disconnect_hold_until_ms == 0u) {
         return false;
@@ -3611,6 +4385,9 @@ LedPreset effective_led_preset(uint32_t now_ms) {
     if (now_ms == 0u) {
         now_ms = millis();
     }
+    if (mode_controller_owns_power_path()) {
+        return g_led_state.preset;
+    }
     if (!mode_controller_has_final_decision()) {
         return standalone_led_preset(now_ms);
     }
@@ -3625,6 +4402,42 @@ float clamp_current_for_assignment_limit(float voltage_v, float current_a) {
     const float sane_voltage = std::max(50.0f, sane_non_negative(voltage_v));
     const float limit_current_a = (g_assignment_power_limit_kw * 1000.0f) / sane_voltage;
     return std::max(0.0f, std::min(sane_current, limit_current_a));
+}
+
+struct ModuleCommandTarget {
+    float requested_voltage_v{0.0f};
+    float requested_current_a{0.0f};
+    float applied_voltage_v{0.0f};
+    float applied_current_a{0.0f};
+};
+
+ModuleCommandTarget build_module_command_target(bool enable,
+                                                float target_v,
+                                                float target_i,
+                                                ModuleTargetHeadroomPolicy headroom_policy =
+                                                    ModuleTargetHeadroomPolicy::Auto) {
+    ModuleCommandTarget cmd{};
+    cmd.requested_voltage_v = std::max(0.0f, std::min(MODULE_MAX_VOLTAGE_V, sane_non_negative(target_v)));
+    cmd.requested_current_a = std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, sane_non_negative(target_i)));
+    if (!enable) {
+        return cmd;
+    }
+
+    const bool ev_driven_hlc_session =
+        g_runtime_cfg.hlc_follow_vehicle_targets &&
+        (g_last_bms_valid || g_hlc_ctx.precharge_seen || g_hlc_ctx.power_delivery_enabled || g_hlc_active);
+    const bool apply_configured_headroom =
+        (headroom_policy == ModuleTargetHeadroomPolicy::ApplyConfigured) || !ev_driven_hlc_session;
+    const float voltage_headroom_v =
+        apply_configured_headroom ? std::max(0.0f, g_runtime_cfg.module_voltage_headroom_v) : 0.0f;
+    const float current_headroom_a =
+        apply_configured_headroom ? std::max(0.0f, g_runtime_cfg.module_current_headroom_a) : 0.0f;
+    cmd.applied_voltage_v = std::max(0.0f, cmd.requested_voltage_v - voltage_headroom_v);
+    const float requested_current_with_headroom_a = std::max(0.0f, cmd.requested_current_a - current_headroom_a);
+    const float limited_current_a =
+        clamp_current_for_assignment_limit(cmd.applied_voltage_v, requested_current_with_headroom_a);
+    cmd.applied_current_a = std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, limited_current_a));
+    return cmd;
 }
 
 void clear_last_bms_request() {
@@ -3688,6 +4501,76 @@ void set_din_physical(din_PhysicalValueType* pv, din_unitSymbolType unit, float 
     pv->Value = round_to_i16(sane_non_negative(value));
 }
 
+void set_din_physical_scaled(din_PhysicalValueType* pv, din_unitSymbolType unit, int16_t value, int8_t multiplier) {
+    if (!pv) return;
+    init_din_PhysicalValueType(pv);
+    pv->Unit = unit;
+    pv->Unit_isUsed = 1;
+    pv->Multiplier = multiplier;
+    pv->Value = value;
+}
+
+void apply_iso_isolation_status(iso2_DC_EVSEStatusType* st, EvseIsolationAssessment assessment) {
+    if (!st) return;
+    switch (assessment) {
+        case EvseIsolationAssessment::Invalid:
+            st->EVSEIsolationStatus = iso2_isolationLevelType_Invalid;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        case EvseIsolationAssessment::Valid:
+            st->EVSEIsolationStatus = iso2_isolationLevelType_Valid;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        case EvseIsolationAssessment::Warning:
+            st->EVSEIsolationStatus = iso2_isolationLevelType_Warning;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        case EvseIsolationAssessment::Fault:
+            st->EVSEIsolationStatus = iso2_isolationLevelType_Fault;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        default:
+            st->EVSEIsolationStatus_isUsed = 0;
+            break;
+    }
+}
+
+void apply_din_isolation_status(din_DC_EVSEStatusType* st, EvseIsolationAssessment assessment) {
+    if (!st) return;
+    switch (assessment) {
+        case EvseIsolationAssessment::Invalid:
+            st->EVSEIsolationStatus = din_isolationLevelType_Invalid;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        case EvseIsolationAssessment::Valid:
+            st->EVSEIsolationStatus = din_isolationLevelType_Valid;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        case EvseIsolationAssessment::Warning:
+            st->EVSEIsolationStatus = din_isolationLevelType_Warning;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        case EvseIsolationAssessment::Fault:
+            st->EVSEIsolationStatus = din_isolationLevelType_Fault;
+            st->EVSEIsolationStatus_isUsed = 1;
+            break;
+        default:
+            st->EVSEIsolationStatus_isUsed = 0;
+            break;
+    }
+}
+
+EvseIsolationAssessment response_evse_isolation_assessment(uint32_t now_ms) {
+    const EvseIsolationAssessment measured = best_effort_evse_isolation_assessment(now_ms);
+    if (measured == EvseIsolationAssessment::Warning) {
+        // Match the older stable line more closely: avoid flapping a warning-only
+        // isolation state in normal DC responses when the hardware is otherwise
+        // healthy, but preserve explicit fault/invalid states.
+        return EvseIsolationAssessment::Valid;
+    }
+    return measured;
+}
+
 void set_iso_dc_status_ready(iso2_DC_EVSEStatusType* st,
                              iso2_EVSENotificationType notification = iso2_EVSENotificationType_None) {
     if (!st) return;
@@ -3695,7 +4578,7 @@ void set_iso_dc_status_ready(iso2_DC_EVSEStatusType* st,
     st->NotificationMaxDelay = 1;
     st->EVSENotification = notification;
     st->EVSEStatusCode = iso2_DC_EVSEStatusCodeType_EVSE_Ready;
-    st->EVSEIsolationStatus_isUsed = 0;
+    apply_iso_isolation_status(st, response_evse_isolation_assessment(millis()));
 }
 
 void set_iso_dc_status_not_ready(iso2_DC_EVSEStatusType* st,
@@ -3705,7 +4588,7 @@ void set_iso_dc_status_not_ready(iso2_DC_EVSEStatusType* st,
     st->NotificationMaxDelay = 1;
     st->EVSENotification = notification;
     st->EVSEStatusCode = iso2_DC_EVSEStatusCodeType_EVSE_NotReady;
-    st->EVSEIsolationStatus_isUsed = 0;
+    apply_iso_isolation_status(st, response_evse_isolation_assessment(millis()));
 }
 
 void set_iso_dc_status_shutdown(iso2_DC_EVSEStatusType* st,
@@ -3715,7 +4598,7 @@ void set_iso_dc_status_shutdown(iso2_DC_EVSEStatusType* st,
     st->NotificationMaxDelay = 1;
     st->EVSENotification = notification;
     st->EVSEStatusCode = iso2_DC_EVSEStatusCodeType_EVSE_Shutdown;
-    st->EVSEIsolationStatus_isUsed = 0;
+    apply_iso_isolation_status(st, response_evse_isolation_assessment(millis()));
 }
 
 void set_din_dc_status_ready(din_DC_EVSEStatusType* st,
@@ -3725,7 +4608,7 @@ void set_din_dc_status_ready(din_DC_EVSEStatusType* st,
     st->NotificationMaxDelay = 1;
     st->EVSENotification = notification;
     st->EVSEStatusCode = din_DC_EVSEStatusCodeType_EVSE_Ready;
-    st->EVSEIsolationStatus_isUsed = 0;
+    apply_din_isolation_status(st, response_evse_isolation_assessment(millis()));
 }
 
 void set_din_dc_status_not_ready(din_DC_EVSEStatusType* st,
@@ -3735,7 +4618,7 @@ void set_din_dc_status_not_ready(din_DC_EVSEStatusType* st,
     st->NotificationMaxDelay = 1;
     st->EVSENotification = notification;
     st->EVSEStatusCode = din_DC_EVSEStatusCodeType_EVSE_NotReady;
-    st->EVSEIsolationStatus_isUsed = 0;
+    apply_din_isolation_status(st, response_evse_isolation_assessment(millis()));
 }
 
 void set_din_dc_status_shutdown(din_DC_EVSEStatusType* st,
@@ -3745,7 +4628,31 @@ void set_din_dc_status_shutdown(din_DC_EVSEStatusType* st,
     st->NotificationMaxDelay = 1;
     st->EVSENotification = notification;
     st->EVSEStatusCode = din_DC_EVSEStatusCodeType_EVSE_Shutdown;
-    st->EVSEIsolationStatus_isUsed = 0;
+    apply_din_isolation_status(st, response_evse_isolation_assessment(millis()));
+}
+
+void set_iso_dc_status_isolation_monitoring_active(
+    iso2_DC_EVSEStatusType* st,
+    EvseIsolationAssessment assessment = EvseIsolationAssessment::Valid,
+    iso2_EVSENotificationType notification = iso2_EVSENotificationType_None) {
+    if (!st) return;
+    init_iso2_DC_EVSEStatusType(st);
+    st->NotificationMaxDelay = 1;
+    st->EVSENotification = notification;
+    st->EVSEStatusCode = iso2_DC_EVSEStatusCodeType_EVSE_IsolationMonitoringActive;
+    apply_iso_isolation_status(st, assessment);
+}
+
+void set_din_dc_status_isolation_monitoring_active(
+    din_DC_EVSEStatusType* st,
+    EvseIsolationAssessment assessment = EvseIsolationAssessment::Valid,
+    din_EVSENotificationType notification = din_EVSENotificationType_None) {
+    if (!st) return;
+    init_din_DC_EVSEStatusType(st);
+    st->NotificationMaxDelay = 1;
+    st->EVSENotification = notification;
+    st->EVSEStatusCode = din_DC_EVSEStatusCodeType_EVSE_IsolationMonitoringActive;
+    apply_din_isolation_status(st, assessment);
 }
 
 void update_real_meter_sample(float voltage_v, float current_a, uint32_t now_ms) {
@@ -3782,7 +4689,7 @@ const char* module_lifecycle_name(cbmodules::ModuleLifecycle lc) {
 }
 
 void log_module_runtime_status(const cbmodules::GroupStatus& st, uint32_t now_ms) {
-    if (controller_serial_quiet_window()) {
+    if (controller_serial_quiet_window() || hlc_runtime_quiet_window()) {
         return;
     }
     if (g_last_module_runtime_log_ms != 0 &&
@@ -3836,8 +4743,7 @@ void apply_fresh_measurements_from_states(cbmodules::GroupStatus* st, uint32_t n
     float sum_v = 0.0f;
     size_t count_v = 0;
     float sum_i = 0.0f;
-    const float target_v = sane_non_negative(st->applied_voltage_v);
-    auto voltage_sample_ready = [target_v](const cbmodules::ModuleStateView& s) {
+    auto voltage_sample_ready = [](const cbmodules::ModuleStateView& s) {
         if (!s.telemetry.online) {
             return false;
         }
@@ -3852,11 +4758,11 @@ void apply_fresh_measurements_from_states(cbmodules::GroupStatus* st, uint32_t n
         if (current_a >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A) {
             return true;
         }
-        if (target_v <= 50.0f) {
-            return voltage_v >= PRECHARGE_START_ACCEPT_MIN_V;
-        }
-        const float required_voltage = std::max(50.0f, target_v * 0.85f);
-        return voltage_v >= required_voltage;
+        // During PreCharge and CurrentDemand ramps, report the real positive
+        // output voltage even while it is still below the eventual target.
+        // Filtering those samples out makes HLC respond with 0 V during a
+        // legitimate ramp, which can cause the EV to abort early.
+        return voltage_v >= PRECHARGE_START_ACCEPT_MIN_V;
     };
     for (const auto& s : states) {
         if (s.group_id != runtime_local_group_id()) continue;
@@ -4058,22 +4964,147 @@ bool snapshot_precharge_present_values(cbmodules::GroupStatus* out_st,
     return ok || raw_valid;
 }
 
-float snapshot_welding_present_voltage_v(uint32_t now_ms) {
-    if (!g_relay1_closed) {
-        return 0.0f;
+enum class WeldingVoltageSource : uint8_t {
+    None = 0,
+    ControllerFeedback = 1,
+    ControllerCache = 2,
+    GroupStatus = 3,
+    MeterCache = 4,
+    FakeZero = 5,
+    FakeResidual = 6,
+};
+
+struct WeldingVoltageSnapshot {
+    float present_v{0.0f};
+    WeldingVoltageSource source{WeldingVoltageSource::None};
+    uint32_t age_ms{UINT32_MAX};
+};
+
+const char* welding_voltage_source_name(WeldingVoltageSource source) {
+    switch (source) {
+        case WeldingVoltageSource::ControllerFeedback: return "controller_feedback";
+        case WeldingVoltageSource::ControllerCache: return "controller_cache";
+        case WeldingVoltageSource::GroupStatus: return "group_status";
+        case WeldingVoltageSource::MeterCache: return "meter_cache";
+        case WeldingVoltageSource::FakeZero: return "fake_zero";
+        case WeldingVoltageSource::FakeResidual: return "fake_residual";
+        default: return "none";
     }
+}
+
+WeldingVoltageSnapshot apply_welding_response_policy(const WeldingVoltageSnapshot& measured) {
+    if (!standalone_welding_fake_zero_enabled()) {
+        return measured;
+    }
+    WeldingVoltageSnapshot response = measured;
+    if (g_hlc_ctx.stop_requested &&
+        g_standalone_fake_welding_response_count < STANDALONE_FAKE_WELDING_RESIDUAL_RESPONSES) {
+        response.present_v = STANDALONE_FAKE_WELDING_RESIDUAL_V;
+        response.source = WeldingVoltageSource::FakeResidual;
+        response.age_ms = 0u;
+        g_standalone_fake_welding_response_count++;
+        return response;
+    }
+    response.present_v = 0.0f;
+    response.source = WeldingVoltageSource::FakeZero;
+    response.age_ms = 0u;
+    return response;
+}
+
+bool controller_cached_welding_voltage(uint32_t now_ms, float* out_present_v, uint32_t* out_age_ms) {
+    if (!mode_controller_uses_external_feedback()) {
+        return false;
+    }
+    if (g_last_controller_feedback_sample_ms == 0u || now_ms < g_last_controller_feedback_sample_ms) {
+        return false;
+    }
+    const uint32_t age_ms = now_ms - g_last_controller_feedback_sample_ms;
+    if (age_ms > controller_feedback_timeout_ms()) {
+        return false;
+    }
+    if (out_present_v) {
+        *out_present_v = sane_non_negative(g_last_controller_feedback_voltage_v);
+    }
+    if (out_age_ms) {
+        *out_age_ms = age_ms;
+    }
+    return sane_non_negative(g_last_controller_feedback_voltage_v) > 0.1f;
+}
+
+WeldingVoltageSnapshot snapshot_welding_present_voltage(uint32_t now_ms) {
+    WeldingVoltageSnapshot snapshot{};
+
     if (mode_controller_uses_external_feedback()) {
         ControllerManagedFeedbackState fb{};
         if (controller_get_managed_feedback(now_ms, &fb)) {
-            return sane_non_negative(fb.present_voltage_v);
+            snapshot.present_v = sane_non_negative(fb.present_voltage_v);
+            snapshot.source = WeldingVoltageSource::ControllerFeedback;
+            snapshot.age_ms = (now_ms >= fb.last_update_ms) ? (now_ms - fb.last_update_ms) : 0u;
+            return snapshot;
         }
-        return sane_non_negative(g_ctrl_feedback.present_voltage_v);
+
+        float cached_v = 0.0f;
+        uint32_t cached_age_ms = UINT32_MAX;
+        if (controller_cached_welding_voltage(now_ms, &cached_v, &cached_age_ms)) {
+            snapshot.present_v = cached_v;
+            snapshot.source = WeldingVoltageSource::ControllerCache;
+            snapshot.age_ms = cached_age_ms;
+            return snapshot;
+        }
+
+        return snapshot;
     }
-    float present_v = snapshot_present_group_voltage_v();
-    if (present_v <= 0.1f) {
-        present_v = sane_non_negative(g_last_measured_v);
+
+    cbmodules::GroupStatus st{};
+    uint32_t group_now_ms = 0u;
+    if (snapshot_group_status(&st, &group_now_ms)) {
+        const float group_v = sane_non_negative(st.combined_voltage_v);
+        const uint32_t latest_ms = latest_local_group_telemetry_ms();
+        const uint32_t group_age_ms =
+            (latest_ms != 0u && now_ms >= latest_ms) ? (now_ms - latest_ms) : UINT32_MAX;
+        const bool group_recent =
+            group_age_ms != UINT32_MAX && group_age_ms <= WELDING_VOLTAGE_PREFERRED_MAX_AGE_MS;
+        if (group_recent || group_v > 0.1f) {
+            snapshot.present_v = group_v;
+            snapshot.source = WeldingVoltageSource::GroupStatus;
+            snapshot.age_ms = group_age_ms;
+            return snapshot;
+        }
     }
-    return sane_non_negative(present_v);
+
+    const float cached_v = sane_non_negative(g_last_measured_v);
+    if (meter_sample_recent(now_ms, WELDING_VOLTAGE_PREFERRED_MAX_AGE_MS)) {
+        snapshot.present_v = cached_v;
+        snapshot.source = WeldingVoltageSource::MeterCache;
+        snapshot.age_ms = (g_meter_last_sample_ms != 0u && now_ms >= g_meter_last_sample_ms)
+                              ? (now_ms - g_meter_last_sample_ms)
+                              : UINT32_MAX;
+    }
+    return snapshot;
+}
+
+WeldingVoltageSnapshot snapshot_welding_present_voltage_settled(uint32_t now_ms) {
+    WeldingVoltageSnapshot best = snapshot_welding_present_voltage(now_ms);
+    if (mode_controller_uses_external_feedback() || g_relay1_closed || g_module_output_enabled) {
+        return best;
+    }
+
+    const uint32_t start_ms = now_ms;
+    while (static_cast<int32_t>(millis() - (start_ms + WELDING_VOLTAGE_SETTLE_WINDOW_MS)) < 0) {
+        delay(WELDING_VOLTAGE_SETTLE_POLL_MS);
+        const uint32_t sample_ms = millis();
+        const WeldingVoltageSnapshot sample = snapshot_welding_present_voltage(sample_ms);
+        if (sample.source == WeldingVoltageSource::None) {
+            continue;
+        }
+        if (best.source == WeldingVoltageSource::None || sample.present_v < best.present_v) {
+            best = sample;
+        }
+        if (best.present_v <= POST_SESSION_RESTART_SAFE_VOLTAGE_V) {
+            break;
+        }
+    }
+    return best;
 }
 
 uint32_t latest_local_group_telemetry_ms() {
@@ -4086,6 +5117,21 @@ uint32_t latest_local_group_telemetry_ms() {
         latest_ms = std::max(latest_ms, s.telemetry.last_current_update_ms);
     }
     return latest_ms;
+}
+
+bool local_group_telemetry_recent(uint32_t now_ms, uint32_t max_age_ms) {
+    const uint32_t latest_ms = latest_local_group_telemetry_ms();
+    if (latest_ms == 0u || now_ms < latest_ms) {
+        return false;
+    }
+    return (now_ms - latest_ms) <= max_age_ms;
+}
+
+bool meter_sample_recent(uint32_t now_ms, uint32_t max_age_ms) {
+    if (g_meter_last_sample_ms == 0u || now_ms < g_meter_last_sample_ms) {
+        return false;
+    }
+    return (now_ms - g_meter_last_sample_ms) <= max_age_ms;
 }
 
 bool snapshot_post_target_present_values(uint32_t baseline_telemetry_ms,
@@ -4247,6 +5293,14 @@ RuntimeEvseLimits snapshot_runtime_evse_limits() {
     limits.max_voltage_v = sane_non_negative(std::min(limits.max_voltage_v, MODULE_MAX_VOLTAGE_V));
     limits.max_current_a = sane_non_negative(std::min(limits.max_current_a, MODULE_MAX_CURRENT_A));
     limits.max_power_kw = sane_non_negative(std::min(limits.max_power_kw, MODULE_MAX_POWER_KW));
+    if (limits.max_voltage_v > 0.1f && limits.max_current_a > 0.1f) {
+        limits.max_power_kw =
+            sane_non_negative(std::min(limits.max_power_kw, (limits.max_voltage_v * limits.max_current_a) / 1000.0f));
+    }
+    if (limits.max_voltage_v > 0.1f && limits.max_power_kw > 0.1f) {
+        limits.max_current_a =
+            sane_non_negative(std::min(limits.max_current_a, (limits.max_power_kw * 1000.0f) / limits.max_voltage_v));
+    }
     return limits;
 }
 
@@ -4259,12 +5313,71 @@ void fill_din_dc_charge_params_real(din_DC_EVSEChargeParameterType* params) {
     set_din_physical(&params->EVSEMaximumCurrentLimit, din_unitSymbolType_A, limits.max_current_a);
     set_din_physical(&params->EVSEMaximumVoltageLimit, din_unitSymbolType_V, limits.max_voltage_v);
     params->EVSEMaximumPowerLimit_isUsed = 1;
-    set_din_physical(&params->EVSEMaximumPowerLimit, din_unitSymbolType_W, limits.max_power_kw * 1000.0f);
+    set_din_physical_scaled(&params->EVSEMaximumPowerLimit, din_unitSymbolType_W,
+                            round_to_i16(sane_non_negative(limits.max_power_kw)), 3);
     set_din_physical(&params->EVSEMinimumCurrentLimit, din_unitSymbolType_A, 0.0f);
     set_din_physical(&params->EVSEMinimumVoltageLimit, din_unitSymbolType_V, 200.0f);
     set_din_physical(&params->EVSEPeakCurrentRipple, din_unitSymbolType_A, 1.0f);
     params->EVSECurrentRegulationTolerance_isUsed = 0;
     params->EVSEEnergyToBeDelivered_isUsed = 0;
+}
+
+void fill_din_dc_charge_params_legacy_compat(din_DC_EVSEChargeParameterType* params) {
+    if (!params) return;
+    init_din_DC_EVSEChargeParameterType(params);
+    set_din_dc_status_ready(&params->DC_EVSEStatus);
+    // Some DIN BMS implementations continue only when the CPD response
+    // advertises the broad legacy capability tuple they historically expect.
+    set_din_physical(&params->EVSEMaximumCurrentLimit, din_unitSymbolType_A, 200.0f);
+    set_din_physical(&params->EVSEMaximumVoltageLimit, din_unitSymbolType_V, 1000.0f);
+    params->EVSEMaximumPowerLimit_isUsed = 1;
+    set_din_physical_scaled(&params->EVSEMaximumPowerLimit, din_unitSymbolType_W, 240, 3);
+    set_din_physical(&params->EVSEMinimumCurrentLimit, din_unitSymbolType_A, 0.0f);
+    set_din_physical(&params->EVSEMinimumVoltageLimit, din_unitSymbolType_V, 200.0f);
+    set_din_physical(&params->EVSEPeakCurrentRipple, din_unitSymbolType_A, 1.0f);
+    params->EVSECurrentRegulationTolerance_isUsed = 0;
+    params->EVSEEnergyToBeDelivered_isUsed = 0;
+}
+
+void fill_iso_dc_charge_params_real(iso2_DC_EVSEChargeParameterType* params) {
+    if (!params) return;
+    init_iso2_DC_EVSEChargeParameterType(params);
+    set_iso_dc_status_ready(&params->DC_EVSEStatus);
+
+    const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+    set_iso_physical(&params->EVSEMaximumCurrentLimit, iso2_unitSymbolType_A, limits.max_current_a);
+    set_iso_physical(&params->EVSEMaximumPowerLimit, iso2_unitSymbolType_W, limits.max_power_kw * 1000.0f);
+    set_iso_physical(&params->EVSEMaximumVoltageLimit, iso2_unitSymbolType_V, limits.max_voltage_v);
+    set_iso_physical(&params->EVSEMinimumCurrentLimit, iso2_unitSymbolType_A, 0.0f);
+    set_iso_physical(&params->EVSEMinimumVoltageLimit, iso2_unitSymbolType_V, 200.0f);
+    set_iso_physical(&params->EVSEPeakCurrentRipple, iso2_unitSymbolType_A, 1.0f);
+    params->EVSECurrentRegulationTolerance_isUsed = 0;
+    params->EVSEEnergyToBeDelivered_isUsed = 0;
+}
+
+void fill_iso_charge_parameter_schedule_real(iso2_ChargeParameterDiscoveryResType* res,
+                                             uint8_t sa_schedule_tuple_id,
+                                             float max_power_kw) {
+    if (!res) return;
+    res->SASchedules_isUsed = 0;
+    res->SAScheduleList_isUsed = 1;
+    init_iso2_SAScheduleListType(&res->SAScheduleList);
+    res->SAScheduleList.SAScheduleTuple.arrayLen = 1;
+    iso2_SAScheduleTupleType* tuple = &res->SAScheduleList.SAScheduleTuple.array[0];
+    init_iso2_SAScheduleTupleType(tuple);
+    tuple->SAScheduleTupleID = (sa_schedule_tuple_id == 0u) ? 1u : sa_schedule_tuple_id;
+    tuple->SalesTariff_isUsed = 0;
+
+    init_iso2_PMaxScheduleType(&tuple->PMaxSchedule);
+    tuple->PMaxSchedule.PMaxScheduleEntry.arrayLen = 1;
+    iso2_PMaxScheduleEntryType* entry = &tuple->PMaxSchedule.PMaxScheduleEntry.array[0];
+    init_iso2_PMaxScheduleEntryType(entry);
+    init_iso2_RelativeTimeIntervalType(&entry->RelativeTimeInterval);
+    entry->RelativeTimeInterval.start = 0;
+    entry->RelativeTimeInterval.duration = 24U * 3600U;
+    entry->RelativeTimeInterval.duration_isUsed = 1;
+    entry->RelativeTimeInterval_isUsed = 1;
+    set_iso_physical(&entry->PMax, iso2_unitSymbolType_W, sane_non_negative(max_power_kw) * 1000.0f);
 }
 
 void fill_din_current_demand_limits(din_CurrentDemandResType* res,
@@ -4278,6 +5391,19 @@ void fill_din_current_demand_limits(din_CurrentDemandResType* res,
     set_din_physical(&res->EVSEMaximumCurrentLimit, din_unitSymbolType_A, max_current_a);
     res->EVSEMaximumPowerLimit_isUsed = 1;
     set_din_physical(&res->EVSEMaximumPowerLimit, din_unitSymbolType_W, max_power_kw * 1000.0f);
+}
+
+void fill_iso_current_demand_limits(iso2_CurrentDemandResType* res,
+                                    float max_voltage_v,
+                                    float max_current_a,
+                                    float max_power_kw) {
+    if (!res) return;
+    res->EVSEMaximumVoltageLimit_isUsed = 1;
+    set_iso_physical(&res->EVSEMaximumVoltageLimit, iso2_unitSymbolType_V, max_voltage_v);
+    res->EVSEMaximumCurrentLimit_isUsed = 1;
+    set_iso_physical(&res->EVSEMaximumCurrentLimit, iso2_unitSymbolType_A, max_current_a);
+    res->EVSEMaximumPowerLimit_isUsed = 1;
+    set_iso_physical(&res->EVSEMaximumPowerLimit, iso2_unitSymbolType_W, max_power_kw * 1000.0f);
 }
 
 void update_last_ev_soc_pct(int soc_pct) {
@@ -4356,8 +5482,6 @@ void update_last_ev_soc_from_request(jpv2g_message_type_t type, const jpv2g_secc
     }
 }
 
-bool modules_apply_target(bool enable, float target_v, float target_i, const char* reason);
-
 void remember_negotiated_charge_limits(HlcAppContext* ctx,
                                        jpv2g_message_type_t type,
                                        const jpv2g_secc_request_t* req) {
@@ -4386,6 +5510,15 @@ void remember_negotiated_charge_limits(HlcAppContext* ctx,
     }
 
     if (max_v <= 0.1f) {
+        if (req->protocol == JPV2G_PROTOCOL_DIN70121 && g_runtime_cfg.din_zero_limits_compat) {
+            ctx->negotiated_ev_max_v = DIN_ZERO_LIMIT_FALLBACK_MAX_V;
+            ctx->negotiated_ev_max_i = DIN_ZERO_LIMIT_FALLBACK_MAX_I;
+            ctx->precharge_prearmed = false;
+            Serial.printf("[HLC] {\"msg\":\"ChargeParameterDiscoveryReqCompat\",\"protocol\":\"din\","
+                          "\"fallbackMaxV\":%.1f,\"fallbackMaxI\":%.1f}\n",
+                          static_cast<double>(ctx->negotiated_ev_max_v),
+                          static_cast<double>(ctx->negotiated_ev_max_i));
+        }
         return;
     }
     ctx->negotiated_ev_max_v = max_v;
@@ -4394,17 +5527,32 @@ void remember_negotiated_charge_limits(HlcAppContext* ctx,
 }
 
 float standalone_prearm_target_voltage_v(const HlcAppContext* ctx) {
-    constexpr float STANDALONE_PREARM_DEFAULT_V = 380.0f;
-    float target_v = sane_non_negative(g_last_requested_target_v);
+    float target_v = g_last_bms_valid ? sane_non_negative(g_last_requested_target_v) : 0.0f;
+    const float negotiated_max_v = ctx ? sane_non_negative(ctx->negotiated_ev_max_v) : 0.0f;
+    const float prearm_seed_v = sane_non_negative(g_runtime_cfg.standalone_prearm_seed_voltage_v);
     if (target_v < 50.0f) {
-        target_v = sane_non_negative(g_last_module_target_v);
+        if (prearm_seed_v >= 50.0f) {
+            target_v = prearm_seed_v;
+            if (negotiated_max_v >= 50.0f) {
+                target_v = std::min(target_v, negotiated_max_v);
+            }
+        } else {
+            target_v = 0.0f;
+        }
     }
+    if (negotiated_max_v >= 50.0f) {
+        target_v = std::min(target_v, negotiated_max_v);
+    }
+    return sane_non_negative(std::min(target_v, MODULE_MAX_VOLTAGE_V));
+}
+
+float standalone_power_delivery_start_voltage_v(const HlcAppContext* ctx) {
+    float target_v = sane_non_negative(g_last_requested_target_v);
     const float negotiated_max_v = ctx ? sane_non_negative(ctx->negotiated_ev_max_v) : 0.0f;
     if (target_v < 50.0f) {
-        target_v = (negotiated_max_v >= 50.0f)
-            ? std::min(negotiated_max_v, STANDALONE_PREARM_DEFAULT_V)
-            : STANDALONE_PREARM_DEFAULT_V;
-    } else if (negotiated_max_v >= 50.0f) {
+        return 0.0f;
+    }
+    if (negotiated_max_v >= 50.0f) {
         target_v = std::min(target_v, negotiated_max_v);
     }
     return sane_non_negative(std::min(target_v, MODULE_MAX_VOLTAGE_V));
@@ -4602,9 +5750,34 @@ void log_hlc_request(jpv2g_message_type_t type, const jpv2g_secc_request_t* req)
                 const int soc = rq->DC_EVChargeParameter_isUsed
                                     ? static_cast<int>(rq->DC_EVChargeParameter.DC_EVStatus.EVRESSSOC)
                                     : -1;
-                Serial.printf("[HLC][REQ] {\"type\":\"ChargeParameterDiscoveryReq\",\"protocol\":\"%s\",\"soc\":%d}\n",
+                Serial.printf("[HLC][REQ] {\"type\":\"ChargeParameterDiscoveryReq\",\"protocol\":\"%s\",\"soc\":%d,"
+                              "\"maxV\":%.1f,\"maxI\":%.1f,\"maxP\":%.1f,"
+                              "\"rawMaxV\":{\"value\":%d,\"mult\":%d,\"unit\":%u},"
+                              "\"rawMaxI\":{\"value\":%d,\"mult\":%d,\"unit\":%u},"
+                              "\"rawMaxPUsed\":%d,\"rawMaxP\":{\"value\":%d,\"mult\":%d,\"unit\":%u}}\n",
                               protocol,
-                              soc);
+                              soc,
+                              rq->DC_EVChargeParameter_isUsed ? din_pv_to_float(&rq->DC_EVChargeParameter.EVMaximumVoltageLimit) : 0.0f,
+                              rq->DC_EVChargeParameter_isUsed ? din_pv_to_float(&rq->DC_EVChargeParameter.EVMaximumCurrentLimit) : 0.0f,
+                              (rq->DC_EVChargeParameter_isUsed && rq->DC_EVChargeParameter.EVMaximumPowerLimit_isUsed)
+                                  ? din_pv_to_float(&rq->DC_EVChargeParameter.EVMaximumPowerLimit)
+                                  : 0.0f,
+                              rq->DC_EVChargeParameter_isUsed ? static_cast<int>(rq->DC_EVChargeParameter.EVMaximumVoltageLimit.Value) : 0,
+                              rq->DC_EVChargeParameter_isUsed ? static_cast<int>(rq->DC_EVChargeParameter.EVMaximumVoltageLimit.Multiplier) : 0,
+                              rq->DC_EVChargeParameter_isUsed ? static_cast<unsigned>(rq->DC_EVChargeParameter.EVMaximumVoltageLimit.Unit) : 0u,
+                              rq->DC_EVChargeParameter_isUsed ? static_cast<int>(rq->DC_EVChargeParameter.EVMaximumCurrentLimit.Value) : 0,
+                              rq->DC_EVChargeParameter_isUsed ? static_cast<int>(rq->DC_EVChargeParameter.EVMaximumCurrentLimit.Multiplier) : 0,
+                              rq->DC_EVChargeParameter_isUsed ? static_cast<unsigned>(rq->DC_EVChargeParameter.EVMaximumCurrentLimit.Unit) : 0u,
+                              (rq->DC_EVChargeParameter_isUsed && rq->DC_EVChargeParameter.EVMaximumPowerLimit_isUsed) ? 1 : 0,
+                              (rq->DC_EVChargeParameter_isUsed && rq->DC_EVChargeParameter.EVMaximumPowerLimit_isUsed)
+                                  ? static_cast<int>(rq->DC_EVChargeParameter.EVMaximumPowerLimit.Value)
+                                  : 0,
+                              (rq->DC_EVChargeParameter_isUsed && rq->DC_EVChargeParameter.EVMaximumPowerLimit_isUsed)
+                                  ? static_cast<int>(rq->DC_EVChargeParameter.EVMaximumPowerLimit.Multiplier)
+                                  : 0,
+                              (rq->DC_EVChargeParameter_isUsed && rq->DC_EVChargeParameter.EVMaximumPowerLimit_isUsed)
+                                  ? static_cast<unsigned>(rq->DC_EVChargeParameter.EVMaximumPowerLimit.Unit)
+                                  : 0u);
                 return;
             }
             case JPV2G_CABLE_CHECK_REQ: {
@@ -4856,6 +6029,139 @@ void normalize_runtime_config(RuntimeConfig* cfg) {
     cfg->controller_slac_arm_timeout_ms =
         std::max<uint32_t>(1000u, std::min<uint32_t>(cfg->controller_slac_arm_timeout_ms, 60000u));
     cfg->led_count = std::max<uint8_t>(1u, std::min<uint8_t>(cfg->led_count, MAX_LED_COUNT));
+    if (!std::isfinite(cfg->module_voltage_headroom_v)) {
+        cfg->module_voltage_headroom_v = DEFAULT_MODULE_VOLTAGE_HEADROOM_V;
+    }
+    if (!std::isfinite(cfg->module_current_headroom_a)) {
+        cfg->module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+    }
+    cfg->module_voltage_headroom_v =
+        std::max(0.0f, std::min(cfg->module_voltage_headroom_v, MAX_MODULE_VOLTAGE_HEADROOM_V));
+    cfg->module_current_headroom_a =
+        std::max(0.0f, std::min(cfg->module_current_headroom_a, MAX_MODULE_CURRENT_HEADROOM_A));
+    cfg->hlc_follow_vehicle_targets = cfg->hlc_follow_vehicle_targets ? true : false;
+    if (!std::isfinite(cfg->standalone_prearm_seed_voltage_v)) {
+        cfg->standalone_prearm_seed_voltage_v = DEFAULT_STANDALONE_PREARM_SEED_V;
+    }
+    cfg->standalone_prearm_seed_voltage_v =
+        std::max(0.0f, std::min(cfg->standalone_prearm_seed_voltage_v, MAX_STANDALONE_PREARM_SEED_V));
+    cfg->standalone_welding_voltage_mode = static_cast<uint8_t>(
+        normalize_standalone_welding_voltage_mode(cfg->standalone_welding_voltage_mode));
+}
+
+bool migrate_runtime_config_v10(const RuntimeConfigV10& legacy, RuntimeConfig* out) {
+    if (!out) return false;
+    if (legacy.magic != CFG_MAGIC || legacy.version != 10u) {
+        return false;
+    }
+    RuntimeConfig migrated{};
+    migrated.mode = legacy.mode;
+    migrated.slac_requires_controller_start = legacy.slac_requires_controller_start;
+    migrated.plc_id = legacy.plc_id;
+    migrated.connector_id = legacy.connector_id;
+    migrated.controller_id = legacy.controller_id;
+    migrated.local_module_address = legacy.local_module_address;
+    migrated.can_node_id = legacy.can_node_id;
+    migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
+    migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
+    migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    migrated.led_count = legacy.led_count;
+    migrated.module_voltage_headroom_v = legacy.module_voltage_headroom_v;
+    migrated.module_current_headroom_a = legacy.module_current_headroom_a;
+    if (current_headroom_uses_legacy_default(migrated.module_current_headroom_a)) {
+        migrated.module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+    }
+    migrated.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
+    migrated.din_zero_limits_compat = legacy.din_zero_limits_compat;
+    migrated.standalone_prearm_seed_voltage_v = legacy.standalone_prearm_seed_voltage_v;
+    migrated.standalone_welding_voltage_mode = legacy.standalone_welding_voltage_mode;
+    normalize_runtime_config(&migrated);
+    *out = migrated;
+    return true;
+}
+
+bool migrate_runtime_config_v8(const RuntimeConfigV8& legacy, RuntimeConfig* out) {
+    if (!out) return false;
+    if (legacy.magic != CFG_MAGIC || legacy.version != 8u) {
+        return false;
+    }
+    RuntimeConfig migrated{};
+    migrated.mode = legacy.mode;
+    migrated.slac_requires_controller_start = legacy.slac_requires_controller_start;
+    migrated.plc_id = legacy.plc_id;
+    migrated.connector_id = legacy.connector_id;
+    migrated.controller_id = legacy.controller_id;
+    migrated.local_module_address = legacy.local_module_address;
+    migrated.can_node_id = legacy.can_node_id;
+    migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
+    migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
+    migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    migrated.led_count = legacy.led_count;
+    migrated.module_voltage_headroom_v = legacy.module_voltage_headroom_v;
+    migrated.module_current_headroom_a = legacy.module_current_headroom_a;
+    if (current_headroom_uses_legacy_default(migrated.module_current_headroom_a)) {
+        migrated.module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+    }
+    migrated.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
+    migrated.din_zero_limits_compat = legacy.din_zero_limits_compat;
+    migrated.standalone_prearm_seed_voltage_v =
+        prearm_seed_uses_legacy_default(legacy.standalone_prearm_seed_voltage_v)
+            ? DEFAULT_STANDALONE_PREARM_SEED_V
+            : legacy.standalone_prearm_seed_voltage_v;
+    normalize_runtime_config(&migrated);
+    *out = migrated;
+    return true;
+}
+
+bool migrate_runtime_config_v7(const RuntimeConfigV7& legacy, RuntimeConfig* out) {
+    if (!out) return false;
+    if (legacy.magic != CFG_MAGIC || legacy.version != 7u) {
+        return false;
+    }
+    RuntimeConfig migrated{};
+    migrated.mode = legacy.mode;
+    migrated.slac_requires_controller_start = legacy.slac_requires_controller_start;
+    migrated.plc_id = legacy.plc_id;
+    migrated.connector_id = legacy.connector_id;
+    migrated.controller_id = legacy.controller_id;
+    migrated.local_module_address = legacy.local_module_address;
+    migrated.can_node_id = legacy.can_node_id;
+    migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
+    migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
+    migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    migrated.led_count = legacy.led_count;
+    migrated.module_voltage_headroom_v = legacy.module_voltage_headroom_v;
+    migrated.module_current_headroom_a = legacy.module_current_headroom_a;
+    if (current_headroom_uses_legacy_default(migrated.module_current_headroom_a)) {
+        migrated.module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+    }
+    migrated.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
+    normalize_runtime_config(&migrated);
+    *out = migrated;
+    return true;
+}
+
+bool migrate_runtime_config_v6(const RuntimeConfigV6& legacy, RuntimeConfig* out) {
+    if (!out) return false;
+    if (legacy.magic != CFG_MAGIC || legacy.version != 6u) {
+        return false;
+    }
+    RuntimeConfig migrated{};
+    migrated.mode = legacy.mode;
+    migrated.slac_requires_controller_start = legacy.slac_requires_controller_start;
+    migrated.plc_id = legacy.plc_id;
+    migrated.connector_id = legacy.connector_id;
+    migrated.controller_id = legacy.controller_id;
+    migrated.local_module_address = legacy.local_module_address;
+    migrated.can_node_id = legacy.can_node_id;
+    migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
+    migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
+    migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    migrated.led_count = legacy.led_count;
+    migrated.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
+    normalize_runtime_config(&migrated);
+    *out = migrated;
+    return true;
 }
 
 bool migrate_runtime_config_v4(const RuntimeConfigV4& legacy, RuntimeConfig* out) {
@@ -4896,6 +6202,7 @@ bool migrate_runtime_config_v5(const RuntimeConfigV5& legacy, RuntimeConfig* out
     migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
     migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
     migrated.led_count = DEFAULT_LED_COUNT;
+    migrated.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
     normalize_runtime_config(&migrated);
     *out = migrated;
     return true;
@@ -4919,13 +6226,14 @@ bool migrate_runtime_config_v3(const RuntimeConfigV3& legacy, RuntimeConfig* out
     migrated.controller_heartbeat_timeout_ms = legacy.controller_heartbeat_timeout_ms;
     migrated.controller_auth_ttl_ms = legacy.controller_auth_ttl_ms;
     migrated.controller_slac_arm_timeout_ms = legacy.controller_slac_arm_timeout_ms;
+    migrated.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
     normalize_runtime_config(&migrated);
     *out = migrated;
     return true;
 }
 
 void print_runtime_config() {
-    Serial.printf("[CFG] mode=%u(%s) slac_ctrl=%d plc_id=%u can_node_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u owner_id=0x%04X hb_to=%lu auth_ttl=%lu slac_arm_to=%lu led_count=%u\n",
+    Serial.printf("[CFG] mode=%u(%s) slac_ctrl=%d plc_id=%u can_node_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u owner_id=0x%04X hb_to=%lu auth_ttl=%lu slac_arm_to=%lu led_count=%u headroom_v=%.1f headroom_i=%.2f hlc_follow_ev=%d din_zero_compat=%d prearm_seed_v=%.1f weld_v_mode=%u(%s)\n",
                   static_cast<unsigned>(g_runtime_cfg.mode),
                   runtime_mode_name(),
                   g_runtime_cfg.slac_requires_controller_start ? 1 : 0,
@@ -4939,7 +6247,15 @@ void print_runtime_config() {
                   static_cast<unsigned long>(g_runtime_cfg.controller_heartbeat_timeout_ms),
                   static_cast<unsigned long>(g_runtime_cfg.controller_auth_ttl_ms),
                   static_cast<unsigned long>(g_runtime_cfg.controller_slac_arm_timeout_ms),
-                  static_cast<unsigned>(g_runtime_cfg.led_count));
+                  static_cast<unsigned>(g_runtime_cfg.led_count),
+                  static_cast<double>(g_runtime_cfg.module_voltage_headroom_v),
+                  static_cast<double>(g_runtime_cfg.module_current_headroom_a),
+                  g_runtime_cfg.hlc_follow_vehicle_targets ? 1 : 0,
+                  g_runtime_cfg.din_zero_limits_compat ? 1 : 0,
+                  static_cast<double>(g_runtime_cfg.standalone_prearm_seed_voltage_v),
+                  static_cast<unsigned>(g_runtime_cfg.standalone_welding_voltage_mode),
+                  standalone_welding_voltage_mode_name(
+                      normalize_standalone_welding_voltage_mode(g_runtime_cfg.standalone_welding_voltage_mode)));
 }
 
 bool load_runtime_config_from_nvs() {
@@ -4963,26 +6279,93 @@ bool load_runtime_config_from_nvs() {
     if (stored == sizeof(nvs_cfg)) {
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &nvs_cfg, sizeof(nvs_cfg));
         loaded = (got == sizeof(nvs_cfg));
+        if (loaded && nvs_cfg.version != CFG_VERSION) {
+            if (nvs_cfg.version == 11u) {
+                if (current_headroom_uses_legacy_default(nvs_cfg.module_current_headroom_a)) {
+                    nvs_cfg.module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+                }
+                nvs_cfg.version = CFG_VERSION;
+                normalize_runtime_config(&nvs_cfg);
+            } else if (nvs_cfg.version == 10u) {
+                nvs_cfg.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
+                if (current_headroom_uses_legacy_default(nvs_cfg.module_current_headroom_a)) {
+                    nvs_cfg.module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+                }
+                nvs_cfg.version = CFG_VERSION;
+                normalize_runtime_config(&nvs_cfg);
+            } else if (nvs_cfg.version == 9u) {
+                nvs_cfg.version = CFG_VERSION;
+                nvs_cfg.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
+                if (current_headroom_uses_legacy_default(nvs_cfg.module_current_headroom_a)) {
+                    nvs_cfg.module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+                }
+                if (prearm_seed_uses_legacy_default(nvs_cfg.standalone_prearm_seed_voltage_v)) {
+                    nvs_cfg.standalone_prearm_seed_voltage_v = DEFAULT_STANDALONE_PREARM_SEED_V;
+                }
+                normalize_runtime_config(&nvs_cfg);
+            } else if (nvs_cfg.version == 8u) {
+                nvs_cfg.hlc_follow_vehicle_targets = DEFAULT_HLC_FOLLOW_VEHICLE_TARGETS;
+                nvs_cfg.standalone_welding_voltage_mode = DEFAULT_STANDALONE_WELDING_VOLTAGE_MODE_RAW;
+                if (current_headroom_uses_legacy_default(nvs_cfg.module_current_headroom_a)) {
+                    nvs_cfg.module_current_headroom_a = DEFAULT_MODULE_CURRENT_HEADROOM_A;
+                }
+                if (prearm_seed_uses_legacy_default(nvs_cfg.standalone_prearm_seed_voltage_v)) {
+                    nvs_cfg.standalone_prearm_seed_voltage_v = DEFAULT_STANDALONE_PREARM_SEED_V;
+                }
+                nvs_cfg.version = CFG_VERSION;
+                normalize_runtime_config(&nvs_cfg);
+            } else {
+                loaded = false;
+            }
+        }
+    } else if (stored == sizeof(RuntimeConfigV10)) {
+        RuntimeConfigV10 legacy{};
+        const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
+        loaded = (got == sizeof(legacy)) && migrate_runtime_config_v10(legacy, &nvs_cfg);
+        if (loaded) {
+            Serial.println("[CFG] migrated legacy v10 config to v12");
+        }
+    } else if (stored == sizeof(RuntimeConfigV8)) {
+        RuntimeConfigV8 legacy{};
+        const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
+        loaded = (got == sizeof(legacy)) && migrate_runtime_config_v8(legacy, &nvs_cfg);
+        if (loaded) {
+            Serial.println("[CFG] migrated legacy v8 config to v12");
+        }
+    } else if (stored == sizeof(RuntimeConfigV7)) {
+        RuntimeConfigV7 legacy{};
+        const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
+        loaded = (got == sizeof(legacy)) && migrate_runtime_config_v7(legacy, &nvs_cfg);
+        if (loaded) {
+            Serial.println("[CFG] migrated legacy v7 config to v12");
+        }
+    } else if (stored == sizeof(RuntimeConfigV6)) {
+        RuntimeConfigV6 legacy{};
+        const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
+        loaded = (got == sizeof(legacy)) && migrate_runtime_config_v6(legacy, &nvs_cfg);
+        if (loaded) {
+            Serial.println("[CFG] migrated legacy v6 config to v10");
+        }
     } else if (stored == sizeof(RuntimeConfigV5)) {
         RuntimeConfigV5 legacy{};
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
         loaded = (got == sizeof(legacy)) && migrate_runtime_config_v5(legacy, &nvs_cfg);
         if (loaded) {
-            Serial.println("[CFG] migrated legacy v5 config to v6");
+            Serial.println("[CFG] migrated legacy v5 config to v10");
         }
     } else if (stored == sizeof(RuntimeConfigV4)) {
         RuntimeConfigV4 legacy{};
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
         loaded = (got == sizeof(legacy)) && migrate_runtime_config_v4(legacy, &nvs_cfg);
         if (loaded) {
-            Serial.println("[CFG] migrated legacy v4 config to v6");
+            Serial.println("[CFG] migrated legacy v4 config to v10");
         }
     } else if (stored == sizeof(RuntimeConfigV3)) {
         RuntimeConfigV3 legacy{};
         const size_t got = g_cfg_prefs.getBytes("runtime_cfg", &legacy, sizeof(legacy));
         loaded = (got == sizeof(legacy)) && migrate_runtime_config_v3(legacy, &nvs_cfg);
         if (loaded) {
-            Serial.println("[CFG] migrated legacy v3 config to v6");
+            Serial.println("[CFG] migrated legacy v3 config to v10");
         }
     }
     g_cfg_prefs.end();
@@ -5023,6 +6406,14 @@ bool parse_bool_from_arg(const String& value) {
     return (v == "1" || v == "true" || v == "on" || v == "yes");
 }
 
+float parse_float_from_arg(const String& value, float fallback) {
+    if (value.isEmpty()) return fallback;
+    char* end = nullptr;
+    const float parsed = strtof(value.c_str(), &end);
+    if (end == value.c_str() || !std::isfinite(parsed)) return fallback;
+    return parsed;
+}
+
 void launch_sw4_setup_portal_if_requested() {
     const bool pressed = read_sw4_pressed();
     Serial.printf("[CFG] SW4 boot state: %s\n", pressed ? "PRESSED" : "released");
@@ -5050,7 +6441,7 @@ void launch_sw4_setup_portal_if_requested() {
 
     server.on("/", HTTP_GET, [&]() {
         String html;
-        html.reserve(1800);
+        html.reserve(2200);
         html += "<html><body><h2>CB PLC Setup</h2>";
         html += "<form method='POST' action='/save'>";
         html += "Mode (0=standalone,1=external_controller) <input name='mode' value='";
@@ -5067,6 +6458,19 @@ void launch_sw4_setup_portal_if_requested() {
         html += "Auth TTL ms <input name='auth_ms' value='" + String(g_runtime_cfg.controller_auth_ttl_ms) + "'/><br/>";
         html += "SLAC arm timeout ms <input name='slac_arm_ms' value='" + String(g_runtime_cfg.controller_slac_arm_timeout_ms) + "'/><br/>";
         html += "LED count (1-32) <input name='led_count' value='" + String(g_runtime_cfg.led_count) + "'/><br/>";
+        html += "Module voltage headroom V (0 disables) <input name='module_v_headroom' value='" + String(g_runtime_cfg.module_voltage_headroom_v, 1) + "'/><br/>";
+        html += "Module current headroom A (0 disables) <input name='module_i_headroom' value='" + String(g_runtime_cfg.module_current_headroom_a, 2) + "'/><br/>";
+        html += "Exact EV targets during HLC (0/1) <input name='hlc_follow_ev' value='";
+        html += (g_runtime_cfg.hlc_follow_vehicle_targets ? "1" : "0");
+        html += "'/><br/>";
+        html += "DIN zero-limit compat (0/1) <input name='din_zero_compat' value='";
+        html += (g_runtime_cfg.din_zero_limits_compat ? "1" : "0");
+        html += "'/><br/>";
+        html += "Standalone prearm seed V (0 disables) <input name='prearm_seed_v' value='" +
+                String(g_runtime_cfg.standalone_prearm_seed_voltage_v, 1) + "'/><br/>";
+        html += "Standalone welding voltage mode (0=measured,1=fake_zero 15V->0V) <input name='weld_v_mode' value='";
+        html += String(g_runtime_cfg.standalone_welding_voltage_mode);
+        html += "'/><br/>";
         html += "<button type='submit'>Save & Reboot</button></form></body></html>";
         server.send(200, "text/html", html);
     });
@@ -5088,6 +6492,20 @@ void launch_sw4_setup_portal_if_requested() {
         if (server.hasArg("auth_ms")) next.controller_auth_ttl_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("auth_ms").toInt()));
         if (server.hasArg("slac_arm_ms")) next.controller_slac_arm_timeout_ms = static_cast<uint32_t>(std::max<long>(0, server.arg("slac_arm_ms").toInt()));
         if (server.hasArg("led_count")) next.led_count = static_cast<uint8_t>(std::max<long>(0, server.arg("led_count").toInt()));
+        if (server.hasArg("module_v_headroom")) next.module_voltage_headroom_v =
+            parse_float_from_arg(server.arg("module_v_headroom"), next.module_voltage_headroom_v);
+        if (server.hasArg("module_i_headroom")) next.module_current_headroom_a =
+            parse_float_from_arg(server.arg("module_i_headroom"), next.module_current_headroom_a);
+        if (server.hasArg("hlc_follow_ev")) next.hlc_follow_vehicle_targets =
+            parse_bool_from_arg(server.arg("hlc_follow_ev"));
+        else if (server.hasArg("hlc_precharge_exact")) next.hlc_follow_vehicle_targets =
+            parse_bool_from_arg(server.arg("hlc_precharge_exact"));
+        if (server.hasArg("din_zero_compat")) next.din_zero_limits_compat =
+            parse_bool_from_arg(server.arg("din_zero_compat"));
+        if (server.hasArg("prearm_seed_v")) next.standalone_prearm_seed_voltage_v =
+            parse_float_from_arg(server.arg("prearm_seed_v"), next.standalone_prearm_seed_voltage_v);
+        if (server.hasArg("weld_v_mode")) next.standalone_welding_voltage_mode =
+            static_cast<uint8_t>(std::max<long>(0, server.arg("weld_v_mode").toInt()));
         normalize_runtime_config(&next);
         const RuntimeConfig previous = g_runtime_cfg;
         g_runtime_cfg = next;
@@ -5118,9 +6536,16 @@ void launch_sw4_setup_portal_if_requested() {
 bool init_module_manager() {
     if (!g_module_mutex) {
         g_module_mutex = xSemaphoreCreateMutex();
-        if (!g_module_mutex) return false;
+        if (!g_module_mutex) {
+            Serial.println("[MOD] module mutex create failed");
+            return false;
+        }
     }
-    if (!lock_modules(100)) return false;
+    if (!lock_modules(100)) {
+        Serial.println("[MOD] init blocked: module mutex timeout");
+        return false;
+    }
+    g_module_ready = false;
 
     if (!g_can.begin()) {
         unlock_modules();
@@ -5138,15 +6563,15 @@ bool init_module_manager() {
     cfg.runtime_probe_interval_ms = 80;
     cfg.module_quarantine_ms = 2000;
     cfg.drain_timeout_ms = 2500;
-    cfg.can_bandwidth_cap_kbps = 0.0f;
-    cfg.can_max_frames_per_second = 300.0f;
-    cfg.can_max_tx_per_tick = 96;
-    cfg.can_probe_tx_max_per_tick = 12;
-    cfg.can_control_tx_reserve_per_tick = 24;
-    cfg.can_control_bit_reserve_kbps = 4.0f;
-    cfg.command_keepalive_ms = 1500;
-    cfg.command_keepalive_stable_ms = 3000;
-    cfg.command_settle_window_ms = 2000;
+    cfg.command_min_interval_ms = 0;
+    cfg.can_max_frames_per_second = 0.0f;
+    cfg.can_max_tx_per_tick = 0;
+    cfg.can_max_rx_per_tick = 0;
+    cfg.can_probe_tx_max_per_tick = 0;
+    cfg.can_control_tx_reserve_per_tick = 0;
+    cfg.command_keepalive_ms = 200;
+    cfg.command_keepalive_stable_ms = 600;
+    cfg.command_settle_window_ms = 800;
     cfg.preventive_current_margin_pct = 0.025f;
     cfg.preventive_power_margin_pct = 0.025f;
     // In standalone mode the PLC owns the full charging path. After precharge,
@@ -5213,9 +6638,25 @@ bool init_module_manager() {
     return g_module_ready;
 }
 
-bool modules_apply_target(bool enable, float target_v, float target_i, const char* reason) {
-    if (!g_module_ready) return false;
-    if (!lock_modules(40)) return false;
+bool maybe_recover_module_manager(uint32_t now_ms, const char* reason);
+
+bool modules_apply_target(bool enable,
+                          float target_v,
+                          float target_i,
+                          const char* reason,
+                          ModuleTargetHeadroomPolicy headroom_policy) {
+    if (!g_module_ready) {
+        const uint32_t recover_now_ms = millis();
+        (void)maybe_recover_module_manager(recover_now_ms, reason ? reason : "ApplyTarget");
+        if (!g_module_ready) {
+            Serial.printf("[MOD] apply blocked (%s) manager_not_ready=1\n", reason ? reason : "-");
+            return false;
+        }
+    }
+    if (!lock_modules(40)) {
+        Serial.printf("[MOD] apply blocked (%s) module_mutex_timeout=1\n", reason ? reason : "-");
+        return false;
+    }
 
     g_module_mgr.poll_rx(24);
     const uint32_t pre_tick_ms = millis();
@@ -5224,29 +6665,29 @@ bool modules_apply_target(bool enable, float target_v, float target_i, const cha
     cbmodules::GroupStatus live_st = g_module_mgr.group_status(runtime_local_group_id());
     apply_fresh_measurements_from_states(&live_st, pre_tick_ms);
 
+    const ModuleCommandTarget cmd = build_module_command_target(enable, target_v, target_i, headroom_policy);
     cbmodules::GroupTarget tgt{};
     tgt.enable = enable;
-    tgt.voltage_v = std::max(0.0f, std::min(MODULE_MAX_VOLTAGE_V, target_v));
-    const float requested_current_a = std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, target_i));
-    const float limited_current_a = clamp_current_for_assignment_limit(tgt.voltage_v, target_i);
+    tgt.voltage_v = enable ? cmd.applied_voltage_v : 0.0f;
     // Do not reuse the previous group's live available-current snapshot to clamp
     // the next target. During hot allocation that value still reflects the old
     // module set and artificially drags the owner down exactly when new modules
     // have just been leased in. The module manager already performs the real
     // capability clamp on the active allowlist.
-    const float safe_current_a = limited_current_a;
-    tgt.current_a = std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, safe_current_a));
-    if (!enable) {
-        tgt.current_a = 0.0f;
-    }
+    tgt.current_a = enable ? cmd.applied_current_a : 0.0f;
 
-    bool ok = g_module_mgr.apply_group_setpoint_allowlist(
-        runtime_local_group_id(), tgt, g_module_allowlist, MODULE_ALLOWLIST_LEASE_MS);
+    cbmodules::GroupControlPlan plan{};
+    plan.group_id = runtime_local_group_id();
+    plan.target = tgt;
+    plan.module_ids = g_module_allowlist;
+    plan.lease_ms = MODULE_ALLOWLIST_LEASE_MS;
+    cbmodules::GroupControlPlanResult plan_result{};
+    bool ok = g_module_mgr.submit_control_plan(plan, &plan_result);
     g_module_mgr.poll_rx(8);
-    const uint32_t now_ms = millis();
-    g_module_mgr.tick(now_ms);
+    const uint32_t now_ms_post = millis();
+    g_module_mgr.tick(now_ms_post);
     auto st = g_module_mgr.group_status(runtime_local_group_id());
-    apply_fresh_measurements_from_states(&st, now_ms);
+    apply_fresh_measurements_from_states(&st, now_ms_post);
     bool assignment_missing = false;
     if (ok && enable && !g_module_allowlist.empty() && st.assigned_modules == 0u) {
         const auto states = g_module_mgr.module_states();
@@ -5290,23 +6731,96 @@ bool modules_apply_target(bool enable, float target_v, float target_i, const cha
                           local_isolated ? 1 : 0);
         }
     }
-    update_real_meter_with_status(st, now_ms);
+    update_real_meter_with_status(st, now_ms_post);
     unlock_modules();
+
+    if (!ok && (!plan_result.invalid_modules.empty() || !plan_result.conflict_modules.empty())) {
+        const char* invalid0 = plan_result.invalid_modules.empty() ? "-" : plan_result.invalid_modules.front().c_str();
+        const char* conflict0 = plan_result.conflict_modules.empty() ? "-" : plan_result.conflict_modules.front().c_str();
+        Serial.printf("[MOD] apply rejected (%s) invalid=%u conflict=%u firstInvalid=%s firstConflict=%s\n",
+                      reason ? reason : "-",
+                      static_cast<unsigned>(plan_result.invalid_modules.size()),
+                      static_cast<unsigned>(plan_result.conflict_modules.size()),
+                      invalid0,
+                      conflict0);
+    }
 
     if (ok && !assignment_missing) {
         g_last_module_target_v = tgt.voltage_v;
         g_last_module_target_i = tgt.current_a;
-        g_last_requested_target_v = tgt.voltage_v;
-        g_last_requested_target_i = enable ? requested_current_a : 0.0f;
+        g_last_requested_target_v = enable ? cmd.requested_voltage_v : 0.0f;
+        g_last_requested_target_i = enable ? cmd.requested_current_a : 0.0f;
         g_module_output_enabled = enable;
     } else {
-        Serial.printf("[MOD] apply failed (%s) en=%d v=%.1f i=%.1f\n",
-                      reason ? reason : "-", enable ? 1 : 0, target_v, target_i);
+        Serial.printf("[MOD] apply failed (%s) en=%d reqV=%.1f reqI=%.1f applyV=%.1f applyI=%.2f hv=%.1f hi=%.2f\n",
+                      reason ? reason : "-",
+                      enable ? 1 : 0,
+                      static_cast<double>(cmd.requested_voltage_v),
+                      static_cast<double>(cmd.requested_current_a),
+                      static_cast<double>(tgt.voltage_v),
+                      static_cast<double>(tgt.current_a),
+                      static_cast<double>(g_runtime_cfg.module_voltage_headroom_v),
+                      static_cast<double>(g_runtime_cfg.module_current_headroom_a));
     }
     return ok;
 }
 
 void request_modules_off(const char* reason);
+
+bool maybe_recover_module_manager(uint32_t now_ms, const char* reason) {
+    if (!mode_uses_plc_module_manager() || g_module_ready) {
+        return false;
+    }
+    if (g_relay1_closed || g_relay2_closed || g_relay3_closed || g_module_output_enabled) {
+        return false;
+    }
+    if (g_module_recovery_retry_at_ms != 0u &&
+        static_cast<int32_t>(now_ms - g_module_recovery_retry_at_ms) < 0) {
+        return false;
+    }
+
+    g_module_recovery_retry_at_ms = now_ms + MODULE_MANAGER_RECOVERY_RETRY_MS;
+    Serial.printf("[MOD] recovery attempt (%s) mode=%s session=%d hlc=%d allow=%u\n",
+                  reason ? reason : "RuntimeRecover",
+                  runtime_mode_name(),
+                  g_session_started ? 1 : 0,
+                  g_hlc_active ? 1 : 0,
+                  static_cast<unsigned>(g_module_allowlist.size()));
+
+    if (mode_is_local_autonomous()) {
+        g_module_allowlist = {runtime_local_module_id()};
+    }
+    const bool recovered = init_module_manager();
+    if (!recovered) {
+        Serial.printf("[MOD] recovery failed (%s)\n", reason ? reason : "RuntimeRecover");
+        return false;
+    }
+
+    g_module_recovery_retry_at_ms = 0u;
+    if (mode_requires_controller_contract()) {
+        g_module_allowlist.clear();
+        g_assignment_power_limit_kw = 0.0f;
+        g_active_module_power_limits_kw.clear();
+        g_module_output_enabled = false;
+        Serial.printf("[MOD] recovery complete (%s) mode=%s allow=0\n",
+                      reason ? reason : "RuntimeRecover",
+                      runtime_mode_name());
+        return true;
+    }
+
+    const bool allow_ok =
+        apply_new_allowlist({runtime_local_module_id()}, MODULE_MAX_POWER_KW, reason ? reason : "RecoverStandalone");
+    if (!allow_ok) {
+        Serial.printf("[MOD] recovery allowlist failed (%s)\n", reason ? reason : "RuntimeRecover");
+        return false;
+    }
+    request_modules_off("RecoverIdle");
+    Serial.printf("[MOD] recovery complete (%s) mode=%s allow=%u\n",
+                  reason ? reason : "RuntimeRecover",
+                  runtime_mode_name(),
+                  static_cast<unsigned>(g_module_allowlist.size()));
+    return true;
+}
 
 bool maybe_repair_standalone_local_allocation(uint32_t now_ms, const char* reason);
 
@@ -5338,6 +6852,7 @@ bool ensure_power_delivery_started(HlcAppContext* ctx, float target_v, const cha
 void request_modules_off(const char* reason) {
     if (g_module_allowlist.empty()) {
         g_module_output_enabled = false;
+        g_last_module_target_v = 0.0f;
         g_last_module_target_i = 0.0f;
         g_last_requested_target_i = 0.0f;
         return;
@@ -5353,6 +6868,7 @@ void request_modules_off(const char* reason) {
                   static_cast<unsigned>(g_module_allowlist.size()));
     if (ok) {
         g_module_output_enabled = false;
+        g_last_module_target_v = 0.0f;
         g_last_module_target_i = 0.0f;
         g_last_requested_target_i = 0.0f;
     } else {
@@ -5374,7 +6890,12 @@ void release_controller_allowlist_if_idle(const char* reason) {
 }
 
 void service_module_manager_once(uint32_t now_ms) {
-    if (!g_module_ready) return;
+    if (!g_module_ready) {
+        (void)maybe_recover_module_manager(now_ms, "RuntimeService");
+        if (!g_module_ready) {
+            return;
+        }
+    }
     (void)maybe_repair_standalone_local_allocation(now_ms, "RuntimeRepair");
     const bool module_control_active =
         mode_is_local_autonomous() || mode_requires_controller_contract() || !g_module_allowlist.empty() ||
@@ -5530,6 +7051,21 @@ bool controller_stop_is_complete() {
     return local_group_released();
 }
 
+bool controller_soft_stop_waits_for_ev_shutdown() {
+    if (mode_controller_has_final_decision()) {
+        return false;
+    }
+    if (!g_ctrl.stop_active || g_ctrl.stop_hard) {
+        return false;
+    }
+    if (!cp_connected(g_cp_state)) {
+        return false;
+    }
+    return g_session_started || g_hlc_active || g_hlc_ready ||
+           g_hlc_ctx.precharge_seen || g_hlc_ctx.power_delivery_enabled ||
+           g_relay1_closed || g_module_output_enabled;
+}
+
 void controller_begin_stop(uint32_t now_ms, bool hard, uint32_t timeout_ms, uint8_t reason_code) {
     g_ctrl.stop_active = true;
     g_ctrl.stop_hard = hard;
@@ -5545,13 +7081,18 @@ void controller_begin_stop(uint32_t now_ms, bool hard, uint32_t timeout_ms, uint
     controller_clear_managed_power_cache();
     controller_clear_managed_feedback_cache();
     g_relay1_deadline_ms = 0;
-    request_modules_off(hard ? "CtrlStopHard" : "CtrlStopSoft");
-    // Release module ownership after we have driven the currently leased set to zero.
-    if (mode_uses_plc_module_manager()) {
-        (void)apply_new_allowlist({}, 0.0f, hard ? "CtrlStopHard" : "CtrlStopSoft");
-    }
-    if (!mode_controller_has_final_decision()) {
-        (void)relay1_set(false, hard ? "CtrlStopHard" : "CtrlStopSoft");
+    const bool orderly_hlc_shutdown = controller_soft_stop_waits_for_ev_shutdown();
+    if (!orderly_hlc_shutdown) {
+        request_modules_off(hard ? "CtrlStopHard" : "CtrlStopSoft");
+        // Release module ownership after we have driven the currently leased set to zero.
+        if (mode_uses_plc_module_manager()) {
+            (void)apply_new_allowlist({}, 0.0f, hard ? "CtrlStopHard" : "CtrlStopSoft");
+        }
+        if (!mode_controller_has_final_decision()) {
+            (void)relay1_set(false, hard ? "CtrlStopHard" : "CtrlStopSoft");
+        }
+    } else {
+        g_hlc_ctx.stop_requested = true;
     }
 }
 
@@ -5566,12 +7107,17 @@ void controller_apply_stop_policy(uint32_t now_ms) {
     controller_clear_managed_power_cache();
     controller_clear_managed_feedback_cache();
     g_relay1_deadline_ms = 0;
-    request_modules_off(g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
-    if (mode_uses_plc_module_manager() && !g_module_allowlist.empty()) {
-        (void)apply_new_allowlist({}, 0.0f, g_ctrl.stop_hard ? "CtrlStopHardRelease" : "CtrlStopSoftRelease");
-    }
-    if (!mode_controller_has_final_decision()) {
-        (void)relay1_set(false, g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
+    const bool orderly_hlc_shutdown = controller_soft_stop_waits_for_ev_shutdown();
+    if (!orderly_hlc_shutdown) {
+        request_modules_off(g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
+        if (mode_uses_plc_module_manager() && !g_module_allowlist.empty()) {
+            (void)apply_new_allowlist({}, 0.0f, g_ctrl.stop_hard ? "CtrlStopHardRelease" : "CtrlStopSoftRelease");
+        }
+        if (!mode_controller_has_final_decision()) {
+            (void)relay1_set(false, g_ctrl.stop_hard ? "CtrlStopHard" : "CtrlStopSoft");
+        }
+    } else {
+        g_hlc_ctx.stop_requested = true;
     }
 
     if (g_ctrl.stop_hard) {
@@ -5636,6 +7182,20 @@ bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, c
             return false;
         }
     }
+    bool next_has_local = false;
+    for (const auto& id : next) {
+        if (id == runtime_local_module_id()) {
+            next_has_local = true;
+            break;
+        }
+    }
+    bool current_has_local = false;
+    for (const auto& id : g_module_allowlist) {
+        if (id == runtime_local_module_id()) {
+            current_has_local = true;
+            break;
+        }
+    }
     const float sanitized_limit_kw = std::max(0.0f, limit_kw);
     const bool limit_changed = std::fabs(sanitized_limit_kw - g_assignment_power_limit_kw) > 0.05f;
     const bool empty_release_pending = next.empty() && g_module_ready && !local_group_released();
@@ -5648,9 +7208,18 @@ bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, c
         if (next.empty()) {
             g_active_module_power_limits_kw.clear();
             g_module_output_enabled = false;
+            g_last_module_target_v = 0.0f;
             g_last_module_target_i = 0.0f;
         }
         return true;
+    }
+
+    if (next.empty()) {
+        g_local_module_defaults_applied = false;
+    } else if (next_has_local && (!current_has_local || !g_local_module_defaults_applied)) {
+        if (!apply_local_module_maxwell_defaults(reason)) {
+            return false;
+        }
     }
 
     if (next == g_module_allowlist && !limit_changed && !empty_release_pending && !next.empty()) {
@@ -5672,13 +7241,18 @@ bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, c
 
     const float previous_limit_kw = g_assignment_power_limit_kw;
     const bool enable = g_module_output_enabled && (g_last_requested_target_i > 0.05f);
-    const float target_v =
-        enable ? std::max(0.0f, std::min(MODULE_MAX_VOLTAGE_V, g_last_requested_target_v)) : 0.0f;
-    const float target_i = enable ? clamp_current_for_assignment_limit(target_v, g_last_requested_target_i) : 0.0f;
+    const ModuleCommandTarget cmd =
+        enable
+            ? build_module_command_target(true,
+                                          g_last_requested_target_v,
+                                          g_last_requested_target_i,
+                                          (g_last_bms_hlc_stage == 2u) ? ModuleTargetHeadroomPolicy::ApplyConfigured
+                                                                       : ModuleTargetHeadroomPolicy::Auto)
+               : ModuleCommandTarget{};
     cbmodules::GroupTarget tgt{};
     tgt.enable = enable;
-    tgt.voltage_v = target_v;
-    tgt.current_a = enable ? std::max(0.0f, std::min(MODULE_MAX_CURRENT_A, target_i)) : 0.0f;
+    tgt.voltage_v = enable ? cmd.applied_voltage_v : 0.0f;
+    tgt.current_a = enable ? cmd.applied_current_a : 0.0f;
     if (next.empty()) {
         tgt.enable = false;
         tgt.voltage_v = 0.0f;
@@ -5718,6 +7292,7 @@ bool apply_new_allowlist(const std::vector<std::string>& next, float limit_kw, c
         restore_default_module_limits(g_active_module_power_limits_kw, {});
         g_assignment_power_limit_kw = 0.0f;
         g_module_output_enabled = false;
+        g_last_module_target_v = 0.0f;
         g_last_module_target_i = 0.0f;
         g_last_requested_target_i = 0.0f;
         g_active_module_power_limits_kw.clear();
@@ -6006,11 +7581,14 @@ void controller_handle_hlc_feedback(const CtrlRxFrame& f) {
     feedback.power_limit_achieved = power_limit;
     feedback.present_voltage_v = std::max(0.0f, present_v);
     feedback.present_current_a = std::max(0.0f, present_i);
+    const uint32_t feedback_applied_ms = feedback.last_update_ms;
     portENTER_CRITICAL(&g_ctrl_feedback_mux);
     g_ctrl_feedback = feedback;
     portEXIT_CRITICAL(&g_ctrl_feedback_mux);
     if (valid) {
-        update_real_meter_sample(feedback.present_voltage_v, feedback.present_current_a, f.rx_ms);
+        g_last_controller_feedback_sample_ms = feedback_applied_ms;
+        g_last_controller_feedback_voltage_v = feedback.present_voltage_v;
+        update_real_meter_sample(feedback.present_voltage_v, feedback.present_current_a, feedback_applied_ms);
     }
     send_ctrl_ack(0x1Au, seq, ACK_OK, valid ? 1u : 0u, ready ? 1u : 0u);
 }
@@ -6349,8 +7927,9 @@ void controller_status_feedback_snapshot(uint32_t now_ms,
 
 void serial_tx_cp_status(uint32_t now_ms) {
     if (!mode_uart_status_stream_active()) return;
-    Serial.printf("[SERCTRL] EVT CP cp=%s duty=%u connected=%d hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d\n",
+    Serial.printf("[SERCTRL] EVT CP cp=%s mv=%d duty=%u connected=%d hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d\n",
                   cp_phase_label(g_cp_state, g_last_cp_duty_pct),
+                  g_last_cp_mv,
                   static_cast<unsigned>(g_last_cp_duty_pct),
                   cp_connected(g_cp_state) ? 1 : 0,
                   controller_heartbeat_alive(now_ms) ? 1 : 0,
@@ -6846,7 +8425,7 @@ void serial_ctrl_handle_line(String line) {
         return;
     }
     if (op == "STATUS") {
-        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d emergency=%d led=%s led_count=%u\n",
+        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s cp_mv=%d duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d emergency=%d led=%s led_count=%u\n",
                       static_cast<unsigned>(g_runtime_cfg.mode),
                       runtime_mode_name(),
                       static_cast<unsigned>(g_runtime_cfg.plc_id),
@@ -6858,6 +8437,7 @@ void serial_ctrl_handle_line(String line) {
                       mode_uses_plc_can_stack() ? 1 : 0,
                       mode_uses_plc_module_manager() ? 1 : 0,
                       cp_phase_label(g_cp_state, g_last_cp_duty_pct),
+                      g_last_cp_mv,
                       static_cast<unsigned>(g_last_cp_duty_pct),
                       controller_heartbeat_alive(millis()) ? 1 : 0,
                       static_cast<unsigned>(g_ctrl.auth_state),
@@ -7306,12 +8886,23 @@ void hlc_reset_session_state(HlcAppContext* ctx) {
     ctx->precharge_converged = false;
     ctx->precharge_prearmed = false;
     ctx->power_delivery_enabled = false;
+    ctx->delivery_current_seen = false;
     ctx->stop_requested = false;
+    ctx->delivery_recovery_active = false;
+    ctx->delivery_recovery_attempted = false;
+    ctx->delivery_recovery_phase = StandaloneDeliveryRecoveryPhase::Idle;
     ctx->precharge_count = 0;
+    ctx->cable_check_started_ms = 0u;
+    ctx->delivery_recovery_started_ms = 0u;
+    ctx->output_limit_shortfall_since_ms = 0u;
     ctx->sa_schedule_tuple_id = 1u;
+    ctx->delivery_recovery_target_v = 0.0f;
+    ctx->output_limit_target_v = 0.0f;
+    ctx->output_limit_target_i = 0.0f;
     ctx->negotiated_ev_max_v = 0.0f;
     ctx->negotiated_ev_max_i = 0.0f;
     g_hlc_disconnect_hold_until_ms = 0;
+    g_standalone_fake_welding_response_count = 0u;
     clear_last_bms_request();
 }
 
@@ -7437,15 +9028,65 @@ int hlc_handle_charge_parameter_discovery(HlcAppContext* ctx,
                                           size_t* written) {
     if (!ctx || !ctx->secc || !req) return -EINVAL;
     int rc = 0;
+    bool zero_compat_active = false;
+    if (req->protocol == JPV2G_PROTOCOL_DIN70121 && req->body) {
+        const auto* rq = static_cast<const din_ChargeParameterDiscoveryReqType*>(req->body);
+        if (rq->DC_EVChargeParameter_isUsed) {
+            const float req_max_v = sane_non_negative(din_pv_to_float(&rq->DC_EVChargeParameter.EVMaximumVoltageLimit));
+            const float req_max_i = sane_non_negative(din_pv_to_float(&rq->DC_EVChargeParameter.EVMaximumCurrentLimit));
+            zero_compat_active =
+                g_runtime_cfg.din_zero_limits_compat &&
+                req_max_v <= 0.1f &&
+                req_max_i <= 0.1f;
+        }
+    }
     if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
-        din_DC_EVSEChargeParameterType params;
-        fill_din_dc_charge_params_real(&params);
-        rc = jpv2g_cbv2g_encode_din_charge_parameter_discovery_res(
-            ctx->secc->session_id, din_responseCodeType_OK, &params, out, out_len, written);
+        const bool zero_ev_limits =
+            sane_non_negative(ctx->negotiated_ev_max_v) <= 0.1f &&
+            sane_non_negative(ctx->negotiated_ev_max_i) <= 0.1f;
+        if (zero_ev_limits && !zero_compat_active) {
+            rc = jpv2g_secc_default_handle(ctx->secc, JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ, req, out, out_len, written);
+        } else {
+            din_DC_EVSEChargeParameterType params;
+            fill_din_dc_charge_params_real(&params);
+            rc = jpv2g_cbv2g_encode_din_charge_parameter_discovery_res(
+                ctx->secc->session_id, din_responseCodeType_OK, &params, out, out_len, written);
+        }
+    } else if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
+        iso2_ChargeParameterDiscoveryResType res;
+        init_iso2_ChargeParameterDiscoveryResType(&res);
+        res.ResponseCode = iso2_responseCodeType_OK;
+        res.EVSEProcessing = iso2_EVSEProcessingType_Finished;
+        res.EVSEChargeParameter_isUsed = 0;
+        res.AC_EVSEChargeParameter_isUsed = 0;
+        res.DC_EVSEChargeParameter_isUsed = 1;
+        fill_iso_dc_charge_params_real(&res.DC_EVSEChargeParameter);
+        const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+        fill_iso_charge_parameter_schedule_real(&res, ctx->sa_schedule_tuple_id, limits.max_power_kw);
+        rc = jpv2g_cbv2g_encode_charge_parameter_discovery_res_payload(
+            ctx->secc->session_id, &res, out, out_len, written);
     } else {
         rc = jpv2g_secc_default_handle(ctx->secc, JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ, req, out, out_len, written);
     }
     if (rc == 0) {
+        if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
+            const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+            Serial.printf("[HLC] {\"msg\":\"ChargeParameterDiscoveryRes\",\"protocol\":\"din\","
+                          "\"rc\":%d,\"bytes\":%u,\"mode\":\"%s\",\"maxV\":%.1f,\"maxI\":%.1f,\"maxP\":%.1f,"
+                          "\"negotiatedMaxV\":%.1f,\"negotiatedMaxI\":%.1f}\n",
+                          rc,
+                          written ? static_cast<unsigned>(*written) : 0u,
+                          zero_compat_active ? "custom_compat"
+                                             : ((sane_non_negative(ctx->negotiated_ev_max_v) <= 0.1f &&
+                                                 sane_non_negative(ctx->negotiated_ev_max_i) <= 0.1f)
+                                                    ? "default"
+                                                    : "custom"),
+                          limits.max_voltage_v,
+                          limits.max_current_a,
+                          limits.max_power_kw,
+                          sane_non_negative(ctx->negotiated_ev_max_v),
+                          sane_non_negative(ctx->negotiated_ev_max_i));
+        }
         (void)maybe_prearm_standalone_precharge(ctx, "ChargeParameterDiscoveryPreArm");
     }
     return rc;
@@ -7457,7 +9098,11 @@ int hlc_handle_cable_check(HlcAppContext* ctx,
                            size_t out_len,
                            size_t* written) {
     if (!ctx || !ctx->secc || !req) return -EINVAL;
-    const int rc = jpv2g_secc_default_handle(ctx->secc, JPV2G_CABLE_CHECK_REQ, req, out, out_len, written);
+    // The connected gun accepts the library's immediate CableCheck completion
+    // for both ISO2 and DIN. The newer custom isolation-monitoring sequence
+    // regressed the ISO2 flow and caused the EV to drop before PreCharge.
+    const int rc =
+        jpv2g_secc_default_handle(ctx->secc, JPV2G_CABLE_CHECK_REQ, req, out, out_len, written);
     if (rc == 0) {
         (void)maybe_prearm_standalone_precharge(ctx, "CableCheckPreArm");
     }
@@ -7513,10 +9158,11 @@ int hlc_handle_precharge(HlcAppContext* ctx,
         const uint32_t feedback_now_ms = millis();
         const uint32_t fb_age_ms =
             (fb_ok && feedback_now_ms >= fb.last_update_ms) ? (feedback_now_ms - fb.last_update_ms) : UINT32_MAX;
-        const bool log_due = !precharge_ready || fb_age_ms >= 200u ||
-                             !controller_serial_quiet_window() ||
-                             s_last_ctrl_precharge_log_ms == 0u ||
-                             static_cast<uint32_t>(now_ms - s_last_ctrl_precharge_log_ms) >= 1000u;
+        const bool quiet_window = controller_serial_quiet_window();
+        const bool log_due =
+            s_last_ctrl_precharge_log_ms == 0u ||
+            static_cast<uint32_t>(now_ms - s_last_ctrl_precharge_log_ms) >= 1000u ||
+            (!quiet_window && (!precharge_ready || fb_age_ms >= 200u));
         if (log_due) {
             s_last_ctrl_precharge_log_ms = now_ms;
             Serial.printf("[HLC] {\"msg\":\"CtrlPreChargeRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"allow\":%d,\"ready\":%d,"
@@ -7579,8 +9225,9 @@ int hlc_handle_precharge(HlcAppContext* ctx,
     }
 
     const uint32_t baseline_telemetry_ms = latest_local_group_telemetry_ms();
+    bool target_applied = false;
     if (allow_energy) {
-        (void)modules_apply_target(true, req_v, req_i, "PreCharge");
+        target_applied = modules_apply_target(true, req_v, req_i, "PreCharge");
     } else {
         request_modules_off("PreChargeBlocked");
         req_i = 0.0f;
@@ -7588,7 +9235,7 @@ int hlc_handle_precharge(HlcAppContext* ctx,
         ctx->power_delivery_enabled = false;
     }
 
-    if (allow_energy && !g_relay1_closed) {
+    if (allow_energy && target_applied && !g_relay1_closed) {
         (void)relay1_set(true, "PreCharge");
     }
     cbmodules::GroupStatus present_st{};
@@ -7600,13 +9247,9 @@ int hlc_handle_precharge(HlcAppContext* ctx,
               baseline_telemetry_ms, req_v, &present_st, &present_v, &present_i, &fresh_after_target)
         : snapshot_live_present_values(&present_st, &present_v, &present_i);
 
-    bool precharge_ready = allow_energy && !g_module_allowlist.empty() && present_st.assigned_modules > 0u &&
-                           precharge_voltage_converged(req_v, present_v);
+    const bool precharge_ready = allow_energy && !g_module_allowlist.empty() && present_st.assigned_modules > 0u &&
+                                 precharge_voltage_converged(req_v, present_v);
     ctx->precharge_converged = precharge_ready;
-    if (!precharge_ready && standalone_precharge_start_ready(ctx, req_v)) {
-        ctx->precharge_converged = true;
-        precharge_ready = true;
-    }
     Serial.printf("[HLC] {\"msg\":\"PreChargeRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"allow\":%d,\"ready\":%d,"
                   "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d,"
                   "\"telemetryValid\":%d,\"sampleFresh\":%d}\n",
@@ -7686,6 +9329,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     const float requested_i = req_i;
     const uint32_t now_ms = millis();
     const bool allow_energy = controller_allows_energy(now_ms);
+    standalone_refresh_delivery_recovery_window(ctx, requested_v, requested_i);
     if (mode_controller_uses_external_feedback()) {
         static uint32_t s_last_ctrl_current_demand_log_ms = 0u;
         const ControllerManagedFeedbackState baseline_feedback = controller_feedback_snapshot();
@@ -7697,14 +9341,19 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         const float present_v_fb = fb_ok ? sane_non_negative(fb.present_voltage_v) : sane_non_negative(g_last_measured_v);
         const float present_i_fb = fb_ok ? sane_non_negative(fb.present_current_a) : 0.0f;
         const bool delivery_active = allow_energy && ctx->power_delivery_enabled && g_relay1_closed;
+        const bool current_converged = current_demand_current_converged(requested_i, present_i_fb);
+        const bool current_ready_safe = current_demand_current_ready_safe(requested_i, present_i_fb);
+        const bool response_current_ready =
+            current_demand_current_ready_for_response(requested_i, current_ready_safe, current_converged, true);
         // Match the standalone CurrentDemand contract. The standalone path does
         // not wait for a second, externally derived "ready" latch once
         // PowerDelivery is armed; it answers from the freshest valid power-path
         // telemetry immediately. In controller mode, waiting for the host's
-        // fb.ready bit adds an avoidable one-feedback delay, so the first
-        // CurrentDemand loop becomes EVSE_NotReady even though standalone would
-        // already answer EVSE_Ready on the same underlying module telemetry.
-        const bool response_ready = delivery_active && fb_ok;
+        // fb.ready bit adds an avoidable one-feedback delay. Still, only report
+        // EVSE_Ready once the requested current has actually converged, and do
+        // not report Ready while the measured current materially overshoots the
+        // EV request during a downward ramp or stop tail.
+        const bool response_ready = delivery_active && fb_ok && response_current_ready;
         if (!allow_energy && !mode_controller_has_final_decision()) {
             request_modules_off("CurrentDemandBlocked");
             (void)relay1_set(false, "CurrentDemandBlocked");
@@ -7740,16 +9389,17 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         const bool current_limited = fb_ok ? fb.current_limit_achieved : false;
         const bool power_limited = fb_ok ? fb.power_limit_achieved : false;
         const bool voltage_limited = fb_ok ? fb.voltage_limit_achieved : false;
-        const bool log_due = !response_ready || fb_age_ms >= 200u ||
-                             !fresh_after_target || !controller_serial_quiet_window() ||
-                             s_last_ctrl_current_demand_log_ms == 0u ||
-                             static_cast<uint32_t>(now_ms - s_last_ctrl_current_demand_log_ms) >= 1000u;
+        const bool quiet_window = controller_serial_quiet_window();
+        const bool log_due =
+            s_last_ctrl_current_demand_log_ms == 0u ||
+            static_cast<uint32_t>(now_ms - s_last_ctrl_current_demand_log_ms) >= 1000u ||
+            (!quiet_window && (!response_ready || fb_age_ms >= 200u || !fresh_after_target));
         if (log_due) {
             s_last_ctrl_current_demand_log_ms = now_ms;
             Serial.printf("[HLC] {\"msg\":\"CtrlCurrentDemandRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"allow\":%d,"
                           "\"ready\":%d,\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d,"
                           "\"fbValid\":%d,\"fbFresh\":%d,\"fbAgeMs\":%lu,\"sampleFresh\":%d,\"deliveryArmed\":%d,"
-                          "\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d}\n",
+                          "\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,\"currSafe\":%d,\"currConv\":%d}\n",
                           requested_v,
                           requested_i,
                           allow_energy ? 1 : 0,
@@ -7765,7 +9415,9 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
                           delivery_active ? 1 : 0,
                           current_limited ? 1 : 0,
                           voltage_limited ? 1 : 0,
-                          power_limited ? 1 : 0);
+                          power_limited ? 1 : 0,
+                          current_ready_safe ? 1 : 0,
+                          current_converged ? 1 : 0);
         }
         const uint8_t* sid = ctx->secc->session_id;
         if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
@@ -7830,17 +9482,20 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
 
         return -ENOTSUP;
     }
-    if (allow_energy && ctx->precharge_seen && !ctx->precharge_converged) {
+    float recovery_present_v = 0.0f;
+    float recovery_present_i = 0.0f;
+    const bool recovery_waiting =
+        standalone_service_delivery_recovery(ctx, requested_v, requested_i, &recovery_present_v, &recovery_present_i);
+    if (allow_energy && ctx->precharge_seen && !ctx->precharge_converged && !ctx->delivery_recovery_active) {
         (void)refresh_precharge_convergence(ctx, requested_v);
         if (!ctx->precharge_converged && standalone_precharge_start_ready(ctx, requested_v)) {
             ctx->precharge_converged = true;
         }
-        if (!ctx->precharge_converged && req->protocol == JPV2G_PROTOCOL_DIN70121 &&
-            requested_i > (PRECHARGE_CURRENT_LIMIT_A + 0.05f)) {
+        if (!ctx->precharge_converged && requested_i > (PRECHARGE_CURRENT_LIMIT_A + 0.05f)) {
             float handoff_v = 0.0f;
             float handoff_i = 0.0f;
             float accept_floor_v = 0.0f;
-            if (standalone_din_handoff_ready(ctx, requested_v, &handoff_v, &handoff_i, &accept_floor_v)) {
+            if (standalone_relaxed_handoff_ready(ctx, requested_v, &handoff_v, &handoff_i, &accept_floor_v)) {
                 ctx->precharge_converged = true;
                 Serial.printf("[HLC] {\"msg\":\"CurrentDemandRelaxedStart\",\"targetV\":%.1f,\"targetI\":%.1f,"
                               "\"presentV\":%.1f,\"presentI\":%.2f,\"acceptFloorV\":%.1f,"
@@ -7856,19 +9511,23 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
             }
         }
     }
-    if (allow_energy && ctx->precharge_converged && req_i > 0.05f && !ctx->power_delivery_enabled) {
+    if (allow_energy && ctx->precharge_converged && req_i > 0.05f &&
+        !ctx->power_delivery_enabled && !ctx->delivery_recovery_active) {
         (void)ensure_power_delivery_started(ctx, requested_v, "CurrentDemandStart");
     }
-    const bool delivery_active = allow_energy && ctx->power_delivery_enabled && g_relay1_closed;
+    bool delivery_active = allow_energy && ctx->power_delivery_enabled && g_relay1_closed;
     const bool current_requested = (req_i > 0.05f);
     const uint32_t baseline_telemetry_ms = latest_local_group_telemetry_ms();
     bool target_applied = false;
-    if (delivery_active) {
+    if (ctx->delivery_recovery_active) {
+        target_applied = false;
+    } else if (delivery_active) {
         target_applied = modules_apply_target(true,
                                               req_v,
                                               current_requested ? req_i : 0.0f,
-                                              current_requested ? "CurrentDemand" : "CurrentDemandHoldZero");
-    } else if (allow_energy && ctx->precharge_seen) {
+                                              current_requested ? "CurrentDemand" : "CurrentDemandHoldZero",
+                                              ModuleTargetHeadroomPolicy::ApplyConfigured);
+    } else if (allow_energy && ctx->precharge_seen && g_relay1_closed) {
         target_applied = modules_apply_target(true,
                                               requested_v,
                                               std::min(PRECHARGE_CURRENT_LIMIT_A, requested_i),
@@ -7885,11 +9544,79 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     bool fresh_after_target = false;
     const bool telemetry_valid = snapshot_post_target_present_values(
         baseline_telemetry_ms, &st, &present_v, &present_i, &fresh_after_target);
-    if (!current_requested) {
-        present_i = 0.0f;
+    if (current_requested && present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A) {
+        ctx->delivery_current_seen = true;
     }
-    const bool response_ready = delivery_active && target_applied && g_relay1_closed &&
-                                (telemetry_valid || present_v > 0.1f || present_i > 0.05f);
+    if (recovery_waiting) {
+        delivery_active = false;
+        target_applied = false;
+        present_v = recovery_present_v;
+        present_i = recovery_present_i;
+    } else if (standalone_delivery_recovery_should_start(ctx, requested_v, requested_i, present_v, present_i, now_ms)) {
+        const bool relay_opened = relay1_set(false, "CurrentDemandRecoveryOpen");
+        if (relay_opened) {
+            request_modules_off("CurrentDemandRecoveryOff");
+            delay(CURRENT_DEMAND_FRESH_SAMPLE_POLL_MS);
+            (void)modules_apply_target(true,
+                                       requested_v,
+                                       requested_i,
+                                       "CurrentDemandRecoveryOpen",
+                                       ModuleTargetHeadroomPolicy::ApplyConfigured);
+        }
+        ctx->delivery_recovery_active = relay_opened;
+        ctx->delivery_recovery_attempted = relay_opened;
+        ctx->delivery_recovery_phase =
+            relay_opened ? StandaloneDeliveryRecoveryPhase::WaitingForOff : StandaloneDeliveryRecoveryPhase::Idle;
+        ctx->delivery_recovery_started_ms = relay_opened ? now_ms : 0u;
+        ctx->delivery_recovery_target_v = relay_opened ? requested_v : 0.0f;
+        ctx->precharge_converged = false;
+        ctx->power_delivery_enabled = false;
+        delivery_active = false;
+        target_applied = false;
+        Serial.printf("[HLC] {\"msg\":\"CurrentDemandRecoveryStart\",\"targetV\":%.1f,\"targetI\":%.1f,"
+                      "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"opened\":%d}\n",
+                      requested_v,
+                      requested_i,
+                      present_v,
+                      present_i,
+                      g_relay1_closed ? 1 : 0,
+                      relay_opened ? 1 : 0);
+    } else if (present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A) {
+        ctx->delivery_recovery_attempted = false;
+        ctx->delivery_recovery_started_ms = 0u;
+        ctx->delivery_recovery_target_v = 0.0f;
+    }
+    const uint32_t response_sample_ms = millis();
+    const bool telemetry_recent =
+        local_group_telemetry_recent(response_sample_ms, CURRENT_DEMAND_RESPONSE_TELEMETRY_MAX_AGE_MS);
+    const bool meter_recent = meter_sample_recent(response_sample_ms, CURRENT_DEMAND_RESPONSE_TELEMETRY_MAX_AGE_MS);
+    const bool current_converged = current_demand_current_converged(requested_i, present_i);
+    const bool current_ready_safe = current_demand_current_ready_safe(requested_i, present_i);
+    const bool response_current_ready =
+        current_demand_current_ready_for_response(requested_i, current_ready_safe, current_converged, false);
+    const bool voltage_ready_safe = current_demand_voltage_ready_safe(requested_v, g_last_module_target_v, present_v);
+    // During active CurrentDemand the EV expects the EVSE to keep processing
+    // rapid request updates and report the physically applied values. Requiring
+    // same-cycle current convergence before answering EVSE_Ready makes the
+    // standalone path flap EVSE_NotReady on normal ramps even though the power
+    // path is active and the measurement is truthful. Still, do not report
+    // Ready while the measured current materially overshoots the EV request,
+    // or while the bus voltage is still materially above the requested/applied
+    // level after the PreCharge -> CurrentDemand handoff.
+    const bool response_sample_ready = telemetry_recent && (telemetry_valid || meter_recent);
+    const bool response_ready =
+        delivery_active && target_applied && g_relay1_closed && response_sample_ready &&
+        response_current_ready && voltage_ready_safe;
+    const bool stop_charging = !mode_requires_controller_contract() && g_ctrl.stop_active;
+    const bool sustained_output_shortfall =
+        standalone_sustained_output_shortfall(ctx,
+                                              delivery_active,
+                                              response_sample_ready,
+                                              requested_v,
+                                              requested_i,
+                                              present_v,
+                                              present_i,
+                                              now_ms);
     const float response_i =
         (req->protocol == JPV2G_PROTOCOL_DIN70121)
             ? din_present_current_response_a(present_i,
@@ -7905,17 +9632,31 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     const float avail_i = sane_non_negative(st.available_current_a);
     const float avail_p = sane_non_negative(st.available_power_kw);
     const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
-    const bool current_limited =
-        (!delivery_active && requested_i > 0.05f) ||
-        st.saturated || (requested_i > (effective_req_i + 0.1f)) || (avail_i > 0.0f && requested_i > (avail_i + 0.1f));
-    const bool power_limited =
-        (!delivery_active && req_power_kw > 0.1f) ||
-        st.saturated || (req_power_kw > (effective_req_power_kw + 0.1f)) || (avail_p > 0.0f && req_power_kw > (avail_p + 0.1f));
+    const float configured_current_headroom_a =
+        delivery_active ? std::max(0.0f, g_runtime_cfg.module_current_headroom_a) : 0.0f;
+    const float requested_power_headroom_kw = (requested_v * configured_current_headroom_a) / 1000.0f;
+    // Keep configured module headroom for the physical target, but do not
+    // advertise EVSE current/power limits just because the standalone path is
+    // intentionally reserving that margin below the EV request.
+    bool current_limited =
+        (!delivery_active && requested_i > 0.05f) || st.saturated ||
+        (requested_i > (effective_req_i + configured_current_headroom_a + 0.1f)) ||
+        (avail_i > 0.0f && requested_i > (avail_i + 0.1f));
+    bool power_limited =
+        (!delivery_active && req_power_kw > 0.1f) || st.saturated ||
+        (req_power_kw > (effective_req_power_kw + requested_power_headroom_kw + 0.1f)) ||
+        (avail_p > 0.0f && req_power_kw > (avail_p + 0.1f));
     const bool voltage_limited = requested_v > (MODULE_MAX_VOLTAGE_V + 0.5f);
+    if (sustained_output_shortfall) {
+        current_limited = true;
+        if (req_power_kw > 0.1f) {
+            power_limited = true;
+        }
+    }
     Serial.printf("[HLC] {\"msg\":\"CurrentDemandRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"appliedV\":%.1f,"
-                  "\"appliedI\":%.2f,\"allow\":%d,\"delivery\":%d,\"targetApplied\":%d,\"ready\":%d,\"hold\":%d,"
+                  "\"appliedI\":%.2f,\"allow\":%d,\"delivery\":%d,\"targetApplied\":%d,\"ready\":%d,\"hold\":%d,\"stopCharging\":%d,"
                   "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d,\"telemetryValid\":%d,"
-                  "\"sampleFresh\":%d,\"saturated\":%d,\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,"
+                  "\"sampleFresh\":%d,\"telemetryRecent\":%d,\"meterRecent\":%d,\"currSafe\":%d,\"currConv\":%d,\"voltSafe\":%d,\"shortfall\":%d,\"saturated\":%d,\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,"
                   "\"availI\":%.1f,\"availP\":%.1f}\n",
                   requested_v,
                   requested_i,
@@ -7926,12 +9667,19 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
                   target_applied ? 1 : 0,
                   response_ready ? 1 : 0,
                   current_requested ? 0 : 1,
+                  stop_charging ? 1 : 0,
                   present_v,
                   present_i,
                   g_relay1_closed ? 1 : 0,
                   ctx->precharge_converged ? 1 : 0,
                   telemetry_valid ? 1 : 0,
                   fresh_after_target ? 1 : 0,
+                  telemetry_recent ? 1 : 0,
+                  meter_recent ? 1 : 0,
+                  current_ready_safe ? 1 : 0,
+                  current_converged ? 1 : 0,
+                  voltage_ready_safe ? 1 : 0,
+                  sustained_output_shortfall ? 1 : 0,
                   st.saturated ? 1 : 0,
                   current_limited ? 1 : 0,
                   voltage_limited ? 1 : 0,
@@ -7943,7 +9691,9 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
         iso2_CurrentDemandResType res;
         init_iso2_CurrentDemandResType(&res);
-        if (response_ready) {
+        if (stop_charging) {
+            set_iso_dc_status_shutdown(&res.DC_EVSEStatus, iso2_EVSENotificationType_StopCharging);
+        } else if (response_ready) {
             set_iso_dc_status_ready(&res.DC_EVSEStatus);
         } else {
             set_iso_dc_status_not_ready(&res.DC_EVSEStatus);
@@ -7953,6 +9703,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         res.EVSECurrentLimitAchieved = current_limited ? 1 : 0;
         res.EVSEVoltageLimitAchieved = voltage_limited ? 1 : 0;
         res.EVSEPowerLimitAchieved = power_limited ? 1 : 0;
+        fill_iso_current_demand_limits(&res, limits.max_voltage_v, limits.max_current_a, limits.max_power_kw);
         fill_iso_meter_info_real(&res.MeterInfo);
         res.MeterInfo_isUsed = 1;
         res.EVSEID.charactersLen = copy_iso_evse_id(res.EVSEID.characters);
@@ -7969,7 +9720,9 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
         din_CurrentDemandResType res;
         init_din_CurrentDemandResType(&res);
-        if (response_ready) {
+        if (stop_charging) {
+            set_din_dc_status_shutdown(&res.DC_EVSEStatus, din_EVSENotificationType_StopCharging);
+        } else if (response_ready) {
             set_din_dc_status_ready(&res.DC_EVSEStatus);
         } else {
             set_din_dc_status_not_ready(&res.DC_EVSEStatus);
@@ -8020,23 +9773,26 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
     bool ready = false;
     bool stop_charging = false;
     if (stop) {
+        g_standalone_fake_welding_response_count = 0u;
         ctx->stop_requested = true;
         ctx->power_delivery_enabled = false;
-        update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
+        ctx->delivery_current_seen = false;
+        clear_last_bms_request();
         if (!mode_controller_has_final_decision()) {
             controller_clear_managed_power_cache();
             (void)relay1_set(false, "PowerDeliveryStop");
             request_modules_off("PowerDeliveryStop");
         }
         ctx->precharge_converged = false;
-        clear_last_bms_request();
         applied = true;
         ready = false;
         stop_charging = true;
     } else if (renegotiate) {
+        g_standalone_fake_welding_response_count = 0u;
         ctx->stop_requested = false;
         ctx->power_delivery_enabled = false;
-        update_last_bms_request(g_last_requested_target_v, 0.0f, 3u, false, true);
+        ctx->delivery_current_seen = false;
+        clear_last_bms_request();
         if (!mode_controller_has_final_decision()) {
             (void)relay1_set(false, "PowerDeliveryRenegotiate");
             request_modules_off("PowerDeliveryRenegotiate");
@@ -8045,7 +9801,9 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
         applied = true;
         ready = false;
     } else if (start) {
+        g_standalone_fake_welding_response_count = 0u;
         ctx->stop_requested = false;
+        ctx->delivery_current_seen = false;
         if (!mode_controller_has_final_decision() && !allow_energy) {
             applied = false;
         } else if (mode_controller_uses_external_feedback()) {
@@ -8107,11 +9865,11 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
                 if (!ctx->precharge_converged && standalone_precharge_start_ready(ctx, g_last_requested_target_v)) {
                     ctx->precharge_converged = true;
                 }
-                if (!ctx->precharge_converged && req->protocol == JPV2G_PROTOCOL_DIN70121) {
+                if (!ctx->precharge_converged) {
                     float handoff_v = 0.0f;
                     float handoff_i = 0.0f;
                     float accept_floor_v = 0.0f;
-                    if (standalone_din_handoff_ready(
+                    if (standalone_relaxed_handoff_ready(
                             ctx, g_last_requested_target_v, &handoff_v, &handoff_i, &accept_floor_v)) {
                         ctx->precharge_converged = true;
                         Serial.printf("[HLC] {\"msg\":\"PowerDeliveryRelaxedStart\",\"targetV\":%.1f,"
@@ -8150,11 +9908,11 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
                         ctx->precharge_converged = true;
                     }
                 }
-                if (!ctx->precharge_converged && req->protocol == JPV2G_PROTOCOL_DIN70121) {
+                if (!ctx->precharge_converged) {
                     float handoff_v = 0.0f;
                     float handoff_i = 0.0f;
                     float accept_floor_v = 0.0f;
-                    if (standalone_din_handoff_ready(
+                    if (standalone_relaxed_handoff_ready(
                             ctx, g_last_requested_target_v, &handoff_v, &handoff_i, &accept_floor_v)) {
                         ctx->precharge_converged = true;
                         Serial.printf("[HLC] {\"msg\":\"PowerDeliveryRelaxedStartAfterWait\",\"targetV\":%.1f,"
@@ -8171,8 +9929,38 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
                 }
             }
             if (ctx->precharge_converged) {
-                applied = ensure_power_delivery_started(ctx, g_last_requested_target_v, "PowerDeliveryStart");
-                ready = applied && g_relay1_closed;
+                const float delivery_start_v = standalone_power_delivery_start_voltage_v(ctx);
+                applied = ensure_power_delivery_started(ctx, delivery_start_v, "PowerDeliveryStart");
+                if (applied && g_relay1_closed) {
+                    cbmodules::GroupStatus delivery_wait_st{};
+                    float delivery_wait_v = 0.0f;
+                    float delivery_wait_i = 0.0f;
+                    bool fresh_after_wait = false;
+                    const bool converged = wait_for_precharge_convergence(delivery_start_v,
+                                                                          POWER_DELIVERY_CONVERGENCE_WAIT_MS,
+                                                                          &delivery_wait_st,
+                                                                          &delivery_wait_v,
+                                                                          &delivery_wait_i,
+                                                                          &fresh_after_wait);
+                    Serial.printf("[HLC] {\"msg\":\"PowerDeliveryStartWait\",\"targetV\":%.1f,"
+                                  "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"fresh\":%d,"
+                                  "\"converged\":%d}\n",
+                                  delivery_start_v,
+                                  delivery_wait_v,
+                                  delivery_wait_i,
+                                  g_relay1_closed ? 1 : 0,
+                                  fresh_after_wait ? 1 : 0,
+                                  converged ? 1 : 0);
+                    // Mirror controller mode: once the relay is closed and the
+                    // delivery target has been armed, answer PowerDelivery as
+                    // ready and let CurrentDemand report the actual live V/I.
+                    // Holding EVSE_NotReady here during a normal handoff makes
+                    // some vehicles start CurrentDemand with avoidable
+                    // uncertainty even though the power path is already active.
+                    ready = g_relay1_closed;
+                } else {
+                    ready = false;
+                }
             }
         }
     }
@@ -8238,17 +10026,25 @@ int hlc_handle_welding_detection(HlcAppContext* ctx,
     if (!ctx || !ctx->secc || !req) return -EINVAL;
 
     const uint32_t now_ms = millis();
-    const float present_v = snapshot_welding_present_voltage_v(now_ms);
+    const WeldingVoltageSnapshot measured_welding = snapshot_welding_present_voltage_settled(now_ms);
+    const WeldingVoltageSnapshot response_welding = apply_welding_response_policy(measured_welding);
+    const float present_v = response_welding.present_v;
     const bool shutdown = ctx->stop_requested || !ctx->power_delivery_enabled || !g_relay1_closed;
 
     Serial.printf("[HLC] {\"msg\":\"WeldingDetectionRuntime\",\"stopRequested\":%d,\"shutdown\":%d,"
-                  "\"relay1\":%d,\"presentV\":%.1f,\"measuredV\":%.1f,\"moduleTargetV\":%.1f,"
+                  "\"relay1\":%d,\"presentV\":%.1f,\"presentVSource\":\"%s\",\"presentVAgeMs\":%lu,"
+                  "\"upstreamV\":%.1f,\"upstreamVSource\":\"%s\",\"upstreamVAgeMs\":%lu,"
+                  "\"moduleTargetV\":%.1f,"
                   "\"moduleTargetI\":%.2f}\n",
                   ctx->stop_requested ? 1 : 0,
                   shutdown ? 1 : 0,
                   g_relay1_closed ? 1 : 0,
                   present_v,
-                  static_cast<double>(g_last_measured_v),
+                  welding_voltage_source_name(response_welding.source),
+                  (response_welding.age_ms == UINT32_MAX) ? 0ul : static_cast<unsigned long>(response_welding.age_ms),
+                  measured_welding.present_v,
+                  welding_voltage_source_name(measured_welding.source),
+                  (measured_welding.age_ms == UINT32_MAX) ? 0ul : static_cast<unsigned long>(measured_welding.age_ms),
                   static_cast<double>(g_last_module_target_v),
                   static_cast<double>(g_last_module_target_i));
 
@@ -8288,11 +10084,14 @@ void hlc_apply_power_side_effects(HlcAppContext* ctx,
     if (!ctx || !req) return;
 
     if (type == JPV2G_SESSION_STOP_REQ) {
-        Serial.printf("[HLC] {\"msg\":\"SessionStopRuntime\",\"relay1\":%d,\"presentV\":%.1f,\"measuredV\":%.1f,"
+        const WeldingVoltageSnapshot welding = snapshot_welding_present_voltage(millis());
+        Serial.printf("[HLC] {\"msg\":\"SessionStopRuntime\",\"relay1\":%d,\"upstreamV\":%.1f,"
+                      "\"upstreamVSource\":\"%s\",\"upstreamVAgeMs\":%lu,"
                       "\"stopRequested\":%d}\n",
                       g_relay1_closed ? 1 : 0,
-                      snapshot_welding_present_voltage_v(millis()),
-                      static_cast<double>(g_last_measured_v),
+                      welding.present_v,
+                      welding_voltage_source_name(welding.source),
+                      (welding.age_ms == UINT32_MAX) ? 0ul : static_cast<unsigned long>(welding.age_ms),
                       ctx->stop_requested ? 1 : 0);
         ctx->precharge_converged = false;
         ctx->power_delivery_enabled = false;
@@ -8396,18 +10195,20 @@ void hlc_worker_task_main(void* arg) {
 
         const uint32_t done_ms = millis();
         const bool unexpected_disconnect_hold =
-            !mode_controller_has_final_decision() && !g_hlc_ctx.stop_requested && cp_connected(g_cp_state) &&
-            (g_hlc_ctx.precharge_seen || g_hlc_ctx.power_delivery_enabled || g_relay1_closed || g_module_output_enabled);
+            !mode_controller_has_final_decision() && !g_ctrl.stop_active && !g_hlc_ctx.stop_requested &&
+            cp_connected(g_cp_state) &&
+            hlc_disconnect_hold_power_path_active();
         if (unexpected_disconnect_hold) {
             g_hlc_disconnect_hold_until_ms = done_ms + HLC_UNEXPECTED_DISCONNECT_HOLD_MS;
             Serial.printf("[HLC] unexpected disconnect: holding power path for %lu ms"
-                          " (cp=%c relay1=%d moduleOn=%d prechargeSeen=%d delivery=%d)\n",
+                          " (cp=%c relay1=%d moduleOn=%d prechargeSeen=%d delivery=%d measI=%.2f)\n",
                           static_cast<unsigned long>(HLC_UNEXPECTED_DISCONNECT_HOLD_MS),
                           g_cp_state,
                           g_relay1_closed ? 1 : 0,
                           g_module_output_enabled ? 1 : 0,
                           g_hlc_ctx.precharge_seen ? 1 : 0,
-                          g_hlc_ctx.power_delivery_enabled ? 1 : 0);
+                          g_hlc_ctx.power_delivery_enabled ? 1 : 0,
+                          sane_non_negative(g_last_measured_i));
         } else {
             g_hlc_ctx.precharge_converged = false;
             g_hlc_ctx.power_delivery_enabled = false;
@@ -8417,7 +10218,13 @@ void hlc_worker_task_main(void* arg) {
                 request_modules_off("ClientSessionDone");
                 (void)relay1_set(false, "ClientSessionDone");
             }
-            stop_session(done_ms);
+            if (g_session_started) {
+                stop_session(done_ms);
+            } else if (g_post_session_restart_wait_active) {
+                g_slac_hold_until_ms =
+                    std::max(g_slac_hold_until_ms, done_ms + POST_SESSION_RESTART_SAMPLE_MS);
+                Serial.println("[SLAC] preserving post-session wait after client disconnect");
+            }
         }
 
         if (g_hlc_ctx.precharge_seen) {
@@ -8541,14 +10348,11 @@ bool init_hlc_stack() {
         g_codec = nullptr;
         return false;
     }
-    const bool quiet_controller_logs = mode_controller_routes_power_externally_over_uart();
-    (void)quiet_controller_logs;
-    // Keep controller diagnostics visible while the external-controller loop is
-    // being aligned to the standalone path. These logs are intentionally noisy;
-    // they provide request/response and handler timing evidence for the EV-side
-    // disconnects that still happen after CurrentDemand reaches full voltage.
-    jpv2g_secc_set_decoded_logs(true);
-    jpv2g_secc_set_timing_logs(true);
+    // The firmware already emits its own structured HLC/runtime logs. Keeping
+    // the third-party decoded/timing traces enabled on top of that adds enough
+    // serial pressure to blow CurrentDemand timing on real vehicles.
+    jpv2g_secc_set_decoded_logs(false);
+    jpv2g_secc_set_timing_logs(false);
 
     g_hlc_ctx.secc = &g_secc;
     hlc_reset_session_state(&g_hlc_ctx);
@@ -8707,6 +10511,8 @@ void start_session(uint32_t now_ms) {
     }
     reset_session_measurements();
     clear_last_bms_request();
+    clear_post_session_restart_wait();
+    g_standalone_fake_welding_response_count = 0u;
     g_last_seen_ev_mac_valid = false;
     g_fsm->start(now_ms);
     g_fsm_priming = false;
@@ -8737,8 +10543,67 @@ void reprime_slac_modem(uint32_t now_ms, const char* reason) {
     g_last_fsm_state = g_fsm->get_state();
 }
 
+void clear_post_session_restart_wait() {
+    g_post_session_restart_wait_active = false;
+    g_post_session_restart_wait_started_ms = 0u;
+    g_post_session_restart_wait_next_sample_ms = 0u;
+    g_post_session_restart_wait_last_log_ms = 0u;
+}
+
+void service_post_session_restart_wait(uint32_t now_ms) {
+    if (!g_post_session_restart_wait_active) {
+        return;
+    }
+    if (!cp_connected(g_cp_state)) {
+        clear_post_session_restart_wait();
+        return;
+    }
+    if (g_fsm_priming || g_session_started) {
+        clear_post_session_restart_wait();
+        return;
+    }
+    if (g_post_session_restart_wait_next_sample_ms != 0u &&
+        static_cast<int32_t>(now_ms - g_post_session_restart_wait_next_sample_ms) < 0) {
+        return;
+    }
+
+    const WeldingVoltageSnapshot residual = snapshot_welding_present_voltage(now_ms);
+    float off_present_v = 0.0f;
+    float off_present_i = 0.0f;
+    const bool output_off = snapshot_local_group_output_off(&off_present_v, &off_present_i);
+    const uint32_t elapsed_ms =
+        (g_post_session_restart_wait_started_ms != 0u && now_ms >= g_post_session_restart_wait_started_ms)
+            ? (now_ms - g_post_session_restart_wait_started_ms)
+            : 0u;
+    const bool min_hold_elapsed = elapsed_ms >= POST_SESSION_RESTART_MIN_HOLD_MS;
+    const bool voltage_safe =
+        residual.source != WeldingVoltageSource::None && residual.present_v <= POST_SESSION_RESTART_SAFE_VOLTAGE_V;
+    const bool ready = min_hold_elapsed && (voltage_safe || output_off);
+
+    if (g_post_session_restart_wait_last_log_ms == 0u ||
+        static_cast<int32_t>(now_ms - g_post_session_restart_wait_last_log_ms) >= 0) {
+        Serial.printf("[SLAC] post-session wait residualV=%.1f src=%s outputOff=%d elapsedMs=%lu ready=%d\n",
+                      residual.present_v,
+                      welding_voltage_source_name(residual.source),
+                      output_off ? 1 : 0,
+                      static_cast<unsigned long>(elapsed_ms),
+                      ready ? 1 : 0);
+        g_post_session_restart_wait_last_log_ms = now_ms + 1000u;
+    }
+
+    if (!ready) {
+        g_post_session_restart_wait_next_sample_ms = now_ms + POST_SESSION_RESTART_SAMPLE_MS;
+        g_slac_hold_until_ms = std::max(g_slac_hold_until_ms, now_ms + POST_SESSION_RESTART_SAMPLE_MS);
+        return;
+    }
+
+    clear_post_session_restart_wait();
+    reprime_slac_modem(now_ms, voltage_safe ? "session stop residual safe" : "session stop output off");
+}
+
 void stop_session(uint32_t now_ms) {
     const bool should_reprime = g_fsm && g_session_started;
+    clear_post_session_restart_wait();
     if (g_fsm && g_session_started) {
         g_fsm->leave_bcd(now_ms);
     }
@@ -8748,6 +10613,7 @@ void stop_session(uint32_t now_ms) {
     if (!mode_controller_has_final_decision()) {
         controller_clear_managed_power_cache();
     }
+    g_standalone_fake_welding_response_count = 0u;
     g_session_started = false;
     g_session_started_ms = 0;
     g_session_rx_queue_drop_baseline = 0u;
@@ -8761,7 +10627,16 @@ void stop_session(uint32_t now_ms) {
     clear_last_bms_request();
     reset_session_measurements();
     if (should_reprime) {
-        reprime_slac_modem(now_ms, "session stop");
+        if (!mode_requires_controller_contract() && cp_connected(g_cp_state)) {
+            g_post_session_restart_wait_active = true;
+            g_post_session_restart_wait_started_ms = now_ms;
+            g_post_session_restart_wait_next_sample_ms = now_ms;
+            g_post_session_restart_wait_last_log_ms = 0u;
+            g_slac_hold_until_ms = std::max(g_slac_hold_until_ms, now_ms + POST_SESSION_RESTART_SAMPLE_MS);
+            Serial.println("[SLAC] delaying restart after session stop until output is safe");
+        } else {
+            reprime_slac_modem(now_ms, "session stop");
+        }
     }
 }
 
@@ -9002,14 +10877,18 @@ void process_cp_and_fsm(uint32_t now_ms) {
     note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0003u);
 
     if (!connected) {
+        clear_post_session_restart_wait();
         return;
     }
+
+    service_post_session_restart_wait(now_ms);
 
     const bool slac_start_ok = controller_allows_slac_start(now_ms);
     const bool pwm_ready = g_cp_pwm_ready_since_ms != 0u &&
                            static_cast<int32_t>(now_ms - g_cp_pwm_ready_since_ms) >=
                                static_cast<int32_t>(CP_STABLE_MS);
     if (!g_session_started && !g_fsm_priming && g_cp_connected_since_ms != 0 &&
+        !g_post_session_restart_wait_active &&
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
         slac_start_ok &&
         (mode_requires_controller_contract() || pwm_ready)) {
@@ -9341,7 +11220,7 @@ void loop() {
     }
     const bool active_hlc_window =
         g_hlc_active || (g_hlc_ready && g_session_started) || g_last_bms_hlc_stage == 2u;
-    if (active_hlc_window && loop_busy_us >= 50000) {
+    if (active_hlc_window && !hlc_runtime_quiet_window() && loop_busy_us >= 50000) {
         Serial.printf("[LOOP] slow total_us=%lld qca_ingress=%lld lwip_pre=%lld serial=%lld ctrl_rx=%lld "
                       "ctrl_watch=%lld cp_fsm=%lld hlc_hold=%lld module=%lld lwip_post=%lld "
                       "cp=%c session=%d hlc=%d stage=%u\n",
