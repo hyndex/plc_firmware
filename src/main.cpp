@@ -12,6 +12,10 @@
 #include <esp_heap_caps.h>
 #include <esp_task_wdt.h>
 #include <esp_timer.h>
+#include <driver/adc.h>
+#include <esp_adc_cal.h>
+#include <hal/adc_ll.h>
+#include <soc/sens_struct.h>
 #include <soc/soc_memory_types.h>
 
 #ifndef CBPLC_ENABLE_STATUS_LEDS
@@ -154,6 +158,7 @@ constexpr int CP_1_PWM_FREQUENCY = 1000;
 constexpr int CP_1_PWM_RESOLUTION = 12;
 constexpr uint32_t CP_1_MAX_DUTY_CYCLE = (1u << CP_1_PWM_RESOLUTION) - 1u;
 constexpr int CP_1_READ_PIN = 1;
+constexpr adc1_channel_t CP_1_ADC_CHANNEL = ADC1_CHANNEL_0;
 
 constexpr int CP_T12_MV = 2300;
 constexpr int CP_T9_MV = 2000;
@@ -162,9 +167,14 @@ constexpr int CP_T3_MV = 1450;
 constexpr int CP_T0_MV = 1250;
 constexpr int CP_NEG_THRESHOLD_MV = 500;
 constexpr int CP_HYSTERESIS_MV = 100;
-constexpr int CP_SAMPLE_COUNT = 80;
+constexpr int CP_SAMPLES_PER_POLL = 4;
+constexpr int CP_SAMPLE_HISTORY_SIZE = 24;
 constexpr int CP_SAMPLE_DELAY_US = 6;
+constexpr uint16_t CP_SAMPLE_PHASE_STEP_US = 197;
 constexpr int CP_TOPK = 12;
+constexpr uint32_t CP_SAMPLE_SETTLE_AFTER_QCA_MS = 1500;
+constexpr uint32_t CP_ADC_MAX_WAIT_SPINS = 2000;
+constexpr uint32_t CP_ADC_FAULT_LOG_MS = 2000;
 
 constexpr uint32_t CP_STABLE_MS = 300;
 constexpr uint32_t CP_STATE_DEBOUNCE_MS = 80;
@@ -2148,10 +2158,66 @@ const char* evse_state_name(slac::evse::State s) {
 }
 
 static uint16_t g_cp_sample_phase_us = 0;
+static std::array<int, CP_SAMPLE_HISTORY_SIZE> g_cp_sample_history{};
+static uint8_t g_cp_sample_history_count = 0;
+static uint8_t g_cp_sample_history_head = 0;
+static portMUX_TYPE g_cp_adc_mux = portMUX_INITIALIZER_UNLOCKED;
+static esp_adc_cal_characteristics_t g_cp_adc_chars{};
+static bool g_cp_adc_chars_ready = false;
+static uint32_t g_cp_next_fault_log_ms = 0;
+static uint32_t g_cp_adc_timeout_count = 0;
+static int g_cp_last_valid_mv = 0;
+
+bool read_cp_mv_once(int* out_mv) {
+    if (!out_mv) {
+        return false;
+    }
+
+    int raw = 0;
+    bool ok = false;
+
+    portENTER_CRITICAL(&g_cp_adc_mux);
+    adc_ll_set_controller(ADC_NUM_1, ADC_LL_CTRL_RTC);
+    adc_ll_rtc_enable_channel(ADC_NUM_1, CP_1_ADC_CHANNEL);
+    adc_ll_rtc_reset();
+    SENS.sar_meas1_ctrl2.meas1_start_sar = 0;
+    SENS.sar_meas1_ctrl2.meas1_start_sar = 1;
+    for (uint32_t spins = 0; spins < CP_ADC_MAX_WAIT_SPINS; ++spins) {
+        if (adc_ll_rtc_convert_is_done(ADC_NUM_1)) {
+            raw = adc_ll_rtc_get_convert_value(ADC_NUM_1);
+            if (!adc_ll_rtc_analysis_raw_data(ADC_NUM_1, static_cast<uint16_t>(raw))) {
+                ok = true;
+            }
+            break;
+        }
+    }
+    adc_ll_rtc_disable_channel(ADC_NUM_1);
+    adc_ll_rtc_reset();
+    portEXIT_CRITICAL(&g_cp_adc_mux);
+
+    if (!ok) {
+        ++g_cp_adc_timeout_count;
+        const uint32_t now_ms = millis();
+        if (g_cp_next_fault_log_ms == 0u || static_cast<int32_t>(now_ms - g_cp_next_fault_log_ms) >= 0) {
+            Serial.printf("[CP] adc timeout channel=%d failures=%lu\n",
+                          static_cast<int>(CP_1_ADC_CHANNEL),
+                          static_cast<unsigned long>(g_cp_adc_timeout_count));
+            g_cp_next_fault_log_ms = now_ms + CP_ADC_FAULT_LOG_MS;
+        }
+        return false;
+    }
+
+    *out_mv = g_cp_adc_chars_ready ? static_cast<int>(esp_adc_cal_raw_to_voltage(static_cast<uint32_t>(raw), &g_cp_adc_chars))
+                                   : raw;
+    return true;
+}
+
 int read_cp_mv_robust() {
     int topk[CP_TOPK];
     int tk = 0;
     int peak = 0;
+    int last_valid_mv = g_cp_last_valid_mv;
+    int valid_samples = 0;
 
     auto insert_topk = [&](int v) {
         if (tk < CP_TOPK) {
@@ -2179,20 +2245,38 @@ int read_cp_mv_robust() {
     if (g_cp_sample_phase_us) {
         delayMicroseconds(g_cp_sample_phase_us);
     }
-    (void)analogRead(CP_1_READ_PIN);
-    for (int i = 0; i < CP_SAMPLE_COUNT; ++i) {
-        delayMicroseconds(CP_SAMPLE_DELAY_US);
-        const int v = analogReadMilliVolts(CP_1_READ_PIN);
+    for (int i = 0; i < CP_SAMPLES_PER_POLL; ++i) {
+        if (i > 0) {
+            delayMicroseconds(CP_SAMPLE_DELAY_US);
+        }
+        int v = 0;
+        if (!read_cp_mv_once(&v)) {
+            continue;
+        }
+        ++valid_samples;
+        last_valid_mv = v;
         if (v > peak) {
             peak = v;
         }
-        insert_topk(v);
-        if ((i & 31) == 31) {
+        g_cp_sample_history[g_cp_sample_history_head] = v;
+        g_cp_sample_history_head =
+            static_cast<uint8_t>((g_cp_sample_history_head + 1u) % CP_SAMPLE_HISTORY_SIZE);
+        if (g_cp_sample_history_count < CP_SAMPLE_HISTORY_SIZE) {
+            ++g_cp_sample_history_count;
+        }
+        if ((i & 1) == 1) {
             taskYIELD();
         }
     }
 
-    g_cp_sample_phase_us = static_cast<uint16_t>((g_cp_sample_phase_us + 53U) % 1000U);
+    g_cp_sample_phase_us = static_cast<uint16_t>((g_cp_sample_phase_us + CP_SAMPLE_PHASE_STEP_US) % 1000U);
+    if (valid_samples <= 0) {
+        return (last_valid_mv > 0) ? last_valid_mv : 0;
+    }
+    g_cp_last_valid_mv = last_valid_mv;
+    for (int i = 0; i < g_cp_sample_history_count; ++i) {
+        insert_topk(g_cp_sample_history[i]);
+    }
     if (tk <= 0) return peak;
 
     int start = tk - ((tk / 6 > 3) ? (tk / 6) : 3);
@@ -2494,6 +2578,7 @@ uint32_t g_session_rx_queue_drop_baseline = 0;
 uint8_t g_slac_failures_this_cp = 0;
 uint8_t g_slac_soft_retries_this_cp = 0;
 uint32_t g_slac_hold_until_ms = 0;
+uint32_t g_cp_poll_enable_at_ms = 0;
 slac::evse::State g_last_fsm_state = slac::evse::State::Reset;
 uint32_t g_next_qca_init_ms = 0;
 bool g_emergency_stop_active = false;
@@ -10732,6 +10817,7 @@ bool try_init_qca_and_fsm(uint32_t now_ms) {
     g_fsm->set_plc_peer_mac(plc_peer_mac);
     g_fsm->start(now_ms);
     g_fsm_priming = true;
+    g_cp_poll_enable_at_ms = now_ms + CP_SAMPLE_SETTLE_AFTER_QCA_MS;
     g_last_fsm_state = g_fsm->get_state();
     Serial.println("[SLAC] priming modem key setup");
     g_next_qca_init_ms = 0;
@@ -10771,6 +10857,35 @@ void service_hlc_disconnect_hold(uint32_t now_ms) {
 }
 
 void process_cp_and_fsm(uint32_t now_ms) {
+    if (g_cp_poll_enable_at_ms != 0u && static_cast<int32_t>(now_ms - g_cp_poll_enable_at_ms) < 0) {
+        note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0000u);
+        if (g_fsm && g_fsm_priming) {
+            for (int i = 0; i < SLAC_ACTIVE_MAX_FRAMES_PER_LOOP; ++i) {
+                const int timeout_ms = (i == 0) ? 2 : 0;
+                note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, static_cast<uint16_t>(0x0100u | (i + 1)));
+                const bool got = g_fsm->poll_channel_once(timeout_ms, now_ms);
+                if (!got) break;
+                if (((i + 1) % FSM_POLL_BREATHER_STRIDE) == 0) {
+                    cooperative_runtime_breather(CrashBreadcrumbStage::FsmPollActive,
+                                                 static_cast<uint16_t>(0x0180u | (i + 1)));
+                }
+            }
+            note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0100u);
+            g_fsm->poll(now_ms);
+            const slac::evse::State priming_state = g_fsm->get_state();
+            if (priming_state != g_last_fsm_state) {
+                Serial.printf("[FSM] %s -> %s\n", evse_state_name(g_last_fsm_state), evse_state_name(priming_state));
+                g_last_fsm_state = priming_state;
+            }
+            if (priming_state == slac::evse::State::Idle) {
+                g_fsm_priming = false;
+                Serial.println("[SLAC] modem key primed");
+            }
+        }
+        apply_cp_output(g_cp_state, now_ms);
+        return;
+    }
+    g_cp_poll_enable_at_ms = 0u;
     note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0001u);
     const int cp_mv = read_cp_mv_robust();
     note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0002u);
@@ -10876,17 +10991,17 @@ void process_cp_and_fsm(uint32_t now_ms) {
     apply_cp_output(g_cp_state, now_ms);
     note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0003u);
 
+    const bool slac_start_ok = controller_allows_slac_start(now_ms);
+    const bool pwm_ready = g_cp_pwm_ready_since_ms != 0u &&
+                           static_cast<int32_t>(now_ms - g_cp_pwm_ready_since_ms) >=
+                               static_cast<int32_t>(CP_STABLE_MS);
+
     if (!connected) {
         clear_post_session_restart_wait();
         return;
     }
 
     service_post_session_restart_wait(now_ms);
-
-    const bool slac_start_ok = controller_allows_slac_start(now_ms);
-    const bool pwm_ready = g_cp_pwm_ready_since_ms != 0u &&
-                           static_cast<int32_t>(now_ms - g_cp_pwm_ready_since_ms) >=
-                               static_cast<int32_t>(CP_STABLE_MS);
     if (!g_session_started && !g_fsm_priming && g_cp_connected_since_ms != 0 &&
         !g_post_session_restart_wait_active &&
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
@@ -11110,7 +11225,13 @@ void setup() {
     refresh_plc_link_local_identity();
 
     analogReadResolution(12);
+    pinMode(CP_1_READ_PIN, INPUT);
+    adcAttachPin(CP_1_READ_PIN);
     analogSetPinAttenuation(CP_1_READ_PIN, ADC_11db);
+    adc_power_acquire();
+    (void)adc1_config_channel_atten(CP_1_ADC_CHANNEL, ADC_ATTEN_DB_12);
+    (void)esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, 1100, &g_cp_adc_chars);
+    g_cp_adc_chars_ready = true;
     ledcSetup(CP_1_PWM_CHANNEL, CP_1_PWM_FREQUENCY, CP_1_PWM_RESOLUTION);
     ledcAttachPin(CP_1_PWM_PIN, CP_1_PWM_CHANNEL);
     g_last_cp_duty_pct = 100;

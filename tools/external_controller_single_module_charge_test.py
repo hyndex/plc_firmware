@@ -72,11 +72,23 @@ MXR_DEFAULT_OUTPUT_POWER_KW = 30.0
 
 
 STATUS_RE = re.compile(
-    r"\[SERCTRL\] STATUS mode=(\d+)\(([^)]+)\)\s+plc_id=(\d+)\s+connector_id=(\d+)\s+"
-    r"controller_id=(\d+)\s+module_addr=0x([0-9A-Fa-f]+)\s+local_group=(\d+)\s+module_id=([^\s]+)\s+"
-    r"can_stack=(\d)\s+module_mgr=(\d)\s+cp=([A-Z0-9]+)\s+duty=(\d+)\s+hb=(\d+)\s+auth=(\d+)\s+"
+    r"(?:\[SERCTRL\] STATUS\s+)?mode=(\d+)\(([^)]+)\)\s+plc_id=(\d+)\s+connector_id=(\d+)\s+"
+    r"controller_id=(\d+)\s+module(?:_addr|ddr)=0x([0-9A-Fa-f]+)\s+local_group=(\d+)\s+module_id=([^\s]+)\s+"
+    r"can_stack=(\d)\s+module_mgr=(\d)\s+cp=([A-Z0-9]+)\s+(?:cp_mv=-?\d+\s+)?duty=(\d+)\s+hb=(\d+)\s+auth=(\d+)\s+"
     r"allow_slac=(\d+)\s+allow_energy=(\d+)\s+armed=(\d+)\s+start=(\d+)\s+"
-    r"relay1=(\d+)\s+relay2=(\d+)\s+relay3=(\d+)\s+alloc_sz=(\d+)"
+    r"relay1=(\d+)(?:\s+relay2=(\d+)\s+relay3=(\d+)\s+alloc_sz=(\d+))?"
+)
+LOCAL_RE = re.compile(
+    r"\[SERCTRL\] LOCAL mode=(\d+)\(([^)]+)\)\s+transport=\S+\s+modules=\S+\s+"
+    r"plc_id=(\d+)\s+connector_id=(\d+)\s+controller_id=(\d+)\s+module_addr=0x([0-9A-Fa-f]+)\s+"
+    r"local_group=(\d+)\s+module_id=([^\s]+)\s+can_stack=(\d)\s+module_mgr=(\d)"
+)
+PARTIAL_STATUS_RE = re.compile(
+    r"(?:^|\s)(?:id|plc_id)=(\d+)\s+controller_id=(\d+)\s+module(?:_addr|ddr)=0x([0-9A-Fa-f]+)\s+"
+    r"local_group=(\d+)\s+module_id=([^\s]+)\s+can_stack=(\d)\s+module_mgr=(\d)\s+"
+    r"cp=([A-Z0-9]+)\s+(?:cp_mv=-?\d+\s+)?duty=(\d+)\s+hb=(\d+)\s+auth=(\d+)\s+"
+    r"allow_slac=(\d+)\s+allow_energy=(\d+)\s+armed=(\d+)\s+start=(\d+)\s+"
+    r"relay1=(\d+)(?:\s+relay2=(\d+)\s+relay3=(\d+)\s+alloc_sz=(\d+))?"
 )
 ACK_RE = re.compile(
     r"\[SERCTRL\] ACK cmd=0x([0-9A-Fa-f]+)\s+seq=(\d+)\s+status=(\d+)\s+detail0=(\d+)\s+detail1=(\d+)"
@@ -535,9 +547,59 @@ def parse_status_line(line: str) -> Optional[PlcStatus]:
         cp=match.group(11),
         duty=int(match.group(12)),
         relay1=int(match.group(19)),
-        relay2=int(match.group(20)),
-        relay3=int(match.group(21)),
-        alloc_sz=int(match.group(22)),
+        relay2=int(match.group(20) or 0),
+        relay3=int(match.group(21) or 0),
+        alloc_sz=int(match.group(22) or 0),
+    )
+
+
+def parse_local_line(line: str) -> Optional[PlcStatus]:
+    match = LOCAL_RE.search(line)
+    if not match:
+        return None
+    return PlcStatus(
+        mode_id=int(match.group(1)),
+        mode_name=match.group(2),
+        plc_id=int(match.group(3)),
+        connector_id=int(match.group(4)),
+        controller_id=int(match.group(5)),
+        module_addr=int(match.group(6), 16),
+        local_group=int(match.group(7)),
+        module_id=match.group(8),
+        can_stack=int(match.group(9)),
+        module_mgr=int(match.group(10)),
+        cp="U",
+        duty=100,
+        relay1=0,
+        relay2=0,
+        relay3=0,
+        alloc_sz=0,
+    )
+
+
+def parse_partial_status_line(line: str, baseline: Optional[PlcStatus]) -> Optional[PlcStatus]:
+    if baseline is None:
+        return None
+    match = PARTIAL_STATUS_RE.search(line)
+    if not match:
+        return None
+    return PlcStatus(
+        mode_id=baseline.mode_id,
+        mode_name=baseline.mode_name,
+        plc_id=int(match.group(1)),
+        connector_id=baseline.connector_id,
+        controller_id=int(match.group(2)),
+        module_addr=int(match.group(3), 16),
+        local_group=int(match.group(4)),
+        module_id=match.group(5),
+        can_stack=int(match.group(6)),
+        module_mgr=int(match.group(7)),
+        cp=match.group(8),
+        duty=int(match.group(9)),
+        relay1=int(match.group(16)),
+        relay2=int(match.group(17) or baseline.relay2),
+        relay3=int(match.group(18) or baseline.relay3),
+        alloc_sz=int(match.group(19) or baseline.alloc_sz),
     )
 
 
@@ -866,6 +928,12 @@ class SingleModuleChargeRunner:
         now = time.time()
 
         status = parse_status_line(line)
+        if status is None:
+            status = parse_local_line(line)
+        if status is None:
+            with self.live_lock:
+                baseline = self.live.last_status
+            status = parse_partial_status_line(line, baseline)
         if status is not None:
             with self.live_lock:
                 self.live.last_status = status
@@ -1170,7 +1238,12 @@ class SingleModuleChargeRunner:
     def _bootstrap_plc(self) -> PlcStatus:
         self._send("CTRL STATUS")
         status = self._wait_for_status()
-        if status.mode_id != 1 or status.controller_id != self.args.controller_id:
+        if status.mode_id == 1 and status.controller_id != self.args.controller_id:
+            self._note_once(
+                f"adopting live controller_id={status.controller_id} from PLC status during bootstrap"
+            )
+            self.args.controller_id = status.controller_id
+        elif status.mode_id != 1:
             self._send(f"CTRL MODE 1 {self.args.plc_id} {self.args.controller_id}")
             time.sleep(0.3)
         ack = self._send_expect_ack(f"CTRL HB {self.args.heartbeat_timeout_ms}", ACK_CMD_HEARTBEAT, timeout_s=3.0, retries=1)
@@ -1642,12 +1715,15 @@ class SingleModuleChargeRunner:
 
             self._set_phase("wait_for_session")
             start_deadline = time.time() + self.args.session_start_timeout_s
-            while time.time() < start_deadline:
+            while True:
                 if self.vehicle_stop_requested:
                     raise RuntimeError(f"vehicle requested stop before CurrentDemand: {self.vehicle_stop_reason}")
 
                 stage, target_v, requested_i = self._update_plan_from_stage()
                 now = time.time()
+                if self.current_demand_started_at is None and now >= start_deadline:
+                    self.failures.append("session never reached CurrentDemand before start timeout")
+                    raise RuntimeError(self.failures[-1])
                 self._tick_relay(now)
                 self._tick_module_output(now)
                 self._tick_telemetry(now)
