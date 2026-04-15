@@ -1079,6 +1079,7 @@ class SingleModuleChargeRunner:
         self.stop_contract_baseline_welding_req_count = 0
         self.stop_contract_baseline_welding_runtime_count = 0
         self.stop_contract_baseline_session_stop_req_count = 0
+        self.stop_contract_baseline_session_stop_runtime_count = 0
         self.stop_contract_baseline_client_session_done_count = 0
 
     def _note_once(self, note: str) -> None:
@@ -1486,7 +1487,7 @@ class SingleModuleChargeRunner:
 
     def _bootstrap_plc(self) -> PlcStatus:
         try:
-            status = self._query_status(timeout_s=4.0, allow_stale=True, stale_max_age_s=5.0)
+            status = self._query_status(timeout_s=8.0, allow_stale=True, stale_max_age_s=8.0)
         except RuntimeError as exc:
             if "timeout waiting for PLC status" not in str(exc):
                 raise
@@ -2120,6 +2121,15 @@ class SingleModuleChargeRunner:
                        stop_notify: bool = False) -> bool:
         stage, target_v, requested_i = self._refresh_plan_from_live()
         self._update_current_demand_rundown(now, stage, requested_i)
+        active_feedback_stage = stage in ("precharge", "power_delivery", "current_demand")
+        # Match the standalone contract more closely: before HLC precharge begins,
+        # controller-mode does not need streamed FEEDBACK frames. Avoid issuing
+        # idle FEEDBACK commands during auth/SLAC attach where some PLC boots
+        # still drop the first ACKs after reset.
+        if not stop_notify and not active_feedback_stage:
+            self.last_feedback_ready = False
+            self.last_feedback_signature = None
+            return False
         feedback_signature = (
             stage,
             int(round(max(0.0, target_v) * 10.0)),
@@ -2132,7 +2142,7 @@ class SingleModuleChargeRunner:
                 welding_zero_due = (
                     self.live.welding_runtime_count - self.stop_contract_baseline_welding_runtime_count
                 ) >= self.args.fake_welding_residual_count
-        active_charge_window = stage in ("precharge", "power_delivery", "current_demand") and not stop_notify
+        active_charge_window = active_feedback_stage and not stop_notify
         feedback_interval_s = (
             self.args.active_feedback_keepalive_s if active_charge_window else self.args.feedback_interval_s
         )
@@ -2425,6 +2435,7 @@ class SingleModuleChargeRunner:
             self.stop_contract_baseline_welding_req_count = self.live.welding_req_count
             self.stop_contract_baseline_welding_runtime_count = self.live.welding_runtime_count
             self.stop_contract_baseline_session_stop_req_count = self.live.session_stop_req_count
+            self.stop_contract_baseline_session_stop_runtime_count = self.live.session_stop_runtime_count
             self.stop_contract_baseline_client_session_done_count = self.live.client_session_done_count
         self.last_feedback_cmd = 0.0
         self.last_feedback_signature = None
@@ -2445,7 +2456,10 @@ class SingleModuleChargeRunner:
                 done = self.live.stop_done
                 hlc_active = self.live.hlc_active
                 session_stop_req_count = self.live.session_stop_req_count
+                session_stop_runtime_count = self.live.session_stop_runtime_count
                 client_session_done_count = self.live.client_session_done_count
+                power_delivery_stop_runtime_count = self.live.power_delivery_stop_runtime_count
+                welding_runtime_count = self.live.welding_runtime_count
             if done and self._relay_is_open():
                 graceful_complete = True
                 break
@@ -2456,9 +2470,19 @@ class SingleModuleChargeRunner:
                 graceful_complete = True
                 break
             if (
+                session_stop_runtime_count > self.stop_contract_baseline_session_stop_runtime_count
+                and self._relay_is_open()
+            ):
+                graceful_complete = True
+                break
+            if (
                 session_stop_req_count > self.stop_contract_baseline_session_stop_req_count
                 and self._relay_is_open()
-                and (not hlc_active)
+                and (
+                    (not hlc_active)
+                    or power_delivery_stop_runtime_count > self.stop_contract_baseline_power_delivery_stop_runtime_count
+                    or welding_runtime_count > self.stop_contract_baseline_welding_runtime_count
+                )
             ):
                 graceful_complete = True
                 break
@@ -2700,7 +2724,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fake-welding-residual-v", type=float, default=DEFAULT_FAKE_WELDING_RESIDUAL_V)
     parser.add_argument("--fake-welding-residual-count", type=int, default=1)
     parser.add_argument("--absolute-current-scale", type=float, default=1024.0)
-    parser.add_argument("--stop-timeout-s", type=float, default=12.0)
+    parser.add_argument("--stop-timeout-s", type=float, default=30.0)
     parser.add_argument(
         "--plc-log",
         default=f"/home/jpi/Desktop/EVSE/plc_firmware/logs/external_controller_single_module_charge_{stamp}.log",
