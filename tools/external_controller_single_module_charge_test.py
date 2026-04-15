@@ -69,6 +69,21 @@ SERIAL_WRITE_TIMEOUT_S = 0.2
 SERIAL_MAX_PENDING_BYTES = 65536
 SERIAL_MAX_LINE_BYTES = 4096
 MXR_DEFAULT_OUTPUT_POWER_KW = 30.0
+MODULE_MAX_VOLTAGE_V = 1000.0
+DEFAULT_HOME_ADDR = 1
+DEFAULT_HOME_GROUP = 1
+DEFAULT_MODULE_VOLTAGE_HEADROOM_V = 10.0
+DEFAULT_MODULE_CURRENT_HEADROOM_A = 1.0
+DEFAULT_FAKE_WELDING_RESIDUAL_V = 15.0
+DEFAULT_LOW_REQUEST_RUNDOWN_MAX_A = 4.0
+DEFAULT_LOW_REQUEST_READY_OVERSHOOT_MAX_A = 4.0
+DEFAULT_ZERO_REQUEST_READY_MAX_A = 4.0
+DEFAULT_LOW_REQUEST_RUNDOWN_TRIGGER_DELTA_A = 5.0
+DEFAULT_LOW_REQUEST_RUNDOWN_GRACE_S = 1.8
+MODULE_WORKER_MIN_INTERVAL_S = 0.005
+MODULE_WORKER_TARGET_INTERVAL_S = 0.01
+MODULE_ACTIVE_FULL_REFRESH_S = 0.25
+MODULE_OFF_RETRY_INTERVAL_S = 0.25
 
 
 STATUS_RE = re.compile(
@@ -117,6 +132,11 @@ IDENTITY_EVT_RE = re.compile(
     r"\[SERCTRL\] IDENTITY kind=([A-Z0-9_]+)\s+plc_id=(\d+)\s+connector_id=(\d+)\s+value=([0-9A-Fa-f]+)"
 )
 HLC_REQ_RE = re.compile(r"RX (PowerDeliveryReq|WeldingDetectionReq|SessionStopReq) \(proto=(\d+)\)")
+HLC_REQ_JSON_RE = re.compile(r"\[HLC\]\[REQ\] (\{.*\})")
+POWER_DELIVERY_STOP_RUNTIME_RE = re.compile(r"\[HLC\] \{\"msg\":\"PowerDeliveryRuntime\".*\"stop\":1")
+WELDING_RUNTIME_RE = re.compile(r"\[HLC\] \{\"msg\":\"WeldingDetectionRuntime\"")
+SESSION_STOP_RUNTIME_RE = re.compile(r"\[HLC\] \{\"msg\":\"SessionStopRuntime\"")
+CLIENT_SESSION_DONE_RE = re.compile(r"\[HLC\] client session done rc=(-?\d+)")
 LOG_FRAGMENT_RE = re.compile(r"\[(?:SERCTRL|RELAY|CP|CTRL|QCA|SLAC|HLC|FSM|NET|MEM|WARN |HOST)\]")
 
 
@@ -140,6 +160,15 @@ def module_is_off(module: mxr.ModuleInfo) -> bool:
     return "OFF" in mxr.status_flags(module.status)
 
 
+def module_online(module: Optional[mxr.ModuleInfo]) -> bool:
+    if module is None:
+        return False
+    last_seen = getattr(module, "last_seen", 0.0) or 0.0
+    return last_seen > 0.0 and (
+        module.status is not None or module.voltage_v is not None or module.current_a is not None
+    )
+
+
 def module_current_value(module: Optional[mxr.ModuleInfo]) -> float:
     if not module or module.current_a is None or not math.isfinite(module.current_a):
         return 0.0
@@ -150,6 +179,15 @@ def module_voltage_value(module: Optional[mxr.ModuleInfo]) -> float:
     if not module or module.voltage_v is None or not math.isfinite(module.voltage_v):
         return 0.0
     return max(0.0, module.voltage_v)
+
+
+def module_available_current_value(module: Optional[mxr.ModuleInfo]) -> float:
+    if not module:
+        return 0.0
+    rated_current_a = module.rated_current_a
+    if rated_current_a is None or not math.isfinite(rated_current_a):
+        return 0.0
+    return max(0.0, rated_current_a)
 
 
 @dataclass
@@ -363,7 +401,9 @@ class DirectMaxwellCan:
         self.sock = None
         self.log_fp = None
         self.started: set[tuple[int, int]] = set()
+        self.last_on_attempt_at: dict[tuple[int, int], float] = {}
         self.last_input_mode: dict[tuple[int, int], int] = {}
+        self.telemetry_cursor: dict[tuple[int, int], int] = {}
 
     def open(self) -> None:
         ensure_parent(self.log_file)
@@ -456,6 +496,50 @@ class DirectMaxwellCan:
             f"{module_status_text(module)}"
         )
 
+    def poll_telemetry(self, module: mxr.ModuleInfo, response_window_s: float) -> None:
+        if not self.sock:
+            raise RuntimeError("CAN socket not open")
+        key = (module.address, module.group)
+        if module_is_off(module):
+            regs = [
+                mxr.REG_GET_STATUS,
+                mxr.REG_GET_VOLTAGE,
+                mxr.REG_GET_CURRENT,
+            ]
+        else:
+            regs = [
+                mxr.REG_GET_CURRENT,
+                mxr.REG_GET_VOLTAGE,
+                mxr.REG_GET_STATUS,
+            ]
+        cursor = self.telemetry_cursor.get(key, 0) % len(regs)
+        reg = regs[cursor]
+        self.telemetry_cursor[key] = cursor + 1
+        mxr.send_read(self.sock, dst_addr=module.address, group=module.group, reg=reg)
+        deadline = time.monotonic() + response_window_s
+        while True:
+            rem = deadline - time.monotonic()
+            if rem <= 0.0:
+                return
+            pkt = mxr.recv_one(self.sock, min(0.01, rem))
+            if pkt is None:
+                continue
+            can_id, data = pkt
+            resp = mxr.parse_maxwell_response(can_id, data)
+            if not resp:
+                continue
+            if int(resp["src"]) != module.address or int(resp["group"]) != module.group:
+                continue
+            mxr.apply_response(module, resp)
+            self._log(
+                f"TEL addr={module.address} grp={module.group} V={module.voltage_v} I={module.current_a} "
+                f"Ilim={module.current_limit_point} Pin={module.input_power_w} "
+                f"mode={module.input_mode if module.input_mode is not None else 'n/a'} "
+                f"rated={module.rated_current_a if module.rated_current_a is not None else 'n/a'} "
+                f"{module_status_text(module)}"
+            )
+            return
+
     def soft_reset(self, module: mxr.ModuleInfo, input_mode: Optional[int] = None) -> None:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
@@ -465,6 +549,8 @@ class DirectMaxwellCan:
         key = (module.address, module.group)
         self.last_input_mode[key] = desired_mode
         self.started.discard(key)
+        self.last_on_attempt_at.pop(key, None)
+        self.telemetry_cursor.pop(key, None)
         self._log(f"RESET addr={module.address} grp={module.group} input_mode={desired_mode}")
         mxr.soft_reset_defaults(self.sock, module, input_mode=desired_mode)
         time.sleep(0.02)
@@ -475,31 +561,65 @@ class DirectMaxwellCan:
         time.sleep(0.02)
         self.refresh(module, response_window_s=0.5)
 
+    def normalize_output_request(self, voltage_v: float, current_a: float) -> tuple[float, float]:
+        return max(0.0, voltage_v), max(0.0, current_a)
+
+    def _send_live_setpoint(self, module: mxr.ModuleInfo, voltage_v: float, current_raw: int) -> None:
+        if not self.sock:
+            raise RuntimeError("CAN socket not open")
+        mxr.send_set_float(self.sock, module.address, module.group, mxr.REG_SET_VOLTAGE, voltage_v)
+        time.sleep(0.005)
+        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, current_raw)
+
+    def _startup_then_setpoint(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> int:
+        if not self.sock:
+            raise RuntimeError("CAN socket not open")
+        return mxr.module_on_absolute(
+            self.sock,
+            module,
+            voltage_v=safe_float(voltage_v),
+            current_a=safe_float(current_a),
+            scale=self.abs_current_scale,
+        )
+
     def set_output(self, module: mxr.ModuleInfo, voltage_v: float, current_a: float) -> None:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
-        safe_voltage_v = max(0.0, voltage_v)
-        safe_current_a = max(0.0, current_a)
+        safe_voltage_v, safe_current_a = self.normalize_output_request(voltage_v, current_a)
         current_raw = int(round(max(0.0, safe_current_a) * self.abs_current_scale))
         current_raw = max(0, min(current_raw, 0xFFFFFFFF))
         key = (module.address, module.group)
+        now = time.monotonic()
         if key not in self.started:
             self._log(
                 f"START addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
             )
+            self._startup_then_setpoint(module, safe_voltage_v, safe_current_a)
+            self.started.add(key)
+            self.last_on_attempt_at[key] = now
+            return
         else:
             self._log(
                 f"SET addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
             )
-        mxr.module_on_absolute(self.sock, module, safe_voltage_v, safe_current_a, self.abs_current_scale)
-        self.started.add(key)
+        if safe_current_a > 0.05 and module_is_off(module) and (now - self.last_on_attempt_at.get(key, 0.0)) >= MODULE_OFF_RETRY_INTERVAL_S:
+            self._log(
+                f"RE-ON addr={module.address} grp={module.group} voltage_v={safe_voltage_v:.1f} current_a={safe_current_a:.2f} raw=0x{current_raw:08X}"
+            )
+            self._startup_then_setpoint(module, safe_voltage_v, safe_current_a)
+            self.last_on_attempt_at[key] = now
+            return
+        self._send_live_setpoint(module, safe_voltage_v, current_raw)
 
     def stop_output(self, module: mxr.ModuleInfo) -> None:
         if not self.sock:
             raise RuntimeError("CAN socket not open")
         self._log(f"STOP addr={module.address} grp={module.group}")
+        mxr.send_set_int(self.sock, module.address, module.group, mxr.REG_SET_CURRENT_ABS, 0)
+        time.sleep(0.01)
         mxr.module_off(self.sock, module)
         self.started.discard((module.address, module.group))
+        self.last_on_attempt_at.pop((module.address, module.group), None)
 
 
 def safe_float(value: object, fallback: float = 0.0) -> float:
@@ -838,6 +958,14 @@ class PlcLiveState:
     last_power_delivery_req_ts: Optional[float] = None
     last_welding_req_ts: Optional[float] = None
     last_session_stop_req_ts: Optional[float] = None
+    power_delivery_stop_runtime_count: int = 0
+    welding_runtime_count: int = 0
+    session_stop_runtime_count: int = 0
+    client_session_done_count: int = 0
+    last_power_delivery_stop_runtime_ts: Optional[float] = None
+    last_welding_runtime_ts: Optional[float] = None
+    last_session_stop_runtime_ts: Optional[float] = None
+    last_client_session_done_ts: Optional[float] = None
     errors: list[str] = field(default_factory=list)
 
 
@@ -846,6 +974,39 @@ class ControlPlan:
     enabled: bool = False
     voltage_v: float = 0.0
     current_a: float = 0.0
+
+
+@dataclass
+class ModuleSnapshot:
+    status: Optional[int] = None
+    voltage_v: float = 0.0
+    current_a: float = 0.0
+    current_limit_point: float = 0.0
+    input_power_w: float = 0.0
+    input_mode: int = -1
+    rated_output_current_reg_a: float = 0.0
+    off: bool = False
+    online: bool = False
+    status_text: str = "status=n/a flags=-"
+    last_update_ts: float = 0.0
+
+
+def build_module_snapshot(module: Optional[mxr.ModuleInfo]) -> ModuleSnapshot:
+    if module is None:
+        return ModuleSnapshot()
+    return ModuleSnapshot(
+        status=module.status,
+        voltage_v=module_voltage_value(module),
+        current_a=module_current_value(module),
+        current_limit_point=clamp_non_negative(getattr(module, "current_limit_point", 0.0)),
+        input_power_w=clamp_non_negative(getattr(module, "input_power_w", 0.0)),
+        input_mode=int(getattr(module, "input_mode", -1) or -1),
+        rated_output_current_reg_a=clamp_non_negative(getattr(module, "rated_current_a", 0.0)),
+        off=module.status is not None and module_is_off(module),
+        online=module_online(module),
+        status_text=module_status_text(module),
+        last_update_ts=float(getattr(module, "last_seen", 0.0) or 0.0),
+    )
 
 
 class SingleModuleChargeRunner:
@@ -865,6 +1026,14 @@ class SingleModuleChargeRunner:
         )
 
         self.home_module: Optional[mxr.ModuleInfo] = None
+        self.module_lock = threading.RLock()
+        self.module_plan = ControlPlan()
+        self.module_snapshot = ModuleSnapshot()
+        self.module_worker_stop = threading.Event()
+        self.module_worker_thread: Optional[threading.Thread] = None
+        self.module_worker_error: Optional[str] = None
+        self.module_force_refresh = False
+        self.module_force_apply = False
         self.phase = "bootstrap"
         self.events: list[str] = []
         self.notes: list[str] = []
@@ -879,8 +1048,11 @@ class SingleModuleChargeRunner:
         self.last_output_signature: Optional[tuple[bool, int, int]] = None
         self.last_set_refresh = 0.0
         self.last_feedback_cmd = 0.0
+        self.last_feedback_signature: Optional[tuple[str, int, int, bool]] = None
+        self.last_feedback_ready = False
         self.last_status_poll = 0.0
         self.last_telemetry_poll = 0.0
+        self.last_full_telemetry_refresh = 0.0
         self.last_progress = 0.0
         self.last_hb = 0.0
         self.last_auth = 0.0
@@ -890,11 +1062,24 @@ class SingleModuleChargeRunner:
         self.next_tx_seq: dict[int, int] = {}
         self.stage_name = "none"
         self.precharge_feedback_count = 0
+        self.current_demand_rundown_until = 0.0
+        self.last_feedback_requested_i = 0.0
 
         self.current_demand_started_at: Optional[float] = None
         self.current_demand_ready_since: Optional[float] = None
+        self.charge_proof_since: Optional[float] = None
+        self.charge_proof_peak_v = 0.0
+        self.charge_proof_peak_i = 0.0
+        self.charge_proof_peak_power_w = 0.0
+        self.last_target_apply_ts = 0.0
         self.vehicle_stop_requested = False
         self.vehicle_stop_reason = ""
+        self.stop_contract_started_at: Optional[float] = None
+        self.stop_contract_baseline_power_delivery_stop_runtime_count = 0
+        self.stop_contract_baseline_welding_req_count = 0
+        self.stop_contract_baseline_welding_runtime_count = 0
+        self.stop_contract_baseline_session_stop_req_count = 0
+        self.stop_contract_baseline_client_session_done_count = 0
 
     def _note_once(self, note: str) -> None:
         if note not in self.notes:
@@ -960,11 +1145,14 @@ class SingleModuleChargeRunner:
 
         ack_match = ACK_RE.search(line)
         if ack_match:
+            cmd_hex = int(ack_match.group(1), 16)
+            seq = int(ack_match.group(2))
             with self.queue_cv:
+                self._sync_tx_seq(cmd_hex, seq)
                 self.ack_queue.append(
                     Ack(
-                        cmd_hex=int(ack_match.group(1), 16),
-                        seq=int(ack_match.group(2)),
+                        cmd_hex=cmd_hex,
+                        seq=seq,
                         status=int(ack_match.group(3)),
                         detail0=int(ack_match.group(4)),
                         detail1=int(ack_match.group(5)),
@@ -1076,21 +1264,75 @@ class SingleModuleChargeRunner:
             return
 
         hlc_req = HLC_REQ_RE.search(line)
+        req_payload = None
         if hlc_req:
             kind = hlc_req.group(1)
+        else:
+            hlc_req_json = HLC_REQ_JSON_RE.search(line)
+            if hlc_req_json:
+                try:
+                    req_payload = json.loads(hlc_req_json.group(1))
+                except json.JSONDecodeError:
+                    req_payload = None
+                kind = req_payload.get("type") if isinstance(req_payload, dict) else None
+            else:
+                kind = None
+        if kind:
             with self.live_lock:
                 if kind == "PowerDeliveryReq":
                     self.live.power_delivery_req_count += 1
                     self.live.last_power_delivery_req_ts = now
+                elif kind == "CurrentDemandReq":
+                    self.live.bms_stage_name = "current_demand"
+                    self.live.delivery_ready = True
+                    target_v = clamp_non_negative(req_payload.get("targetV", 0.0)) if isinstance(req_payload, dict) else 0.0
+                    target_i = clamp_non_negative(req_payload.get("targetI", 0.0)) if isinstance(req_payload, dict) else 0.0
+                    if target_v > 0.0:
+                        self.live.target_v = target_v
+                        self.live.latched_target_v = target_v
+                    if target_i > 0.0:
+                        self.live.target_i = target_i
+                        self.live.latched_target_i = target_i
                 elif kind == "WeldingDetectionReq":
                     self.live.welding_req_count += 1
                     self.live.last_welding_req_ts = now
                 elif kind == "SessionStopReq":
                     self.live.session_stop_req_count += 1
                     self.live.last_session_stop_req_ts = now
-            if self.current_demand_started_at is not None:
+            if self.current_demand_started_at is not None and kind in (
+                "PowerDeliveryReq",
+                "WeldingDetectionReq",
+                "SessionStopReq",
+            ):
                 self.vehicle_stop_requested = True
                 self.vehicle_stop_reason = kind
+                self.current_plan = ControlPlan(False, 0.0, 0.0)
+                self.desired_relay = False
+                self.last_feedback_signature = None
+            return
+
+        if POWER_DELIVERY_STOP_RUNTIME_RE.search(line):
+            with self.live_lock:
+                self.live.power_delivery_stop_runtime_count += 1
+                self.live.last_power_delivery_stop_runtime_ts = now
+            return
+
+        if WELDING_RUNTIME_RE.search(line):
+            with self.live_lock:
+                self.live.welding_runtime_count += 1
+                self.live.last_welding_runtime_ts = now
+            return
+
+        if SESSION_STOP_RUNTIME_RE.search(line):
+            with self.live_lock:
+                self.live.session_stop_runtime_count += 1
+                self.live.last_session_stop_runtime_ts = now
+            return
+
+        if CLIENT_SESSION_DONE_RE.search(line):
+            with self.live_lock:
+                self.live.client_session_done_count += 1
+                self.live.last_client_session_done_ts = now
 
     def _send(self, cmd: str) -> None:
         self.link.command(cmd)
@@ -1190,6 +1432,13 @@ class SingleModuleChargeRunner:
                 time.sleep(0.1)
         raise RuntimeError(str(last_error) if last_error else f"ack wait failed for {cmd}")
 
+    def _send_untracked_ackable(self, cmd: str, cmd_hex: int) -> None:
+        # Match the validated C++ harness: active-window FEEDBACK/HB/AUTH are
+        # best-effort streamed commands, not tracked RPCs. Let incoming ACKs
+        # advance the sequence opportunistically instead of pre-consuming one
+        # here.
+        self._send(cmd)
+
     def _query_status(self, timeout_s: float = 2.0, allow_stale: bool = False, stale_max_age_s: float = 3.0) -> PlcStatus:
         while self.status_queue:
             self.status_queue.popleft()
@@ -1236,8 +1485,30 @@ class SingleModuleChargeRunner:
         self.remote_start_sent = True
 
     def _bootstrap_plc(self) -> PlcStatus:
-        self._send("CTRL STATUS")
-        status = self._wait_for_status()
+        try:
+            status = self._query_status(timeout_s=4.0, allow_stale=True, stale_max_age_s=5.0)
+        except RuntimeError as exc:
+            if "timeout waiting for PLC status" not in str(exc):
+                raise
+            self._note_once("bootstrap status delayed after reset; continuing with configured PLC mapping")
+            status = PlcStatus(
+                mode_id=1,
+                mode_name="external_controller",
+                plc_id=int(self.args.plc_id or 0),
+                connector_id=int(self.args.plc_id or 0),
+                controller_id=int(self.args.controller_id),
+                module_addr=int(self.args.home_addr),
+                local_group=int(self.args.home_group),
+                module_id=f"PLC{int(self.args.plc_id or 0)}",
+                can_stack=0,
+                module_mgr=0,
+                cp="U",
+                duty=100,
+                relay1=0,
+                relay2=0,
+                relay3=0,
+                alloc_sz=0,
+            )
         if status.mode_id == 1 and status.controller_id != self.args.controller_id:
             self._note_once(
                 f"adopting live controller_id={status.controller_id} from PLC status during bootstrap"
@@ -1266,13 +1537,25 @@ class SingleModuleChargeRunner:
             ack = self._send_expect_ack(f"CTRL RELAY {mask} 0 0", ACK_CMD_RELAY, timeout_s=3.0, retries=1)
             if ack.status != ACK_OK:
                 raise RuntimeError(f"CTRL RELAY open for relay{relay_idx} rejected status={ack.status}")
-        status = self._query_status()
+        status = self._query_status(allow_stale=True, stale_max_age_s=3.0)
         if status.mode_id != 1:
             raise RuntimeError("PLC did not enter mode=1 external_controller")
         if status.can_stack != 0 or status.module_mgr != 0:
             raise RuntimeError(
                 f"external-controller routing mismatch: can_stack={status.can_stack} module_mgr={status.module_mgr}"
             )
+        if (
+            self.args.home_addr == DEFAULT_HOME_ADDR
+            and self.args.home_group == DEFAULT_HOME_GROUP
+            and (status.module_addr != self.args.home_addr or status.local_group != self.args.home_group)
+        ):
+            self._note_once(
+                "adopting live PLC module mapping "
+                f"0x{status.module_addr:02X}/g{status.local_group} "
+                f"in place of default 0x{self.args.home_addr:02X}/g{self.args.home_group}"
+            )
+            self.args.home_addr = status.module_addr
+            self.args.home_group = status.local_group
         return status
 
     def _probe_home_module(self) -> mxr.ModuleInfo:
@@ -1288,6 +1571,159 @@ class SingleModuleChargeRunner:
                     break
         raise RuntimeError(f"module 0x{self.args.home_addr:02X}/g{self.args.home_group} not found on {self.args.can_iface}")
 
+    def _snapshot_module_locked(self) -> None:
+        self.module_snapshot = build_module_snapshot(self.home_module)
+
+    def _get_module_snapshot(self) -> ModuleSnapshot:
+        with self.module_lock:
+            return ModuleSnapshot(
+                status=self.module_snapshot.status,
+                voltage_v=self.module_snapshot.voltage_v,
+                current_a=self.module_snapshot.current_a,
+                current_limit_point=self.module_snapshot.current_limit_point,
+                input_power_w=self.module_snapshot.input_power_w,
+                input_mode=self.module_snapshot.input_mode,
+                rated_output_current_reg_a=self.module_snapshot.rated_output_current_reg_a,
+                off=self.module_snapshot.off,
+                online=self.module_snapshot.online,
+                status_text=self.module_snapshot.status_text,
+                last_update_ts=self.module_snapshot.last_update_ts,
+            )
+
+    def _publish_module_plan(self, force_refresh: bool = False, force_apply: bool = False) -> None:
+        with self.module_lock:
+            self.module_plan = ControlPlan(
+                enabled=self.current_plan.enabled,
+                voltage_v=self.current_plan.voltage_v,
+                current_a=self.current_plan.current_a,
+            )
+            if force_refresh:
+                self.module_force_refresh = True
+            if force_apply:
+                self.module_force_apply = True
+
+    def _module_worker_interval_s(self) -> float:
+        return max(
+            MODULE_WORKER_MIN_INTERVAL_S,
+            min(
+                MODULE_WORKER_TARGET_INTERVAL_S,
+                self.args.control_interval_s,
+                self.args.telemetry_interval_s,
+            ),
+        )
+
+    def _module_worker_loop(self) -> None:
+        if self.home_module is None:
+            return
+        last_signature: Optional[tuple[bool, int, int]] = None
+        plan_active = False
+        last_set_refresh = 0.0
+        last_full_refresh = 0.0
+
+        while not self.module_worker_stop.is_set():
+            loop_started = time.monotonic()
+            applied_now = False
+            require_fresh_sample_after_apply = False
+            try:
+                with self.module_lock:
+                    plan = ControlPlan(
+                        enabled=self.module_plan.enabled,
+                        voltage_v=self.module_plan.voltage_v,
+                        current_a=self.module_plan.current_a,
+                    )
+                    force_refresh = self.module_force_refresh
+                    self.module_force_refresh = False
+                    force_apply = self.module_force_apply
+                    self.module_force_apply = False
+
+                safe_v, safe_i = self.can.normalize_output_request(plan.voltage_v, plan.current_a)
+                signature = (plan.enabled, int(round(safe_v * 10.0)), int(round(safe_i * 100.0)))
+                signature_changed = last_signature != signature
+                control_refresh_s = self.args.control_interval_s
+                if module_is_off(self.home_module):
+                    control_refresh_s = min(control_refresh_s, MODULE_OFF_RETRY_INTERVAL_S)
+                if plan.enabled and (
+                    force_apply or signature_changed or (loop_started - last_set_refresh) >= control_refresh_s
+                ):
+                    require_fresh_sample_after_apply = force_apply or signature_changed or (not plan_active)
+                    self.can.set_output(self.home_module, safe_v, safe_i)
+                    plan_active = True
+                    last_signature = signature
+                    last_set_refresh = loop_started
+                    applied_now = True
+                    if not module_online(self.home_module):
+                        force_refresh = True
+                elif (not plan.enabled) and plan_active:
+                    self.can.stop_output(self.home_module)
+                    plan_active = False
+                    last_signature = None
+                    last_set_refresh = loop_started
+                    applied_now = True
+                    force_refresh = True
+
+                should_poll = (
+                    plan.enabled
+                    or plan_active
+                    or self.desired_relay
+                    or self._relay_is_closed()
+                    or self.phase in ("wait_for_session", "stopping")
+                )
+                if should_poll:
+                    full_refresh_due = force_refresh or (loop_started - last_full_refresh) >= MODULE_ACTIVE_FULL_REFRESH_S
+                    if full_refresh_due:
+                        self.can.refresh(self.home_module, response_window_s=self.args.telemetry_response_s)
+                        last_full_refresh = time.monotonic()
+                    else:
+                        self.can.poll_telemetry(self.home_module, response_window_s=self.args.telemetry_response_s)
+                    with self.module_lock:
+                        self._snapshot_module_locked()
+                elif force_refresh:
+                    self.can.refresh(self.home_module, response_window_s=self.args.telemetry_response_s)
+                    last_full_refresh = time.monotonic()
+                    with self.module_lock:
+                        self._snapshot_module_locked()
+
+                with self.module_lock:
+                    self.plan_active = plan_active
+                    self.last_output_signature = last_signature
+                    self.last_set_refresh = last_set_refresh
+                    if applied_now and require_fresh_sample_after_apply:
+                        self.last_target_apply_ts = loop_started
+            except Exception as exc:
+                self.module_worker_error = str(exc)
+                return
+
+            sleep_s = self._module_worker_interval_s() - (time.monotonic() - loop_started)
+            if sleep_s > 0.0:
+                self.module_worker_stop.wait(sleep_s)
+
+    def _start_module_worker(self) -> None:
+        if self.home_module is None:
+            raise RuntimeError("home module not ready")
+        if self.module_worker_thread and self.module_worker_thread.is_alive():
+            return
+        with self.module_lock:
+            self._snapshot_module_locked()
+            self.module_plan = ControlPlan()
+            self.module_force_refresh = True
+            self.module_force_apply = True
+        self.module_worker_error = None
+        self.module_worker_stop.clear()
+        self.module_worker_thread = threading.Thread(target=self._module_worker_loop, daemon=True)
+        self.module_worker_thread.start()
+
+    def _stop_module_worker(self) -> None:
+        self.module_worker_stop.set()
+        if self.module_worker_thread and self.module_worker_thread.is_alive():
+            self.module_worker_thread.join(timeout=2.0)
+        self.module_worker_thread = None
+
+    def _check_module_worker(self) -> None:
+        if self.module_worker_error:
+            raise RuntimeError(f"module worker failed: {self.module_worker_error}")
+        if self.module_worker_thread and not self.module_worker_thread.is_alive():
+            raise RuntimeError("module worker stopped unexpectedly")
+
     def _target_voltage(self) -> float:
         with self.live_lock:
             if self.live.target_v > 0.0:
@@ -1298,74 +1734,311 @@ class SingleModuleChargeRunner:
 
     def _requested_current(self) -> float:
         with self.live_lock:
+            if self.live.bms_stage_name in ("precharge", "power_delivery", "current_demand"):
+                return self.live.target_i
             if self.live.target_i > 0.0:
                 return self.live.target_i
-            if self.live.latched_target_i > 0.0:
-                return self.live.latched_target_i
         return 0.0
 
-    def _aggregate_feedback_telemetry(self) -> Optional[tuple[float, float]]:
-        if self.home_module is None:
-            return None
-        last_seen = getattr(self.home_module, "last_seen", 0.0) or 0.0
-        if last_seen <= 0.0 or (time.monotonic() - last_seen) > max(1.0, self.args.telemetry_interval_s * 4.0):
-            return None
-        return (
-            module_voltage_value(self.home_module),
-            module_current_value(self.home_module),
-        )
-
-    def _effective_stage_current(self, stage: str, requested_i: float) -> float:
-        if stage == "precharge":
-            return requested_i if requested_i > 0.05 else max(0.0, self.args.precharge_current_a)
-        return requested_i if requested_i > 0.05 else 0.0
-
-    def _update_plan_from_stage(self) -> tuple[str, float, float]:
+    def _live_stage_snapshot(self) -> tuple[str, float, float]:
         with self.live_lock:
             stage = self.live.bms_stage_name
+            target_v = self.live.target_v if self.live.target_v > 0.0 else self.live.latched_target_v
+            if stage in ("precharge", "power_delivery", "current_demand"):
+                requested_i = self.live.target_i
+            elif self.live.target_i > 0.0:
+                requested_i = self.live.target_i
+            else:
+                requested_i = 0.0
+        return stage, target_v, requested_i
+
+    def _apply_stage_plan(self, stage: str, target_v: float, requested_i: float) -> tuple[str, float, float]:
         if stage != self.stage_name:
+            prev_stage = self.stage_name
             self.stage_name = stage
-            self.precharge_feedback_count = 0
-        target_v = self._target_voltage()
-        requested_i = self._requested_current()
+            if not (prev_stage == "precharge" and stage == "power_delivery"):
+                self.precharge_feedback_count = 0
+        command_v, command_i = self._effective_stage_command(stage, target_v, requested_i)
         if stage == "precharge":
-            self.current_plan = ControlPlan(True, target_v, self._effective_stage_current(stage, requested_i))
+            self.current_plan = ControlPlan(True, command_v, command_i)
             self.desired_relay = True
         elif stage in ("power_delivery", "current_demand"):
-            self.current_plan = ControlPlan(True, target_v, self._effective_stage_current(stage, requested_i))
+            self.current_plan = ControlPlan(True, command_v, command_i)
             self.desired_relay = True
         else:
             self.current_plan = ControlPlan(False, 0.0, 0.0)
             self.desired_relay = False
         return stage, target_v, requested_i
 
-    def _tick_contract(self, now: float) -> None:
-        if (now - self.last_hb) * 1000.0 >= self.args.heartbeat_ms:
+    def _refresh_plan_from_live(self) -> tuple[str, float, float]:
+        return self._apply_stage_plan(*self._live_stage_snapshot())
+
+    def _aggregate_feedback_telemetry(self) -> Optional[tuple[float, float]]:
+        snapshot = self._get_module_snapshot()
+        if not snapshot.online:
+            return None
+        if snapshot.last_update_ts <= 0.0:
+            return None
+        if (time.monotonic() - snapshot.last_update_ts) > max(1.0, self.args.telemetry_interval_s * 4.0):
+            return None
+        return (snapshot.voltage_v, snapshot.current_a)
+
+    def _effective_stage_current(self, stage: str, requested_i: float) -> float:
+        if stage == "precharge":
+            return requested_i if requested_i > 0.05 else max(0.0, self.args.precharge_current_a)
+        return requested_i if requested_i > 0.05 else 0.0
+
+    def _effective_stage_voltage(self, stage: str, target_v: float, requested_i: float) -> float:
+        if (
+            stage == "current_demand"
+            and requested_i > 0.05
+            and self.args.apply_current_demand_headroom
+        ):
+            return max(0.0, target_v - self.args.module_voltage_headroom_v)
+        return max(0.0, target_v)
+
+    def _effective_stage_command(self, stage: str, target_v: float, requested_i: float) -> tuple[float, float]:
+        command_v = self._effective_stage_voltage(stage, target_v, requested_i)
+        command_i = self._effective_stage_current(stage, requested_i)
+        if (
+            stage == "current_demand"
+            and requested_i > 0.05
+            and self.args.apply_current_demand_headroom
+            and requested_i > DEFAULT_LOW_REQUEST_RUNDOWN_MAX_A
+        ):
+            # Match the known-good standalone/controller stop tail behavior:
+            # keep the configured current headroom during active charging, but
+            # do not undercut the EV's own low-current rundown request (for
+            # example 3 A -> 2 A) right before 0 A / PowerDelivery(stop).
+            command_i = max(0.0, command_i - self.args.module_current_headroom_a)
+        return command_v, command_i
+
+    def _current_demand_current_ready_safe(self, requested_i: float, present_i: float) -> bool:
+        target_i = max(0.0, requested_i)
+        measured_i = max(0.0, present_i)
+        if target_i <= 0.05:
+            return measured_i <= DEFAULT_ZERO_REQUEST_READY_MAX_A
+        overshoot_tolerance_a = max(2.0, target_i * 0.15)
+        return measured_i <= (target_i + overshoot_tolerance_a)
+
+    def _current_demand_voltage_ready_safe(self, requested_v: float, applied_v: float, present_v: float) -> bool:
+        target_v = max(0.0, applied_v)
+        if target_v < 50.0:
+            target_v = max(0.0, requested_v)
+        measured_v = max(0.0, present_v)
+        if target_v <= 1.0:
+            return measured_v <= max(1.0, self.args.feedback_voltage_tolerance_v)
+        overshoot_tolerance_v = max(20.0, target_v * 0.05)
+        return measured_v <= (target_v + overshoot_tolerance_v)
+
+    def _delivery_feedback_ready(self,
+                                 relay_closed: bool,
+                                 requested_v: float,
+                                 applied_v: float,
+                                 requested_i: float,
+                                 present_v: float,
+                                 present_i: float) -> bool:
+        if max(requested_v, applied_v) <= 10.0 or not relay_closed or present_v < 1.0:
+            return False
+        if not self._current_demand_voltage_ready_safe(requested_v, applied_v, present_v):
+            return False
+        return self._current_demand_current_ready_safe(requested_i, present_i)
+
+    def _precharge_feedback_ready(self, relay_closed: bool, target_v: float, present_v: float, present_i: float) -> bool:
+        self.precharge_feedback_count += 1
+        tolerance_v = (
+            self.args.feedback_voltage_tolerance_v
+            if target_v <= 1.0
+            else max(self.args.feedback_voltage_tolerance_v, target_v * 0.05)
+        )
+        if target_v <= 1.0:
+            voltage_ready = present_v <= tolerance_v
+        else:
+            voltage_ready = abs(present_v - target_v) <= tolerance_v or present_v >= (target_v - tolerance_v)
+        accept_floor_v = max(self.args.precharge_ready_min_voltage_v, target_v * 0.05)
+        current_flow_visible = present_i >= self.args.current_demand_ready_min_current_a
+        strong_single_sample_ready = (
+            self.precharge_feedback_count >= 1
+            and present_i >= (self.args.precharge_current_a * 0.75)
+        )
+        relaxed_ready = (
+            current_flow_visible
+            and present_v >= accept_floor_v
+            and (self.precharge_feedback_count >= 2 or strong_single_sample_ready)
+        )
+        return relay_closed and (voltage_ready or relaxed_ready)
+
+    def _current_demand_feedback_ready(
+        self,
+        relay_closed: bool,
+        target_applied: bool,
+        sample_valid: bool,
+        sample_ts: float,
+    ) -> bool:
+        return relay_closed and target_applied and sample_valid and sample_ts >= self.last_target_apply_ts
+
+    def _update_current_demand_rundown(self, now: float, stage: str, requested_i: float) -> None:
+        target_i = max(0.0, requested_i)
+        low_request = stage == "current_demand" and 0.05 < target_i <= DEFAULT_LOW_REQUEST_RUNDOWN_MAX_A
+        if low_request:
+            trigger_delta = max(DEFAULT_LOW_REQUEST_RUNDOWN_TRIGGER_DELTA_A, target_i * 2.0)
+            if self.last_feedback_requested_i > (target_i + trigger_delta):
+                self.current_demand_rundown_until = now + DEFAULT_LOW_REQUEST_RUNDOWN_GRACE_S
+        else:
+            self.current_demand_rundown_until = 0.0
+        self.last_feedback_requested_i = target_i
+
+    def _current_demand_rundown_active(self, now: float, requested_i: float, present_i: float) -> bool:
+        target_i = max(0.0, requested_i)
+        measured_i = max(0.0, present_i)
+        return (
+            0.05 < target_i <= DEFAULT_LOW_REQUEST_RUNDOWN_MAX_A
+            and now < self.current_demand_rundown_until
+            and measured_i >= target_i
+            and measured_i <= (target_i + DEFAULT_LOW_REQUEST_READY_OVERSHOOT_MAX_A)
+        )
+
+    def _relay_refresh_suppressed(self) -> bool:
+        stage, _, requested_i = self._live_stage_snapshot()
+        return self.vehicle_stop_requested or (stage == "current_demand" and requested_i <= 0.05)
+
+    def _delivery_feedback_limits(self, stage: str, requested_v: float, requested_i: float) -> tuple[bool, bool, bool]:
+        req_v = max(0.0, requested_v)
+        req_i = max(0.0, requested_i)
+        applied_i = max(0.0, self.current_plan.current_a)
+        headroom_i = (
+            max(0.0, self.args.module_current_headroom_a)
+            if stage == "current_demand" and req_i > 0.05 and self.args.apply_current_demand_headroom
+            else 0.0
+        )
+        req_power_kw = (req_v * req_i) / 1000.0
+        effective_req_power_kw = (req_v * applied_i) / 1000.0
+        requested_power_headroom_kw = (req_v * headroom_i) / 1000.0
+
+        # Mirror the standalone CurrentDemand truthfulness rule: preserve the
+        # configured 10 V / 1 A headroom physically, but do not claim EVSE
+        # current/power saturation unless the request exceeds the intended
+        # headroom-adjusted command or the module's own capability registers.
+        current_limit = req_i > (applied_i + headroom_i + 0.1)
+        power_limit = req_power_kw > (effective_req_power_kw + requested_power_headroom_kw + 0.1)
+        voltage_limit = req_v > (MODULE_MAX_VOLTAGE_V + 0.5)
+
+        # Maxwell's live current-limit register tracks the currently commanded
+        # output, not the module's physical capability. Use only the rated
+        # capability here so normal 10 V / 1 A headroom does not masquerade as
+        # EVSE saturation.
+        available_current_a = module_available_current_value(self.home_module)
+        if available_current_a > 0.0 and req_i > (available_current_a + 0.1):
+            current_limit = True
+        available_power_kw = 0.0
+        if available_current_a > 0.0 and req_v > 0.1:
+            available_power_kw = min(MXR_DEFAULT_OUTPUT_POWER_KW, (req_v * available_current_a) / 1000.0)
+        if available_power_kw > 0.0 and req_power_kw > (available_power_kw + 0.1):
+            power_limit = True
+
+        return current_limit, voltage_limit, power_limit
+
+    def _send_feedback_state(
+        self,
+        now: float,
+        *,
+        valid: bool,
+        ready: bool,
+        present_v: float,
+        present_i: float,
+        current_limit: bool = False,
+        voltage_limit: bool = False,
+        power_limit: bool = False,
+        stop_notify: bool = False,
+        timeout_s: float = 2.0,
+        require_ack: bool = True,
+    ) -> bool:
+        cmd = (
+            f"CTRL FEEDBACK {1 if valid else 0} {1 if ready else 0} "
+            f"{max(0.0, present_v):.1f} {max(0.0, present_i):.1f} "
+            f"{1 if current_limit else 0} {1 if voltage_limit else 0} "
+            f"{1 if power_limit else 0} {1 if stop_notify else 0}"
+        )
+        if require_ack:
             ack = self._send_expect_ack(
-                f"CTRL HB {self.args.heartbeat_timeout_ms}",
-                ACK_CMD_HEARTBEAT,
-                timeout_s=2.0,
+                cmd,
+                ACK_CMD_FEEDBACK,
+                timeout_s=timeout_s,
                 retries=1,
             )
             if ack.status != ACK_OK:
-                raise RuntimeError(f"CTRL HB rejected status={ack.status}")
+                raise RuntimeError(f"CTRL FEEDBACK rejected status={ack.status}")
+        else:
+            self._send_untracked_ackable(cmd, ACK_CMD_FEEDBACK)
+        self.last_feedback_cmd = now
+        return ready
+
+    def _welding_feedback_active(self, stage: str) -> bool:
+        if (
+            self.stop_contract_started_at is None
+            or self.current_demand_started_at is None
+            or not self.args.fake_welding
+        ):
+            return False
+        with self.live_lock:
+            if self.live.welding_req_count > self.stop_contract_baseline_welding_req_count:
+                return True
+            return self.live.power_delivery_stop_runtime_count > self.stop_contract_baseline_power_delivery_stop_runtime_count
+
+    def _update_plan_from_stage(self) -> tuple[str, float, float]:
+        return self._refresh_plan_from_live()
+
+    def _tick_contract(self, now: float) -> None:
+        with self.live_lock:
+            cp_phase = self.live.cp_phase
+            b1_since_ts = self.live.b1_since_ts
+            slac_session = self.live.slac_session
+            slac_matched = self.live.slac_matched
+            hlc_active = self.live.hlc_active
+            session_started = self.live.session_started
+
+        active_window = (
+            hlc_active
+            or slac_matched
+            or slac_session
+            or session_started
+            or self.stage_name in ("precharge", "power_delivery", "current_demand")
+        )
+
+        if (now - self.last_hb) * 1000.0 >= self.args.heartbeat_ms:
+            if active_window:
+                self._send_untracked_ackable(f"CTRL HB {self.args.heartbeat_timeout_ms}", ACK_CMD_HEARTBEAT)
+            else:
+                ack = self._send_expect_ack(
+                    f"CTRL HB {self.args.heartbeat_timeout_ms}",
+                    ACK_CMD_HEARTBEAT,
+                    timeout_s=2.0,
+                    retries=1,
+                )
+                if ack.status != ACK_OK:
+                    raise RuntimeError(f"CTRL HB rejected status={ack.status}")
             self.last_hb = now
 
-        auth_refresh_s = max(1.0, min(self.args.auth_ttl_ms / 2000.0, (self.args.auth_ttl_ms - 1500) / 1000.0))
+        active_auth_refresh_s = max(1.0, min(5.0, self.args.auth_ttl_ms / 4000.0))
+        idle_auth_refresh_s = max(1.0, min(self.args.auth_ttl_ms / 2000.0, (self.args.auth_ttl_ms - 1500) / 1000.0))
+        auth_refresh_s = active_auth_refresh_s if active_window else idle_auth_refresh_s
         if (now - self.last_auth) >= auth_refresh_s:
-            ack = self._send_expect_ack(
-                f"CTRL AUTH grant {self.args.auth_ttl_ms}",
-                ACK_CMD_AUTH,
-                timeout_s=2.0,
-                retries=1,
-            )
-            if ack.status != ACK_OK:
-                raise RuntimeError(f"CTRL AUTH grant rejected status={ack.status}")
+            if active_window:
+                self._send_untracked_ackable(f"CTRL AUTH grant {self.args.auth_ttl_ms}", ACK_CMD_AUTH)
+            else:
+                ack = self._send_expect_ack(
+                    f"CTRL AUTH grant {self.args.auth_ttl_ms}",
+                    ACK_CMD_AUTH,
+                    timeout_s=2.0,
+                    retries=1,
+                )
+                if ack.status != ACK_OK:
+                    raise RuntimeError(f"CTRL AUTH grant rejected status={ack.status}")
             self.last_auth = now
 
         explicit_status_due = (now - self.last_status_poll) >= self.args.status_interval_s
         status_stale = self.last_status_rx <= 0.0 or (now - self.last_status_rx) >= max(1.0, self.args.status_interval_s)
-        if explicit_status_due and status_stale:
+        if (not active_window) and explicit_status_due and status_stale:
             try:
                 self._query_status(
                     timeout_s=min(1.0, self.args.status_interval_s),
@@ -1375,14 +2048,8 @@ class SingleModuleChargeRunner:
             except Exception as exc:
                 self._note_once(f"status poll degraded during {self.phase}: {exc}")
             self.last_status_poll = now
-        elif explicit_status_due:
+        elif (not active_window) and explicit_status_due:
             self.last_status_poll = now
-
-        with self.live_lock:
-            cp_phase = self.live.cp_phase
-            b1_since_ts = self.live.b1_since_ts
-            slac_matched = self.live.slac_matched
-            hlc_active = self.live.hlc_active
 
         waiting_for_slac = (not slac_matched) and (not hlc_active)
         at_b1 = cp_phase == "B1"
@@ -1393,7 +2060,6 @@ class SingleModuleChargeRunner:
             and b1_since_ts is not None
             and (now - b1_since_ts) >= self.args.b1_start_delay_s
         )
-
         if (start_window_ready or (waiting_for_slac and in_digital_comm_window)) and (not self.remote_start_sent):
             self._send_slac_start(now)
             if start_window_ready:
@@ -1402,18 +2068,24 @@ class SingleModuleChargeRunner:
             self.remote_start_sent = False
 
     def _tick_relay(self, now: float) -> None:
+        relay_refresh_s = max(2.0, self.args.relay_refresh_s)
         if self.desired_relay:
-            if self.last_relay_command is not True or not self._relay_is_closed() or (now - self.last_relay_refresh) >= self.args.relay_refresh_s:
-                self._set_relay(True, self.args.relay_hold_ms, require_ack=True)
+            refresh_due = (
+                (now - self.last_relay_refresh) >= relay_refresh_s
+                and not self._relay_refresh_suppressed()
+            )
+            if self.last_relay_command is not True or not self._relay_is_closed() or refresh_due:
+                self._set_relay(True, self.args.relay_hold_ms, require_ack=False)
                 self.last_relay_refresh = now
                 self.last_relay_command = True
         else:
             if self.last_relay_command is not False or not self._relay_is_open():
-                self._set_relay(False, 0, require_ack=True)
+                self._set_relay(False, 0, require_ack=False)
                 self.last_relay_refresh = now
                 self.last_relay_command = False
 
     def _tick_module_output(self, now: float) -> None:
+        self._refresh_plan_from_live()
         if self.home_module is None:
             return
         signature = (
@@ -1421,95 +2093,172 @@ class SingleModuleChargeRunner:
             int(round(max(0.0, self.current_plan.voltage_v) * 10.0)),
             int(round(max(0.0, self.current_plan.current_a) * 100.0)),
         )
-        if self.current_plan.enabled and (
-            self.last_output_signature != signature or (now - self.last_set_refresh) >= self.args.control_interval_s
-        ):
-            self.can.set_output(self.home_module, self.current_plan.voltage_v, self.current_plan.current_a)
-            self.plan_active = True
-            self.last_output_signature = signature
-            self.last_set_refresh = now
-        elif (not self.current_plan.enabled) and self.plan_active:
-            self.can.stop_output(self.home_module)
-            self.plan_active = False
-            self.last_output_signature = None
+        force_apply = False
+        force_refresh = False
+        if self.current_plan.enabled:
+            if self.last_output_signature != signature:
+                force_apply = True
+                force_refresh = True
+        elif self.plan_active or self.last_output_signature is not None:
+            force_apply = True
+            force_refresh = True
+        self._publish_module_plan(force_refresh=force_refresh, force_apply=force_apply)
 
     def _tick_telemetry(self, now: float) -> None:
-        if (now - self.last_telemetry_poll) < self.args.telemetry_interval_s:
-            return
-        should_poll = self.home_module is not None and (
-            self.current_plan.enabled
-            or self.plan_active
-            or self.desired_relay
-            or self._relay_is_closed()
-            or self.phase in ("wait_for_session", "stopping")
-        )
-        if should_poll and self.home_module is not None:
-            self.can.refresh(self.home_module, response_window_s=self.args.telemetry_response_s)
+        self._check_module_worker()
+        snapshot = self._get_module_snapshot()
+        if snapshot.last_update_ts <= 0.0 or (time.monotonic() - snapshot.last_update_ts) > max(1.0, self.args.telemetry_interval_s * 4.0):
+            self._publish_module_plan(force_refresh=True)
         self.last_telemetry_poll = now
 
-    def _tick_feedback(self, now: float, stage: str, target_v: float, requested_i: float) -> bool:
-        if (now - self.last_feedback_cmd) < self.args.feedback_interval_s:
-            return False
+    def _tick_feedback(self,
+                       now: float,
+                       stage: str,
+                       target_v: float,
+                       requested_i: float,
+                       *,
+                       stop_notify: bool = False) -> bool:
+        stage, target_v, requested_i = self._refresh_plan_from_live()
+        self._update_current_demand_rundown(now, stage, requested_i)
+        feedback_signature = (
+            stage,
+            int(round(max(0.0, target_v) * 10.0)),
+            int(round(max(0.0, requested_i) * 100.0)),
+            stop_notify,
+        )
+        welding_zero_due = False
+        if stop_notify and self.stop_contract_started_at is not None and self.args.fake_welding:
+            with self.live_lock:
+                welding_zero_due = (
+                    self.live.welding_runtime_count - self.stop_contract_baseline_welding_runtime_count
+                ) >= self.args.fake_welding_residual_count
+        active_charge_window = stage in ("precharge", "power_delivery", "current_demand") and not stop_notify
+        feedback_interval_s = (
+            self.args.active_feedback_keepalive_s if active_charge_window else self.args.feedback_interval_s
+        )
+        feedback_due = (
+            self.last_feedback_signature != feedback_signature
+            or welding_zero_due
+            or (now - self.last_feedback_cmd) >= feedback_interval_s
+        )
+        if not feedback_due:
+            return self.last_feedback_ready if self.last_feedback_signature == feedback_signature else False
         telemetry = self._aggregate_feedback_telemetry()
+        welding_active = self._welding_feedback_active(stage)
+        if welding_active:
+            with self.live_lock:
+                welding_runtime_seen_count = max(
+                    0,
+                    self.live.welding_runtime_count - self.stop_contract_baseline_welding_runtime_count,
+                )
+            present_v = 0.0
+            if welding_runtime_seen_count < self.args.fake_welding_residual_count:
+                present_v = self.args.fake_welding_residual_v
+            ready = self._send_feedback_state(
+                now,
+                valid=True,
+                ready=False,
+                present_v=present_v,
+                present_i=0.0,
+                stop_notify=True,
+            )
+            self.last_feedback_signature = feedback_signature
+            self.last_feedback_ready = ready
+            return ready
         if telemetry is None:
-            ack = self._send_expect_ack("CTRL FEEDBACK 0 0 0 0 0 0 0", ACK_CMD_FEEDBACK, timeout_s=2.0, retries=1)
-            if ack.status != ACK_OK:
-                raise RuntimeError(f"CTRL FEEDBACK invalid rejected status={ack.status}")
+            if stop_notify:
+                ready = self._send_feedback_state(
+                    now,
+                    valid=True,
+                    ready=False,
+                    present_v=0.0,
+                    present_i=0.0,
+                    stop_notify=True,
+                )
+                self.last_feedback_signature = feedback_signature
+                self.last_feedback_ready = ready
+                return ready
+            if active_charge_window:
+                self._send_untracked_ackable("CTRL FEEDBACK 0 0 0 0 0 0 0", ACK_CMD_FEEDBACK)
+            else:
+                ack = self._send_expect_ack("CTRL FEEDBACK 0 0 0 0 0 0 0", ACK_CMD_FEEDBACK, timeout_s=2.0, retries=1)
+                if ack.status != ACK_OK:
+                    raise RuntimeError(f"CTRL FEEDBACK invalid rejected status={ack.status}")
             self.last_feedback_cmd = now
+            self.last_feedback_signature = feedback_signature
+            self.last_feedback_ready = False
             return False
 
         present_v, present_i = telemetry
         ready = False
         if stage == "precharge":
-            self.precharge_feedback_count += 1
             relay_closed = self._relay_is_closed() or self.desired_relay
-            tolerance_v = (
-                self.args.feedback_voltage_tolerance_v
-                if target_v <= 1.0
-                else max(self.args.feedback_voltage_tolerance_v, target_v * 0.05)
+            ready = self._precharge_feedback_ready(relay_closed, target_v, present_v, present_i)
+            ready = self._send_feedback_state(
+                now,
+                valid=True,
+                ready=ready,
+                present_v=present_v,
+                present_i=present_i,
+                stop_notify=stop_notify,
+                require_ack=not active_charge_window,
             )
-            if target_v <= 1.0:
-                voltage_ready = present_v <= tolerance_v
-            else:
-                voltage_ready = abs(present_v - target_v) <= tolerance_v or present_v >= (target_v - tolerance_v)
-            accept_floor_v = max(self.args.precharge_ready_min_voltage_v, target_v * 0.05)
-            current_floor = max(0.5, self.args.precharge_current_a * self.args.precharge_ready_min_current_ratio)
-            relaxed_ready = present_v >= accept_floor_v or (
-                self.precharge_feedback_count >= 2 and present_i >= current_floor
-            )
-            ready = relay_closed and (voltage_ready or relaxed_ready)
-            ack = self._send_expect_ack(
-                f"CTRL FEEDBACK 1 {1 if ready else 0} {present_v:.1f} {present_i:.1f} 0 0 0",
-                ACK_CMD_FEEDBACK,
-                timeout_s=2.0,
-                retries=1,
-            )
-        elif stage in ("power_delivery", "current_demand"):
+            self.last_feedback_signature = feedback_signature
+            self.last_feedback_ready = ready
+            return ready
+        elif stage == "power_delivery":
             relay_closed = self._relay_is_closed()
-            current_ready = requested_i <= 0.05 or present_i >= self.args.current_demand_ready_min_current_a
-            ready = (
-                relay_closed
-                and present_v >= self.args.current_demand_ready_min_voltage_v
-                and current_ready
+            ready = self._precharge_feedback_ready(relay_closed, target_v, present_v, present_i)
+            ready = self._send_feedback_state(
+                now,
+                valid=True,
+                ready=ready,
+                present_v=present_v,
+                present_i=present_i,
+                stop_notify=stop_notify,
+                require_ack=not active_charge_window,
             )
-            ack = self._send_expect_ack(
-                f"CTRL FEEDBACK 1 {1 if ready else 0} {present_v:.1f} {present_i:.1f} "
-                "0 0 0",
-                ACK_CMD_FEEDBACK,
-                timeout_s=2.0,
-                retries=1,
+            self.last_feedback_signature = feedback_signature
+            self.last_feedback_ready = ready
+            return ready
+        elif stage == "current_demand":
+            relay_closed = self._relay_is_closed()
+            snapshot = self._get_module_snapshot()
+            target_applied = self.current_plan.enabled and (self.plan_active or self.last_output_signature is not None)
+            ready = self._current_demand_feedback_ready(
+                relay_closed,
+                target_applied,
+                snapshot.online,
+                snapshot.last_update_ts,
             )
+            current_limit, voltage_limit, power_limit = self._delivery_feedback_limits(stage, target_v, requested_i)
+            ready = self._send_feedback_state(
+                now,
+                valid=True,
+                ready=ready,
+                present_v=present_v,
+                present_i=present_i,
+                current_limit=current_limit,
+                voltage_limit=voltage_limit,
+                power_limit=power_limit,
+                stop_notify=stop_notify,
+                require_ack=not active_charge_window,
+            )
+            self.last_feedback_signature = feedback_signature
+            self.last_feedback_ready = ready
+            return ready
         else:
-            ack = self._send_expect_ack(
-                f"CTRL FEEDBACK 1 0 {present_v:.1f} {present_i:.1f} 0 0 0",
-                ACK_CMD_FEEDBACK,
-                timeout_s=2.0,
-                retries=1,
+            ready = self._send_feedback_state(
+                now,
+                valid=True,
+                ready=False,
+                present_v=present_v,
+                present_i=present_i,
+                stop_notify=stop_notify,
             )
-        if ack.status != ACK_OK:
-            raise RuntimeError(f"CTRL FEEDBACK rejected status={ack.status}")
-        self.last_feedback_cmd = now
-        return ready
+            self.last_feedback_signature = feedback_signature
+            self.last_feedback_ready = ready
+            return ready
 
     def _tick_cleanup_contract(self, now: float) -> None:
         if (now - self.last_hb) * 1000.0 >= self.args.heartbeat_ms:
@@ -1551,29 +2300,66 @@ class SingleModuleChargeRunner:
     def _tick_progress(self, now: float, stage: str, ready: bool) -> None:
         if (now - self.last_progress) < 5.0:
             return
-        present_v = module_voltage_value(self.home_module)
-        present_i = module_current_value(self.home_module)
+        snapshot = self._get_module_snapshot()
+        present_v = snapshot.voltage_v
+        present_i = snapshot.current_a
+        present_power_w = present_v * present_i
         print(
             f"[PROGRESS] phase={self.phase} stage={stage or '-'} relay1={int(self._relay_is_closed())} "
             f"targetV={self._target_voltage():.1f} targetI={self._requested_current():.1f} "
-            f"presentV={present_v:.1f} presentI={present_i:.1f} ready={int(ready)} "
+            f"presentV={present_v:.1f} presentI={present_i:.1f} presentP={present_power_w:.0f} ready={int(ready)} "
             f"cp={self.live.cp_phase} slac={int(self.live.slac_matched)} hlc={int(self.live.hlc_ready)}",
             flush=True,
         )
         self.last_progress = now
 
-    def _current_demand_ready(self, stage: str, ready: bool) -> bool:
-        if stage != "current_demand" or not ready:
-            self.current_demand_ready_since = None
-            return False
-        if self.current_demand_started_at is None:
-            self.current_demand_started_at = time.time()
-        if self.current_demand_ready_since is None:
-            self.current_demand_ready_since = time.time()
-        return (time.time() - self.current_demand_ready_since) >= self.args.current_demand_hold_s
+    def _charge_success_reached(self, stage: str, ready: bool) -> bool:
+        now = time.time()
+        snapshot = self._get_module_snapshot()
+        present_v = snapshot.voltage_v
+        present_i = snapshot.current_a
+        present_power_w = present_v * present_i
 
-    def _cleanup(self) -> None:
-        self._set_phase("stopping")
+        if stage == "current_demand":
+            if self.current_demand_started_at is None:
+                self.current_demand_started_at = now
+            if ready:
+                if self.current_demand_ready_since is None:
+                    self.current_demand_ready_since = now
+            else:
+                self.current_demand_ready_since = None
+        else:
+            self.current_demand_ready_since = None
+
+        proof_now = (
+            stage == "current_demand"
+            and ready
+            and present_v >= self.args.charge_success_min_voltage_v
+            and present_i >= self.args.charge_success_min_current_a
+            and present_power_w >= self.args.charge_success_min_power_w
+        )
+        if proof_now:
+            if self.charge_proof_since is None:
+                self.charge_proof_since = now
+                print(
+                    f"[PASSCHK] charge proof started V={present_v:.1f} I={present_i:.1f} P={present_power_w:.0f}",
+                    flush=True,
+                )
+            self.charge_proof_peak_v = max(self.charge_proof_peak_v, present_v)
+            self.charge_proof_peak_i = max(self.charge_proof_peak_i, present_i)
+            self.charge_proof_peak_power_w = max(self.charge_proof_peak_power_w, present_power_w)
+            return (now - self.charge_proof_since) >= self.args.current_demand_hold_s
+
+        if self.charge_proof_since is not None:
+            print(
+                f"[PASSCHK] charge proof reset stage={stage or '-'} ready={int(ready)} "
+                f"V={present_v:.1f} I={present_i:.1f} P={present_power_w:.0f}",
+                flush=True,
+            )
+        self.charge_proof_since = None
+        return False
+
+    def _cleanup_force_stop(self) -> None:
         try:
             ack = self._send_expect_ack(
                 f"CTRL STOP soft {int(self.args.stop_timeout_s * 1000.0)}",
@@ -1592,16 +2378,15 @@ class SingleModuleChargeRunner:
 
         self.current_plan = ControlPlan(False, 0.0, 0.0)
         self.desired_relay = False
-        if self.home_module is not None:
-            try:
-                self.can.stop_output(self.home_module)
-            except Exception as exc:
-                self.notes.append(f"module stop failed during cleanup: {exc}")
+        self.last_feedback_signature = None
+        self._publish_module_plan(force_refresh=True, force_apply=True)
 
         stop_deadline = time.time() + self.args.stop_timeout_s
         self.last_feedback_cmd = 0.0
+        self.last_feedback_signature = None
         while time.time() < stop_deadline:
             now = time.time()
+            self._check_module_worker()
             self._tick_relay(now)
             self._tick_telemetry(now)
             with self.live_lock:
@@ -1632,7 +2417,81 @@ class SingleModuleChargeRunner:
         except Exception:
             pass
 
+    def _cleanup(self) -> None:
+        self._set_phase("stopping")
+        self.stop_contract_started_at = time.time()
+        with self.live_lock:
+            self.stop_contract_baseline_power_delivery_stop_runtime_count = self.live.power_delivery_stop_runtime_count
+            self.stop_contract_baseline_welding_req_count = self.live.welding_req_count
+            self.stop_contract_baseline_welding_runtime_count = self.live.welding_runtime_count
+            self.stop_contract_baseline_session_stop_req_count = self.live.session_stop_req_count
+            self.stop_contract_baseline_client_session_done_count = self.live.client_session_done_count
+        self.last_feedback_cmd = 0.0
+        self.last_feedback_signature = None
+
+        graceful_complete = False
+        graceful_deadline = time.time() + self.args.stop_timeout_s
+        while time.time() < graceful_deadline:
+            now = time.time()
+            self._check_module_worker()
+            stage, target_v, requested_i = self._update_plan_from_stage()
+            self._tick_relay(now)
+            self._tick_module_output(now)
+            self._tick_telemetry(now)
+            self._tick_feedback(now, stage, target_v, requested_i, stop_notify=True)
+            self._tick_contract(now)
+            self._tick_progress(now, stage, False)
+            with self.live_lock:
+                done = self.live.stop_done
+                hlc_active = self.live.hlc_active
+                session_stop_req_count = self.live.session_stop_req_count
+                client_session_done_count = self.live.client_session_done_count
+            if done and self._relay_is_open():
+                graceful_complete = True
+                break
+            if (
+                client_session_done_count > self.stop_contract_baseline_client_session_done_count
+                and self._relay_is_open()
+            ):
+                graceful_complete = True
+                break
+            if (
+                session_stop_req_count > self.stop_contract_baseline_session_stop_req_count
+                and self._relay_is_open()
+                and (not hlc_active)
+            ):
+                graceful_complete = True
+                break
+            time.sleep(0.05)
+
+        self.stop_contract_started_at = None
+        if not graceful_complete:
+            self.notes.append("orderly stop contract timed out; forcing PLC stop")
+            self._cleanup_force_stop()
+            return
+
+        self.current_plan = ControlPlan(False, 0.0, 0.0)
+        self.desired_relay = False
+        self._publish_module_plan(force_refresh=True, force_apply=True)
+        try:
+            self._send_expect_ack(f"CTRL AUTH deny {self.args.auth_ttl_ms}", ACK_CMD_AUTH, timeout_s=2.0, retries=1)
+        except Exception:
+            pass
+        try:
+            self._send_expect_ack("CTRL SLAC disarm 3000", ACK_CMD_SLAC, timeout_s=2.0, retries=1)
+        except Exception:
+            pass
+        try:
+            self._send_expect_ack("CTRL FEEDBACK 1 0 0 0 0 0 0", ACK_CMD_FEEDBACK, timeout_s=2.0, retries=1)
+        except Exception:
+            pass
+        try:
+            self._set_relay(False, 0, require_ack=False)
+        except Exception:
+            pass
+
     def _write_summary(self, result: str) -> None:
+        snapshot = self._get_module_snapshot()
         payload = {
             "result": result,
             "phase": self.phase,
@@ -1641,6 +2500,10 @@ class SingleModuleChargeRunner:
             "failures": self.failures,
             "current_demand_started_at": self.current_demand_started_at,
             "current_demand_ready_since": self.current_demand_ready_since,
+            "charge_proof_since": self.charge_proof_since,
+            "charge_proof_peak_v": self.charge_proof_peak_v,
+            "charge_proof_peak_i": self.charge_proof_peak_i,
+            "charge_proof_peak_power_w": self.charge_proof_peak_power_w,
             "vehicle_stop_requested": self.vehicle_stop_requested,
             "vehicle_stop_reason": self.vehicle_stop_reason,
             "plc": {
@@ -1669,16 +2532,26 @@ class SingleModuleChargeRunner:
                 "target_i": self.live.target_i,
                 "fb_v": self.live.fb_v,
                 "fb_i": self.live.fb_i,
+                "power_delivery_req_count": self.live.power_delivery_req_count,
+                "welding_req_count": self.live.welding_req_count,
+                "session_stop_req_count": self.live.session_stop_req_count,
+                "power_delivery_stop_runtime_count": self.live.power_delivery_stop_runtime_count,
+                "welding_runtime_count": self.live.welding_runtime_count,
+                "session_stop_runtime_count": self.live.session_stop_runtime_count,
+                "client_session_done_count": self.live.client_session_done_count,
                 "relay1": self.live.relay_states.get(1),
             },
             "module": {
                 "address": self.home_module.address if self.home_module else None,
                 "group": self.home_module.group if self.home_module else None,
-                "rated_current_a": self.home_module.rated_current_a if self.home_module else None,
-                "status": module_status_text(self.home_module) if self.home_module else None,
-                "voltage_v": self.home_module.voltage_v if self.home_module else None,
-                "current_a": self.home_module.current_a if self.home_module else None,
-                "off": module_is_off(self.home_module) if self.home_module else None,
+                "rated_output_current_reg_a": snapshot.rated_output_current_reg_a,
+                "status": snapshot.status_text,
+                "voltage_v": snapshot.voltage_v,
+                "current_a": snapshot.current_a,
+                "current_limit_point": snapshot.current_limit_point,
+                "input_power_w": snapshot.input_power_w,
+                "input_mode": snapshot.input_mode,
+                "off": snapshot.off,
             },
         }
         ensure_parent(self.args.summary_file)
@@ -1707,18 +2580,24 @@ class SingleModuleChargeRunner:
             self.can.refresh(self.home_module, response_window_s=0.5)
             self.can.soft_reset(self.home_module, input_mode=self.args.input_mode)
             self.can.refresh(self.home_module, response_window_s=0.5)
+            with self.module_lock:
+                self._snapshot_module_locked()
             print(
                 f"[MODULE] addr={self.home_module.address} grp={self.home_module.group} "
                 f"rated={self.home_module.rated_current_a}A {module_status_text(self.home_module)}",
                 flush=True,
             )
+            self._start_module_worker()
 
             self._set_phase("wait_for_session")
             start_deadline = time.time() + self.args.session_start_timeout_s
             while True:
                 if self.vehicle_stop_requested:
-                    raise RuntimeError(f"vehicle requested stop before CurrentDemand: {self.vehicle_stop_reason}")
+                    if self.current_demand_started_at is None:
+                        raise RuntimeError(f"vehicle requested stop before CurrentDemand: {self.vehicle_stop_reason}")
+                    raise RuntimeError(f"vehicle requested stop after CurrentDemand: {self.vehicle_stop_reason}")
 
+                self._check_module_worker()
                 stage, target_v, requested_i = self._update_plan_from_stage()
                 now = time.time()
                 if self.current_demand_started_at is None and now >= start_deadline:
@@ -1731,19 +2610,24 @@ class SingleModuleChargeRunner:
                 self._tick_contract(now)
                 self._tick_progress(now, stage, ready)
 
-                if self._current_demand_ready(stage, ready):
+                if self._charge_success_reached(stage, ready):
                     result = "pass"
                     module_desc = (
                         f"module {self.home_module.address}/g{self.home_module.group}"
                         if self.home_module is not None
                         else "requested module"
                     )
-                    print(f"[PASS] sustained CurrentDemand reached with {module_desc}", flush=True)
+                    print(
+                        f"[PASS] sustained charging reached with {module_desc} "
+                        f"Vpk={self.charge_proof_peak_v:.1f} Ipk={self.charge_proof_peak_i:.1f} "
+                        f"Ppk={self.charge_proof_peak_power_w:.0f}",
+                        flush=True,
+                    )
                     break
                 time.sleep(0.01)
 
             if result != "pass":
-                self.failures.append("session never reached sustained CurrentDemand")
+                self.failures.append("session never reached sustained charging proof")
                 raise RuntimeError(self.failures[-1])
 
             try:
@@ -1761,6 +2645,7 @@ class SingleModuleChargeRunner:
                 self.notes.append(f"cleanup failed: {cleanup_exc}")
             return 1
         finally:
+            self._stop_module_worker()
             self._write_summary(result)
             self.can.close()
             self.link.close()
@@ -1776,8 +2661,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--plc-id", type=int, default=None)
     parser.add_argument("--controller-id", type=int, default=1)
     parser.add_argument("--power-relay", type=int, default=1)
-    parser.add_argument("--home-addr", type=int, default=1)
-    parser.add_argument("--home-group", type=int, default=1)
+    parser.add_argument("--home-addr", type=int, default=DEFAULT_HOME_ADDR)
+    parser.add_argument("--home-group", type=int, default=DEFAULT_HOME_GROUP)
     parser.add_argument("--input-mode", type=int, choices=(1, 2, 3), default=None)
     parser.add_argument("--can-iface", default="can0")
     parser.add_argument("--discovery-timeout-s", type=float, default=1.5)
@@ -1789,21 +2674,31 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--session-start-timeout-s", type=float, default=240.0)
     parser.add_argument("--b1-start-delay-s", type=float, default=0.6)
     parser.add_argument("--control-interval-s", type=float, default=0.10)
-    parser.add_argument("--feedback-interval-s", type=float, default=0.10)
-    parser.add_argument("--telemetry-interval-s", type=float, default=0.10)
+    parser.add_argument("--feedback-interval-s", type=float, default=0.02)
+    parser.add_argument("--active-feedback-keepalive-s", type=float, default=0.02)
+    parser.add_argument("--telemetry-interval-s", type=float, default=0.02)
     parser.add_argument("--telemetry-response-s", type=float, default=0.10)
     parser.add_argument("--status-interval-s", type=float, default=5.0)
-    parser.add_argument("--heartbeat-ms", type=int, default=1500)
-    parser.add_argument("--heartbeat-timeout-ms", type=int, default=6400)
-    parser.add_argument("--auth-ttl-ms", type=int, default=12000)
+    parser.add_argument("--heartbeat-ms", type=int, default=4000)
+    parser.add_argument("--heartbeat-timeout-ms", type=int, default=20000)
+    parser.add_argument("--auth-ttl-ms", type=int, default=25000)
     parser.add_argument("--arm-ms", type=int, default=45000)
-    parser.add_argument("--relay-hold-ms", type=int, default=15000)
-    parser.add_argument("--relay-refresh-s", type=float, default=3.0)
+    parser.add_argument("--relay-hold-ms", type=int, default=25000)
+    parser.add_argument("--relay-refresh-s", type=float, default=20.0)
+    parser.add_argument("--charge-success-min-voltage-v", type=float, default=100.0)
+    parser.add_argument("--charge-success-min-current-a", type=float, default=10.0)
+    parser.add_argument("--charge-success-min-power-w", type=float, default=1000.0)
     parser.add_argument("--feedback-voltage-tolerance-v", type=float, default=15.0)
     parser.add_argument("--precharge-ready-min-voltage-v", type=float, default=5.0)
     parser.add_argument("--precharge-ready-min-current-ratio", type=float, default=0.25)
     parser.add_argument("--current-demand-ready-min-voltage-v", type=float, default=0.1)
     parser.add_argument("--current-demand-ready-min-current-a", type=float, default=0.05)
+    parser.add_argument("--apply-current-demand-headroom", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--module-voltage-headroom-v", type=float, default=DEFAULT_MODULE_VOLTAGE_HEADROOM_V)
+    parser.add_argument("--module-current-headroom-a", type=float, default=DEFAULT_MODULE_CURRENT_HEADROOM_A)
+    parser.add_argument("--fake-welding", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--fake-welding-residual-v", type=float, default=DEFAULT_FAKE_WELDING_RESIDUAL_V)
+    parser.add_argument("--fake-welding-residual-count", type=int, default=1)
     parser.add_argument("--absolute-current-scale", type=float, default=1024.0)
     parser.add_argument("--stop-timeout-s", type=float, default=12.0)
     parser.add_argument(

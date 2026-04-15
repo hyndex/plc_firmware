@@ -180,6 +180,7 @@ constexpr uint32_t CP_STABLE_MS = 300;
 constexpr uint32_t CP_STATE_DEBOUNCE_MS = 80;
 constexpr uint32_t CP_DISCONNECT_DEBOUNCE_MS = 1200;
 constexpr uint32_t CP_CONNECTED_HOLD_MS = 1500;
+constexpr uint32_t CP_ACTIVE_SESSION_FAULT_HOLD_MS = 3000;
 // Keep the plc_firmware wrapper more tolerant than the shared cbslac core.
 // The inner FSM can wait 40 s for CM_SLAC_PARAM.REQ, so the outer watchdog
 // must not abort a healthy session first.
@@ -547,6 +548,10 @@ constexpr float PRECHARGE_START_ACCEPT_MIN_RATIO = 0.05f;
 constexpr float PRECHARGE_START_ACCEPT_MIN_V = 5.0f;
 constexpr float PRECHARGE_START_ACCEPT_MIN_CURRENT_A = 0.50f;
 constexpr float CURRENT_DEMAND_ZERO_REQUEST_READY_DECAY_MAX_A = 4.0f;
+constexpr float CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_MAX_A = 4.0f;
+constexpr float CURRENT_DEMAND_LOW_REQUEST_READY_OVERSHOOT_MAX_A = 4.0f;
+constexpr float CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_TRIGGER_DELTA_A = 5.0f;
+constexpr uint32_t CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_GRACE_MS = 1800u;
 constexpr uint32_t PRECHARGE_RELAX_MIN_COUNT = 2u;
 constexpr float STANDALONE_DELIVERY_RECOVERY_MIN_VOLTAGE_RATIO = 0.90f;
 constexpr float STANDALONE_DELIVERY_RECOVERY_VOLTAGE_MARGIN_V = 8.0f;
@@ -565,7 +570,13 @@ constexpr uint8_t STANDALONE_FAKE_WELDING_RESIDUAL_RESPONSES = 1u;
 constexpr uint32_t CABLE_CHECK_MONITOR_MIN_MS = 350u;
 constexpr uint32_t PRECHARGE_POST_TARGET_SAMPLE_TIMEOUT_MS = 600u;
 constexpr uint32_t POWER_DELIVERY_CONVERGENCE_WAIT_MS = 700u;
-constexpr uint32_t CONTROLLER_FEEDBACK_POST_TARGET_WAIT_MS = 20u;
+// External-controller mode depends on a host feedback sample that lands after
+// the latest CurrentDemand / PreCharge target has been applied. A 20 ms wait
+// was shorter than both the Linux controller tick (50 ms) and the proven
+// Python harness feedback cadence (100 ms), so the PLC routinely replied from
+// the previous host sample. Hold long enough to catch the next host update
+// while still staying well below the HLC response budget.
+constexpr uint32_t CONTROLLER_FEEDBACK_POST_TARGET_WAIT_MS = 120u;
 constexpr uint32_t HLC_UNEXPECTED_DISCONNECT_HOLD_MS = 10000u;
 constexpr float POST_SESSION_RESTART_SAFE_VOLTAGE_V = 60.0f;
 constexpr uint32_t POST_SESSION_RESTART_MIN_HOLD_MS = 1000u;
@@ -2560,6 +2571,7 @@ char g_cp_state_candidate = 'A';
 uint32_t g_cp_candidate_since_ms = 0;
 uint32_t g_cp_connected_since_ms = 0;
 uint32_t g_cp_last_seen_connected_ms = 0;
+uint32_t g_cp_last_digital_activity_ms = 0;
 uint32_t g_cp_pwm_ready_since_ms = 0;
 uint32_t g_cp_next_spike_log_ms = 0;
 uint32_t g_hlc_disconnect_hold_until_ms = 0;
@@ -2608,11 +2620,13 @@ typedef struct {
     bool delivery_recovery_attempted;
     StandaloneDeliveryRecoveryPhase delivery_recovery_phase;
     uint32_t precharge_count;
+    uint32_t current_demand_low_request_rundown_until_ms;
     uint32_t cable_check_started_ms;
     uint32_t delivery_recovery_started_ms;
     uint32_t output_limit_shortfall_since_ms;
     uint8_t sa_schedule_tuple_id;
     float delivery_recovery_target_v;
+    float last_current_demand_request_i;
     float output_limit_target_v;
     float output_limit_target_i;
     float negotiated_ev_max_v;
@@ -3813,6 +3827,47 @@ bool current_demand_current_ready_for_response(float requested_i,
     return current_ready_safe && current_converged;
 }
 
+bool current_demand_low_request_rundown_expected(float requested_i) {
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    return target_i > 0.05f && target_i <= CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_MAX_A;
+}
+
+void current_demand_update_low_request_rundown(HlcAppContext* ctx, float requested_i, uint32_t now_ms) {
+    if (!ctx) return;
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    const float previous_i =
+        std::isfinite(ctx->last_current_demand_request_i) ? std::max(0.0f, ctx->last_current_demand_request_i) : 0.0f;
+    if (current_demand_low_request_rundown_expected(target_i)) {
+        const float trigger_delta = std::max(CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_TRIGGER_DELTA_A, target_i * 2.0f);
+        if (previous_i > (target_i + trigger_delta)) {
+            ctx->current_demand_low_request_rundown_until_ms = now_ms + CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_GRACE_MS;
+        }
+    } else {
+        ctx->current_demand_low_request_rundown_until_ms = 0u;
+    }
+    ctx->last_current_demand_request_i = target_i;
+}
+
+bool current_demand_low_request_rundown_active(const HlcAppContext* ctx,
+                                               float requested_i,
+                                               float present_i,
+                                               uint32_t now_ms) {
+    if (!ctx || !current_demand_low_request_rundown_expected(requested_i)) {
+        return false;
+    }
+    if (ctx->current_demand_low_request_rundown_until_ms == 0u ||
+        static_cast<int32_t>(ctx->current_demand_low_request_rundown_until_ms - now_ms) <= 0) {
+        return false;
+    }
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    const float measured_i = std::isfinite(present_i) ? std::max(0.0f, present_i) : 0.0f;
+    // Allow a bounded residual-current rundown for small EV requests after a
+    // large step-down, but do not keep reporting EVSE_Ready while the current
+    // is still far above the requested low-current plateau.
+    return measured_i >= target_i &&
+           measured_i <= (target_i + CURRENT_DEMAND_LOW_REQUEST_READY_OVERSHOOT_MAX_A);
+}
+
 bool current_demand_voltage_ready_safe(float requested_v, float applied_v, float present_v) {
     float target_v = std::isfinite(applied_v) ? std::max(0.0f, applied_v) : 0.0f;
     if (target_v < 50.0f) {
@@ -3827,7 +3882,8 @@ bool current_demand_voltage_ready_safe(float requested_v, float applied_v, float
 }
 
 enum class EvseIsolationAssessment : uint8_t {
-    Invalid = 0,
+    Unavailable = 0,
+    Invalid,
     Valid,
     Warning,
     Fault,
@@ -3835,6 +3891,7 @@ enum class EvseIsolationAssessment : uint8_t {
 
 const char* evse_isolation_assessment_name(EvseIsolationAssessment assessment) {
     switch (assessment) {
+        case EvseIsolationAssessment::Unavailable: return "unavailable";
         case EvseIsolationAssessment::Valid: return "valid";
         case EvseIsolationAssessment::Warning: return "warning";
         case EvseIsolationAssessment::Fault: return "fault";
@@ -3843,6 +3900,30 @@ const char* evse_isolation_assessment_name(EvseIsolationAssessment assessment) {
 }
 
 EvseIsolationAssessment best_effort_evse_isolation_assessment(uint32_t now_ms) {
+    if (!mode_uses_plc_module_manager()) {
+        if (!mode_controller_uses_external_feedback()) {
+            return EvseIsolationAssessment::Unavailable;
+        }
+
+        const bool active_power_session =
+            cp_connected(g_cp_state) &&
+            (g_hlc_active || g_hlc_ctx.precharge_seen || g_relay1_closed || g_session_started);
+        if (!active_power_session) {
+            return EvseIsolationAssessment::Unavailable;
+        }
+        if (g_emergency_stop_active || g_ctrl.stop_hard) {
+            return EvseIsolationAssessment::Fault;
+        }
+
+        const ControllerManagedFeedbackState fb = controller_feedback_snapshot();
+        if (!fb.seen) {
+            return EvseIsolationAssessment::Invalid;
+        }
+        if (!controller_feedback_fresh(now_ms, fb) || !fb.valid) {
+            return EvseIsolationAssessment::Warning;
+        }
+        return EvseIsolationAssessment::Valid;
+    }
     if (!g_module_ready) {
         return EvseIsolationAssessment::Invalid;
     }
@@ -3996,6 +4077,43 @@ bool standalone_relaxed_handoff_ready(HlcAppContext* ctx,
     // current. Requiring full voltage convergence in that case leaves
     // standalone mode stuck in the precharge-current hold even though the
     // vehicle has already advanced the session.
+    const bool strong_single_sample_ready =
+        ctx->precharge_count >= 1u && present_i >= (PRECHARGE_CURRENT_LIMIT_A * 0.75f);
+    return current_flow_visible && present_v >= accept_floor_v &&
+           (multi_sample_ready || strong_single_sample_ready);
+}
+
+bool controller_relaxed_handoff_ready(HlcAppContext* ctx,
+                                      float requested_v,
+                                      const ControllerManagedFeedbackState& fb,
+                                      float* out_present_v,
+                                      float* out_present_i,
+                                      float* out_accept_floor_v) {
+    if (!ctx || !mode_controller_uses_external_feedback()) {
+        return false;
+    }
+    if (!ctx->precharge_seen || !g_relay1_closed || !fb.valid) {
+        return false;
+    }
+
+    const float present_v =
+        (std::isfinite(fb.present_voltage_v) && fb.present_voltage_v > 0.0f) ? fb.present_voltage_v : 0.0f;
+    const float present_i =
+        (std::isfinite(fb.present_current_a) && fb.present_current_a > 0.0f) ? fb.present_current_a : 0.0f;
+    if (out_present_v) *out_present_v = present_v;
+    if (out_present_i) *out_present_i = present_i;
+
+    if (precharge_voltage_converged(requested_v, present_v)) {
+        if (out_accept_floor_v) *out_accept_floor_v = 0.0f;
+        return false;
+    }
+
+    const float target_v = std::isfinite(requested_v) ? std::max(0.0f, requested_v) : 0.0f;
+    const float accept_floor_v = std::max(PRECHARGE_START_ACCEPT_MIN_V, target_v * PRECHARGE_START_ACCEPT_MIN_RATIO);
+    if (out_accept_floor_v) *out_accept_floor_v = accept_floor_v;
+
+    const bool current_flow_visible = present_i >= PRECHARGE_START_ACCEPT_MIN_CURRENT_A;
+    const bool multi_sample_ready = ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT;
     const bool strong_single_sample_ready =
         ctx->precharge_count >= 1u && present_i >= (PRECHARGE_CURRENT_LIMIT_A * 0.75f);
     return current_flow_visible && present_v >= accept_floor_v &&
@@ -4421,6 +4539,18 @@ bool hlc_disconnect_hold_power_path_active() {
            sane_non_negative(g_last_measured_i) >= 0.5f;
 }
 
+bool hlc_zero_current_tail_disconnect_expected() {
+    const float requested_i = sane_non_negative(g_last_bms_requested_i);
+    const float measured_i = sane_non_negative(g_last_measured_i);
+    return g_hlc_ctx.precharge_seen &&
+           g_hlc_ctx.power_delivery_enabled &&
+           g_last_bms_valid &&
+           g_last_bms_hlc_stage == 2u &&
+           requested_i <= 0.05f &&
+           measured_i <= CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_MAX_A &&
+           cp_connected(g_cp_state);
+}
+
 bool standalone_disconnect_hold_active(uint32_t now_ms) {
     if (g_hlc_disconnect_hold_until_ms == 0u) {
         return false;
@@ -4598,6 +4728,9 @@ void set_din_physical_scaled(din_PhysicalValueType* pv, din_unitSymbolType unit,
 void apply_iso_isolation_status(iso2_DC_EVSEStatusType* st, EvseIsolationAssessment assessment) {
     if (!st) return;
     switch (assessment) {
+        case EvseIsolationAssessment::Unavailable:
+            st->EVSEIsolationStatus_isUsed = 0;
+            break;
         case EvseIsolationAssessment::Invalid:
             st->EVSEIsolationStatus = iso2_isolationLevelType_Invalid;
             st->EVSEIsolationStatus_isUsed = 1;
@@ -4623,6 +4756,9 @@ void apply_iso_isolation_status(iso2_DC_EVSEStatusType* st, EvseIsolationAssessm
 void apply_din_isolation_status(din_DC_EVSEStatusType* st, EvseIsolationAssessment assessment) {
     if (!st) return;
     switch (assessment) {
+        case EvseIsolationAssessment::Unavailable:
+            st->EVSEIsolationStatus_isUsed = 0;
+            break;
         case EvseIsolationAssessment::Invalid:
             st->EVSEIsolationStatus = din_isolationLevelType_Invalid;
             st->EVSEIsolationStatus_isUsed = 1;
@@ -5303,6 +5439,44 @@ bool wait_for_precharge_convergence(float requested_v,
     }
 }
 
+bool wait_for_controller_precharge_convergence(float requested_v,
+                                               uint32_t timeout_ms,
+                                               ControllerManagedFeedbackState* out_fb,
+                                               bool* out_fresh_after_wait) {
+    const uint32_t started_ms = millis();
+    const ControllerManagedFeedbackState baseline_feedback = controller_feedback_snapshot();
+    const uint32_t baseline_feedback_ms = baseline_feedback.last_update_ms;
+    ControllerManagedFeedbackState fb{};
+    bool fresh_after_wait = false;
+    for (;;) {
+        fb = controller_feedback_snapshot();
+        const uint32_t now_ms = millis();
+        fresh_after_wait = fb.seen && fb.last_update_ms != 0u && fb.last_update_ms > baseline_feedback_ms;
+        const bool feedback_ready = controller_feedback_fresh(now_ms, fb) && fb.valid;
+        const float present_v =
+            (std::isfinite(fb.present_voltage_v) && fb.present_voltage_v > 0.0f) ? fb.present_voltage_v : 0.0f;
+        if (feedback_ready && precharge_voltage_converged(requested_v, present_v)) {
+            if (out_fb) {
+                *out_fb = fb;
+            }
+            if (out_fresh_after_wait) {
+                *out_fresh_after_wait = fresh_after_wait;
+            }
+            return true;
+        }
+        if ((now_ms - started_ms) >= timeout_ms) {
+            if (out_fb) {
+                *out_fb = fb;
+            }
+            if (out_fresh_after_wait) {
+                *out_fresh_after_wait = fresh_after_wait;
+            }
+            return false;
+        }
+        delay(CURRENT_DEMAND_FRESH_SAMPLE_POLL_MS);
+    }
+}
+
 bool snapshot_post_target_controller_feedback(uint32_t baseline_feedback_ms,
                                               ControllerManagedFeedbackState* out_fb,
                                               bool* out_fresh_after_target) {
@@ -5713,6 +5887,8 @@ const char* hlc_message_type_name(jpv2g_message_type_t type) {
 
 void log_hlc_request(jpv2g_message_type_t type, const jpv2g_secc_request_t* req) {
     if (!req) return;
+    g_cp_last_digital_activity_ms = millis();
+    bool allow_quiet_window_bypass = false;
     if (mode_controller_uses_external_feedback()) {
         static uint32_t s_last_precharge_req_log_ms = 0u;
         static uint32_t s_last_power_delivery_req_log_ms = 0u;
@@ -5739,9 +5915,23 @@ void log_hlc_request(jpv2g_message_type_t type, const jpv2g_secc_request_t* req)
             }
             *last_log_ms = now_ms;
         }
+        switch (type) {
+            case JPV2G_SESSION_SETUP_REQ:
+            case JPV2G_AUTHORIZATION_REQ:
+            case JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ:
+            case JPV2G_PRE_CHARGE_REQ:
+            case JPV2G_POWER_DELIVERY_REQ:
+            case JPV2G_CURRENT_DEMAND_REQ:
+            case JPV2G_WELDING_DETECTION_REQ:
+            case JPV2G_SESSION_STOP_REQ:
+                allow_quiet_window_bypass = true;
+                break;
+            default:
+                break;
+        }
     }
     const char* protocol = hlc_protocol_name(req->protocol);
-    if (controller_serial_quiet_window()) {
+    if (controller_serial_quiet_window() && !allow_quiet_window_bypass) {
         return;
     }
     if (!req->body) {
@@ -8977,11 +9167,13 @@ void hlc_reset_session_state(HlcAppContext* ctx) {
     ctx->delivery_recovery_attempted = false;
     ctx->delivery_recovery_phase = StandaloneDeliveryRecoveryPhase::Idle;
     ctx->precharge_count = 0;
+    ctx->current_demand_low_request_rundown_until_ms = 0u;
     ctx->cable_check_started_ms = 0u;
     ctx->delivery_recovery_started_ms = 0u;
     ctx->output_limit_shortfall_since_ms = 0u;
     ctx->sa_schedule_tuple_id = 1u;
     ctx->delivery_recovery_target_v = 0.0f;
+    ctx->last_current_demand_request_i = 0.0f;
     ctx->output_limit_target_v = 0.0f;
     ctx->output_limit_target_i = 0.0f;
     ctx->negotiated_ev_max_v = 0.0f;
@@ -9166,6 +9358,18 @@ int hlc_handle_charge_parameter_discovery(HlcAppContext* ctx,
                                                  sane_non_negative(ctx->negotiated_ev_max_i) <= 0.1f)
                                                     ? "default"
                                                     : "custom"),
+                          limits.max_voltage_v,
+                          limits.max_current_a,
+                          limits.max_power_kw,
+                          sane_non_negative(ctx->negotiated_ev_max_v),
+                          sane_non_negative(ctx->negotiated_ev_max_i));
+        } else if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
+            const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+            Serial.printf("[HLC] {\"msg\":\"ChargeParameterDiscoveryRes\",\"protocol\":\"iso2\","
+                          "\"rc\":%d,\"bytes\":%u,\"mode\":\"custom\",\"maxV\":%.1f,\"maxI\":%.1f,\"maxP\":%.1f,"
+                          "\"negotiatedMaxV\":%.1f,\"negotiatedMaxI\":%.1f}\n",
+                          rc,
+                          written ? static_cast<unsigned>(*written) : 0u,
                           limits.max_voltage_v,
                           limits.max_current_a,
                           limits.max_power_kw,
@@ -9422,23 +9626,35 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         ControllerManagedFeedbackState fb{};
         bool fresh_after_target = false;
         const bool fb_ok = snapshot_post_target_controller_feedback(baseline_feedback_ms, &fb, &fresh_after_target);
+        const uint32_t feedback_now_ms = millis();
         const bool stop_charging = fb_ok && fb.stop_charging;
+        const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
         const float present_v_fb = fb_ok ? sane_non_negative(fb.present_voltage_v) : sane_non_negative(g_last_measured_v);
         const float present_i_fb = fb_ok ? sane_non_negative(fb.present_current_a) : 0.0f;
         const bool delivery_active = allow_energy && ctx->power_delivery_enabled && g_relay1_closed;
         const bool current_converged = current_demand_current_converged(requested_i, present_i_fb);
         const bool current_ready_safe = current_demand_current_ready_safe(requested_i, present_i_fb);
+        current_demand_update_low_request_rundown(ctx, requested_i, feedback_now_ms);
+        const bool current_rundown_active =
+            current_demand_low_request_rundown_active(ctx, requested_i, present_i_fb, feedback_now_ms);
+        // Match the standalone CurrentDemand readiness contract here too. On
+        // the live ISO2 vehicle, keeping controller mode in EVSE_NotReady
+        // through the normal ramp-in window causes the EV to back off moments
+        // later even though the applied current, limits, and headroom are all
+        // otherwise truthful.
         const bool response_current_ready =
-            current_demand_current_ready_for_response(requested_i, current_ready_safe, current_converged, true);
-        // Match the standalone CurrentDemand contract. The standalone path does
-        // not wait for a second, externally derived "ready" latch once
-        // PowerDelivery is armed; it answers from the freshest valid power-path
-        // telemetry immediately. In controller mode, waiting for the host's
-        // fb.ready bit adds an avoidable one-feedback delay. Still, only report
-        // EVSE_Ready once the requested current has actually converged, and do
-        // not report Ready while the measured current materially overshoots the
-        // EV request during a downward ramp or stop tail.
-        const bool response_ready = delivery_active && fb_ok && response_current_ready;
+            current_demand_current_ready_for_response(requested_i, current_ready_safe, current_converged, false) ||
+            current_rundown_active;
+        const bool voltage_ready_safe = current_demand_voltage_ready_safe(requested_v, requested_v, present_v_fb);
+        // Wait briefly for post-target feedback, but do not require the sample
+        // to be newer than the request-local baseline once the bounded wait has
+        // expired. On the live bench the controller path can legitimately keep
+        // reporting a truthful, safe feedback sample across the ramp while the
+        // baseline-relative freshness bit is still false for this cycle.
+        // Guard the step-down overshoot case with the current/voltage-safe
+        // checks instead of stalling the whole CurrentDemand loop on freshness.
+        const bool response_ready =
+            delivery_active && fb_ok && response_current_ready && voltage_ready_safe;
         if (!allow_energy && !mode_controller_has_final_decision()) {
             request_modules_off("CurrentDemandBlocked");
             (void)relay1_set(false, "CurrentDemandBlocked");
@@ -9460,7 +9676,8 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         if (!fb_ok && present_v <= 0.1f) {
             present_v = snapshot_present_group_voltage_v();
         }
-        const uint32_t fb_age_ms = (fb_ok && now_ms >= fb.last_update_ms) ? (now_ms - fb.last_update_ms) : UINT32_MAX;
+        const uint32_t fb_age_ms =
+            (fb_ok && feedback_now_ms >= fb.last_update_ms) ? (feedback_now_ms - fb.last_update_ms) : UINT32_MAX;
         const float response_i =
             (req->protocol == JPV2G_PROTOCOL_DIN70121)
                 ? din_present_current_response_a(present_i,
@@ -9477,14 +9694,16 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         const bool quiet_window = controller_serial_quiet_window();
         const bool log_due =
             s_last_ctrl_current_demand_log_ms == 0u ||
-            static_cast<uint32_t>(now_ms - s_last_ctrl_current_demand_log_ms) >= 1000u ||
+            static_cast<uint32_t>(feedback_now_ms - s_last_ctrl_current_demand_log_ms) >= 1000u ||
             (!quiet_window && (!response_ready || fb_age_ms >= 200u || !fresh_after_target));
         if (log_due) {
-            s_last_ctrl_current_demand_log_ms = now_ms;
+            s_last_ctrl_current_demand_log_ms = feedback_now_ms;
             Serial.printf("[HLC] {\"msg\":\"CtrlCurrentDemandRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"allow\":%d,"
                           "\"ready\":%d,\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d,"
                           "\"fbValid\":%d,\"fbFresh\":%d,\"fbAgeMs\":%lu,\"sampleFresh\":%d,\"deliveryArmed\":%d,"
-                          "\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,\"currSafe\":%d,\"currConv\":%d}\n",
+                          "\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,\"currSafe\":%d,\"currConv\":%d,"
+                          "\"rundown\":%d,"
+                          "\"voltSafe\":%d,\"maxV\":%.1f,\"maxI\":%.1f,\"maxP\":%.1f}\n",
                           requested_v,
                           requested_i,
                           allow_energy ? 1 : 0,
@@ -9494,7 +9713,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
                           g_relay1_closed ? 1 : 0,
                           ctx->precharge_converged ? 1 : 0,
                           fb_ok && fb.valid ? 1 : 0,
-                          controller_feedback_fresh(now_ms, fb) ? 1 : 0,
+                          controller_feedback_fresh(feedback_now_ms, fb) ? 1 : 0,
                           static_cast<unsigned long>(fb_age_ms),
                           fresh_after_target ? 1 : 0,
                           delivery_active ? 1 : 0,
@@ -9502,7 +9721,12 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
                           voltage_limited ? 1 : 0,
                           power_limited ? 1 : 0,
                           current_ready_safe ? 1 : 0,
-                          current_converged ? 1 : 0);
+                          current_converged ? 1 : 0,
+                          current_rundown_active ? 1 : 0,
+                          voltage_ready_safe ? 1 : 0,
+                          limits.max_voltage_v,
+                          limits.max_current_a,
+                          limits.max_power_kw);
         }
         const uint8_t* sid = ctx->secc->session_id;
         if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
@@ -9524,6 +9748,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
             res.EVSECurrentLimitAchieved = current_limited ? 1 : 0;
             res.EVSEVoltageLimitAchieved = voltage_limited ? 1 : 0;
             res.EVSEPowerLimitAchieved = power_limited ? 1 : 0;
+            fill_iso_current_demand_limits(&res, limits.max_voltage_v, limits.max_current_a, limits.max_power_kw);
             fill_iso_meter_info_real(&res.MeterInfo);
             res.MeterInfo_isUsed = 1;
             res.EVSEID.charactersLen = copy_iso_evse_id(res.EVSEID.characters);
@@ -9556,6 +9781,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
             res.EVSECurrentLimitAchieved = current_limited ? 1 : 0;
             res.EVSEVoltageLimitAchieved = voltage_limited ? 1 : 0;
             res.EVSEPowerLimitAchieved = power_limited ? 1 : 0;
+            fill_din_current_demand_limits(&res, limits.max_voltage_v, limits.max_current_a, limits.max_power_kw);
             return jpv2g_cbv2g_encode_din_current_demand_res(
                 sid,
                 din_responseCodeType_OK,
@@ -9677,8 +9903,12 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     const bool meter_recent = meter_sample_recent(response_sample_ms, CURRENT_DEMAND_RESPONSE_TELEMETRY_MAX_AGE_MS);
     const bool current_converged = current_demand_current_converged(requested_i, present_i);
     const bool current_ready_safe = current_demand_current_ready_safe(requested_i, present_i);
+    current_demand_update_low_request_rundown(ctx, requested_i, now_ms);
+    const bool current_rundown_active =
+        current_demand_low_request_rundown_active(ctx, requested_i, present_i, now_ms);
     const bool response_current_ready =
-        current_demand_current_ready_for_response(requested_i, current_ready_safe, current_converged, false);
+        current_demand_current_ready_for_response(requested_i, current_ready_safe, current_converged, false) ||
+        current_rundown_active;
     const bool voltage_ready_safe = current_demand_voltage_ready_safe(requested_v, g_last_module_target_v, present_v);
     // During active CurrentDemand the EV expects the EVSE to keep processing
     // rapid request updates and report the physically applied values. Requiring
@@ -9741,7 +9971,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     Serial.printf("[HLC] {\"msg\":\"CurrentDemandRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"appliedV\":%.1f,"
                   "\"appliedI\":%.2f,\"allow\":%d,\"delivery\":%d,\"targetApplied\":%d,\"ready\":%d,\"hold\":%d,\"stopCharging\":%d,"
                   "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d,\"telemetryValid\":%d,"
-                  "\"sampleFresh\":%d,\"telemetryRecent\":%d,\"meterRecent\":%d,\"currSafe\":%d,\"currConv\":%d,\"voltSafe\":%d,\"shortfall\":%d,\"saturated\":%d,\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,"
+                  "\"sampleFresh\":%d,\"telemetryRecent\":%d,\"meterRecent\":%d,\"currSafe\":%d,\"currConv\":%d,\"rundown\":%d,\"voltSafe\":%d,\"shortfall\":%d,\"saturated\":%d,\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,"
                   "\"availI\":%.1f,\"availP\":%.1f}\n",
                   requested_v,
                   requested_i,
@@ -9763,6 +9993,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
                   meter_recent ? 1 : 0,
                   current_ready_safe ? 1 : 0,
                   current_converged ? 1 : 0,
+                  current_rundown_active ? 1 : 0,
                   voltage_ready_safe ? 1 : 0,
                   sustained_output_shortfall ? 1 : 0,
                   st.saturated ? 1 : 0,
@@ -9897,9 +10128,9 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
             const bool fb_ok = controller_get_managed_feedback(now_ms, &fb);
             const float requested_v = sane_non_negative(g_last_requested_target_v);
             const bool controller_path_armed = allow_energy && ctx->precharge_seen && g_relay1_closed && fb_ok;
-            const bool controller_precharge_ready =
-                controller_path_armed && (fb.ready || controller_precharge_start_ready(ctx, requested_v, fb));
             if (!ctx->precharge_converged) {
+                const bool controller_precharge_ready =
+                    controller_path_armed && controller_precharge_start_ready(ctx, requested_v, fb);
                 if (controller_precharge_ready) {
                     if (!controller_serial_quiet_window()) {
                         Serial.printf("[HLC] {\"msg\":\"CtrlPowerDeliveryArmedStart\",\"targetV\":%.1f,"
@@ -9914,22 +10145,50 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
                                       sane_non_negative(fb.present_current_a));
                     }
                     ctx->precharge_converged = true;
-                } else if (controller_path_armed && ctx->precharge_count >= PRECHARGE_RELAX_MIN_COUNT) {
-                    Serial.printf("[HLC] {\"msg\":\"CtrlPowerDeliveryRelaxedStart\",\"targetV\":%.1f,"
-                                  "\"relay1\":%d,\"fbValid\":%d,\"fbFresh\":%d,\"prechargeCount\":%lu,"
-                                  "\"presentV\":%.1f,\"presentI\":%.2f}\n",
-                                  requested_v,
-                                  g_relay1_closed ? 1 : 0,
-                                  fb.valid ? 1 : 0,
-                                  controller_feedback_fresh(now_ms) ? 1 : 0,
-                                  static_cast<unsigned long>(ctx->precharge_count),
-                                  sane_non_negative(fb.present_voltage_v),
-                                  sane_non_negative(fb.present_current_a));
-                    ctx->precharge_converged = true;
+                } else if (controller_path_armed) {
+                    float handoff_v = 0.0f;
+                    float handoff_i = 0.0f;
+                    float accept_floor_v = 0.0f;
+                    if (controller_relaxed_handoff_ready(
+                            ctx, requested_v, fb, &handoff_v, &handoff_i, &accept_floor_v)) {
+                        Serial.printf("[HLC] {\"msg\":\"CtrlPowerDeliveryRelaxedStart\",\"targetV\":%.1f,"
+                                      "\"relay1\":%d,\"fbValid\":%d,\"fbFresh\":%d,\"prechargeCount\":%lu,"
+                                      "\"presentV\":%.1f,\"presentI\":%.2f,\"acceptFloorV\":%.1f}\n",
+                                      requested_v,
+                                      g_relay1_closed ? 1 : 0,
+                                      fb.valid ? 1 : 0,
+                                      controller_feedback_fresh(now_ms, fb) ? 1 : 0,
+                                      static_cast<unsigned long>(ctx->precharge_count),
+                                      handoff_v,
+                                      handoff_i,
+                                      accept_floor_v);
+                        ctx->precharge_converged = true;
+                    }
                 }
             }
             ready = allow_energy && ctx->precharge_seen && ctx->precharge_converged && g_relay1_closed;
-            if (!ready) {
+            if (ready) {
+                ControllerManagedFeedbackState wait_fb{};
+                bool fresh_after_wait = false;
+                const bool converged = wait_for_controller_precharge_convergence(
+                    requested_v,
+                    POWER_DELIVERY_CONVERGENCE_WAIT_MS,
+                    &wait_fb,
+                    &fresh_after_wait);
+                Serial.printf("[HLC] {\"msg\":\"CtrlPowerDeliveryStartWait\",\"targetV\":%.1f,"
+                              "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"fresh\":%d,"
+                              "\"converged\":%d}\n",
+                              requested_v,
+                              sane_non_negative(wait_fb.present_voltage_v),
+                              sane_non_negative(wait_fb.present_current_a),
+                              g_relay1_closed ? 1 : 0,
+                              fresh_after_wait ? 1 : 0,
+                              converged ? 1 : 0);
+                // Mirror the standalone PowerDelivery contract: once the
+                // relay is closed and the handoff window has been observed,
+                // answer ready and let CurrentDemand report the live V/I.
+                ready = g_relay1_closed;
+            } else {
                 Serial.printf("[HLC] {\"msg\":\"CtrlPowerDeliveryWaiting\",\"targetV\":%.1f,"
                               "\"relay1\":%d,\"fbValid\":%d,\"fbReady\":%d,\"fbFresh\":%d,"
                               "\"prechargeDone\":%d,\"presentV\":%.1f,\"presentI\":%.2f}\n",
@@ -9937,7 +10196,7 @@ int hlc_handle_power_delivery(HlcAppContext* ctx,
                               g_relay1_closed ? 1 : 0,
                               fb.valid ? 1 : 0,
                               fb.ready ? 1 : 0,
-                              controller_feedback_fresh(now_ms) ? 1 : 0,
+                              controller_feedback_fresh(now_ms, fb) ? 1 : 0,
                               ctx->precharge_converged ? 1 : 0,
                               sane_non_negative(fb.present_voltage_v),
                               sane_non_negative(fb.present_current_a));
@@ -10279,9 +10538,10 @@ void hlc_worker_task_main(void* arg) {
         jpv2g_socket_close(client_fd);
 
         const uint32_t done_ms = millis();
+        const bool expected_zero_current_disconnect = hlc_zero_current_tail_disconnect_expected();
         const bool unexpected_disconnect_hold =
             !mode_controller_has_final_decision() && !g_ctrl.stop_active && !g_hlc_ctx.stop_requested &&
-            cp_connected(g_cp_state) &&
+            !expected_zero_current_disconnect && cp_connected(g_cp_state) &&
             hlc_disconnect_hold_power_path_active();
         if (unexpected_disconnect_hold) {
             g_hlc_disconnect_hold_until_ms = done_ms + HLC_UNEXPECTED_DISCONNECT_HOLD_MS;
@@ -10295,6 +10555,15 @@ void hlc_worker_task_main(void* arg) {
                           g_hlc_ctx.power_delivery_enabled ? 1 : 0,
                           sane_non_negative(g_last_measured_i));
         } else {
+            if (expected_zero_current_disconnect) {
+                Serial.printf("[HLC] zero-current tail disconnect treated as orderly session end"
+                              " (cp=%c relay1=%d moduleOn=%d reqI=%.2f measI=%.2f)\n",
+                              g_cp_state,
+                              g_relay1_closed ? 1 : 0,
+                              g_module_output_enabled ? 1 : 0,
+                              sane_non_negative(g_last_bms_requested_i),
+                              sane_non_negative(g_last_measured_i));
+            }
             g_hlc_ctx.precharge_converged = false;
             g_hlc_ctx.power_delivery_enabled = false;
             g_hlc_ctx.stop_requested = false;
@@ -10709,6 +10978,7 @@ void stop_session(uint32_t now_ms) {
     g_last_fsm_state = slac::evse::State::Reset;
     g_last_ev_soc_pct = -1;
     g_last_seen_ev_mac_valid = false;
+    g_cp_last_digital_activity_ms = 0u;
     clear_last_bms_request();
     reset_session_measurements();
     if (should_reprime) {
@@ -10896,18 +11166,40 @@ void process_cp_and_fsm(uint32_t now_ms) {
     }
     char filtered_cp_state = raw_cp_state;
     const bool was_connected_state = cp_connected(g_cp_state);
+    // Once HLC / power path activity is live, anchor transient CP fault hold to
+    // whichever signal was seen most recently: analog CP or digital session traffic.
+    const bool session_active_for_fault_hold =
+        g_session_started || g_hlc_active || g_hlc_ready || g_relay1_closed || g_module_output_enabled;
+    const bool active_session_fault_hold =
+        was_connected_state && session_active_for_fault_hold && raw_cp_state != 'A' && !cp_connected(raw_cp_state);
     if (was_connected_state && !cp_connected(raw_cp_state) && g_cp_last_seen_connected_ms != 0) {
+        const uint32_t hold_anchor_ms =
+            session_active_for_fault_hold
+                ? std::max(g_cp_last_seen_connected_ms, g_cp_last_digital_activity_ms)
+                : g_cp_last_seen_connected_ms;
+        const uint32_t hold_ms =
+            active_session_fault_hold ? CP_ACTIVE_SESSION_FAULT_HOLD_MS : CP_CONNECTED_HOLD_MS;
         const bool within_hold =
-            static_cast<int32_t>(now_ms - g_cp_last_seen_connected_ms) <= static_cast<int32_t>(CP_CONNECTED_HOLD_MS);
+            hold_anchor_ms != 0u &&
+            static_cast<int32_t>(now_ms - hold_anchor_ms) <= static_cast<int32_t>(hold_ms);
         if (within_hold) {
             filtered_cp_state = g_cp_state;
-            if (raw_cp_state == 'A' &&
+            if ((raw_cp_state == 'A' || active_session_fault_hold) &&
                 (g_cp_next_spike_log_ms == 0 || static_cast<int32_t>(now_ms - g_cp_next_spike_log_ms) >= 0)) {
-                Serial.printf("[CP] hold A-disconnect spike raw=%c stable=%c mv=%d hold_ms=%lu\n",
+                const char* hold_anchor =
+                    (session_active_for_fault_hold && g_cp_last_digital_activity_ms >= g_cp_last_seen_connected_ms)
+                        ? "digital"
+                        : "cp";
+                Serial.printf("[CP] hold %s raw=%c stable=%c mv=%d hold_ms=%lu anchor=%s relay1=%d moduleOn=%d hlc=%d\n",
+                              active_session_fault_hold ? "active-session fault" : "A-disconnect spike",
                               raw_cp_state,
                               g_cp_state,
                               cp_mv,
-                              static_cast<unsigned long>(CP_CONNECTED_HOLD_MS));
+                              static_cast<unsigned long>(hold_ms),
+                              hold_anchor,
+                              g_relay1_closed ? 1 : 0,
+                              g_module_output_enabled ? 1 : 0,
+                              g_hlc_active ? 1 : 0);
                 g_cp_next_spike_log_ms = now_ms + 10000;
             }
         }
@@ -11008,9 +11300,6 @@ void process_cp_and_fsm(uint32_t now_ms) {
         slac_start_ok &&
         (mode_requires_controller_contract() || pwm_ready)) {
         start_session(now_ms);
-        if (mode_requires_controller_contract() && !mode_controller_has_final_decision()) {
-            g_ctrl.slac_start_latched = false;
-        }
     } else if (mode_requires_controller_contract() && !g_session_started &&
                g_cp_connected_since_ms != 0 && !slac_start_ok) {
         static uint32_t next_wait_log_ms = 0;

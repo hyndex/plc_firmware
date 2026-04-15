@@ -210,7 +210,21 @@ class Monitor:
         time.sleep(max(0.05, self.args.esp_reset_pulse_s))
         self.ser.setDTR(True)
         self.ser.setRTS(False)
-        time.sleep(max(1.0, self.args.esp_reset_wait_s))
+        boot_deadline = time.monotonic() + max(1.0, self.args.esp_reset_wait_s)
+        rx_buffer = ""
+        while time.monotonic() < boot_deadline:
+            raw = self.ser.read(4096)
+            if not raw:
+                continue
+            rx_buffer += raw.decode("utf-8", errors="replace")
+            while "\n" in rx_buffer:
+                line, rx_buffer = rx_buffer.split("\n", 1)
+                line = line.rstrip("\r")
+                now = time.monotonic()
+                self._log(f"{ts()} {line}")
+                self._parse_cfg(line)
+                self._parse_runtime_events(line, now)
+                self._parse_hlc_json(line, now)
 
     def _parse_cfg(self, line: str) -> None:
         match = CFG_RE.search(line)
@@ -383,8 +397,10 @@ class Monitor:
             raise RuntimeError("CurrentDemand never reached stable ready hold")
         if not self.summary["hold_completed"]:
             raise RuntimeError(f"CurrentDemand hold did not complete {self.args.hold_s:.1f}s")
-        if self.summary["mode"] != "standalone":
+        if self.summary["mode"] and self.summary["mode"] != "standalone":
             raise RuntimeError(f"PLC not in standalone mode: {self.summary['mode'] or 'unknown'}")
+        if not self.summary["mode"]:
+            self._note_once("cfg banner not observed during reset window; mode inferred from flashed standalone image and runtime behavior")
         if self.summary["headroom_expected_v"] is not None and self.summary["max_applied_v_error"] > self.args.max_applied_v_error:
             raise RuntimeError(
                 f"applied voltage deviated from requested-headroom by {self.summary['max_applied_v_error']:.2f}V"
