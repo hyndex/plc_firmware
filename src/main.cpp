@@ -5530,7 +5530,15 @@ struct RuntimeEvseLimits {
     float max_power_kw;
 };
 
-RuntimeEvseLimits snapshot_runtime_evse_limits() {
+float evse_current_limit_voltage_basis_v(float requested_basis_v, float max_voltage_v) {
+    const float basis_v = sane_non_negative(requested_basis_v);
+    if (basis_v < 50.0f) {
+        return 0.0f;
+    }
+    return sane_non_negative(std::min(basis_v, max_voltage_v));
+}
+
+RuntimeEvseLimits snapshot_runtime_evse_limits(float requested_current_limit_voltage_v = 0.0f) {
     RuntimeEvseLimits limits{
         MODULE_MAX_VOLTAGE_V,
         MODULE_MAX_CURRENT_A,
@@ -5556,19 +5564,21 @@ RuntimeEvseLimits snapshot_runtime_evse_limits() {
         limits.max_power_kw =
             sane_non_negative(std::min(limits.max_power_kw, (limits.max_voltage_v * limits.max_current_a) / 1000.0f));
     }
-    if (limits.max_voltage_v > 0.1f && limits.max_power_kw > 0.1f) {
+    const float current_limit_basis_v =
+        evse_current_limit_voltage_basis_v(requested_current_limit_voltage_v, limits.max_voltage_v);
+    if (current_limit_basis_v > 0.1f && limits.max_power_kw > 0.1f) {
         limits.max_current_a =
-            sane_non_negative(std::min(limits.max_current_a, (limits.max_power_kw * 1000.0f) / limits.max_voltage_v));
+            sane_non_negative(std::min(limits.max_current_a, (limits.max_power_kw * 1000.0f) / current_limit_basis_v));
     }
     return limits;
 }
 
-void fill_din_dc_charge_params_real(din_DC_EVSEChargeParameterType* params) {
+void fill_din_dc_charge_params_real(din_DC_EVSEChargeParameterType* params, float current_limit_voltage_v = 0.0f) {
     if (!params) return;
     init_din_DC_EVSEChargeParameterType(params);
     set_din_dc_status_ready(&params->DC_EVSEStatus);
 
-    const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+    const RuntimeEvseLimits limits = snapshot_runtime_evse_limits(current_limit_voltage_v);
     set_din_physical(&params->EVSEMaximumCurrentLimit, din_unitSymbolType_A, limits.max_current_a);
     set_din_physical(&params->EVSEMaximumVoltageLimit, din_unitSymbolType_V, limits.max_voltage_v);
     params->EVSEMaximumPowerLimit_isUsed = 1;
@@ -5598,12 +5608,12 @@ void fill_din_dc_charge_params_legacy_compat(din_DC_EVSEChargeParameterType* par
     params->EVSEEnergyToBeDelivered_isUsed = 0;
 }
 
-void fill_iso_dc_charge_params_real(iso2_DC_EVSEChargeParameterType* params) {
+void fill_iso_dc_charge_params_real(iso2_DC_EVSEChargeParameterType* params, float current_limit_voltage_v = 0.0f) {
     if (!params) return;
     init_iso2_DC_EVSEChargeParameterType(params);
     set_iso_dc_status_ready(&params->DC_EVSEStatus);
 
-    const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+    const RuntimeEvseLimits limits = snapshot_runtime_evse_limits(current_limit_voltage_v);
     set_iso_physical(&params->EVSEMaximumCurrentLimit, iso2_unitSymbolType_A, limits.max_current_a);
     set_iso_physical(&params->EVSEMaximumPowerLimit, iso2_unitSymbolType_W, limits.max_power_kw * 1000.0f);
     set_iso_physical(&params->EVSEMaximumVoltageLimit, iso2_unitSymbolType_V, limits.max_voltage_v);
@@ -9325,7 +9335,7 @@ int hlc_handle_charge_parameter_discovery(HlcAppContext* ctx,
             rc = jpv2g_secc_default_handle(ctx->secc, JPV2G_CHARGE_PARAMETER_DISCOVERY_REQ, req, out, out_len, written);
         } else {
             din_DC_EVSEChargeParameterType params;
-            fill_din_dc_charge_params_real(&params);
+            fill_din_dc_charge_params_real(&params, ctx->negotiated_ev_max_v);
             rc = jpv2g_cbv2g_encode_din_charge_parameter_discovery_res(
                 ctx->secc->session_id, din_responseCodeType_OK, &params, out, out_len, written);
         }
@@ -9337,8 +9347,8 @@ int hlc_handle_charge_parameter_discovery(HlcAppContext* ctx,
         res.EVSEChargeParameter_isUsed = 0;
         res.AC_EVSEChargeParameter_isUsed = 0;
         res.DC_EVSEChargeParameter_isUsed = 1;
-        fill_iso_dc_charge_params_real(&res.DC_EVSEChargeParameter);
-        const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+        fill_iso_dc_charge_params_real(&res.DC_EVSEChargeParameter, ctx->negotiated_ev_max_v);
+        const RuntimeEvseLimits limits = snapshot_runtime_evse_limits(ctx->negotiated_ev_max_v);
         fill_iso_charge_parameter_schedule_real(&res, ctx->sa_schedule_tuple_id, limits.max_power_kw);
         rc = jpv2g_cbv2g_encode_charge_parameter_discovery_res_payload(
             ctx->secc->session_id, &res, out, out_len, written);
@@ -9347,7 +9357,7 @@ int hlc_handle_charge_parameter_discovery(HlcAppContext* ctx,
     }
     if (rc == 0) {
         if (req->protocol == JPV2G_PROTOCOL_DIN70121) {
-            const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+            const RuntimeEvseLimits limits = snapshot_runtime_evse_limits(ctx->negotiated_ev_max_v);
             Serial.printf("[HLC] {\"msg\":\"ChargeParameterDiscoveryRes\",\"protocol\":\"din\","
                           "\"rc\":%d,\"bytes\":%u,\"mode\":\"%s\",\"maxV\":%.1f,\"maxI\":%.1f,\"maxP\":%.1f,"
                           "\"negotiatedMaxV\":%.1f,\"negotiatedMaxI\":%.1f}\n",
@@ -9364,7 +9374,7 @@ int hlc_handle_charge_parameter_discovery(HlcAppContext* ctx,
                           sane_non_negative(ctx->negotiated_ev_max_v),
                           sane_non_negative(ctx->negotiated_ev_max_i));
         } else if (req->protocol == JPV2G_PROTOCOL_ISO15118_2) {
-            const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+            const RuntimeEvseLimits limits = snapshot_runtime_evse_limits(ctx->negotiated_ev_max_v);
             Serial.printf("[HLC] {\"msg\":\"ChargeParameterDiscoveryRes\",\"protocol\":\"iso2\","
                           "\"rc\":%d,\"bytes\":%u,\"mode\":\"custom\",\"maxV\":%.1f,\"maxI\":%.1f,\"maxP\":%.1f,"
                           "\"negotiatedMaxV\":%.1f,\"negotiatedMaxI\":%.1f}\n",
@@ -9628,7 +9638,8 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         const bool fb_ok = snapshot_post_target_controller_feedback(baseline_feedback_ms, &fb, &fresh_after_target);
         const uint32_t feedback_now_ms = millis();
         const bool stop_charging = fb_ok && fb.stop_charging;
-        const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+        const RuntimeEvseLimits limits =
+            snapshot_runtime_evse_limits(std::max(sane_non_negative(requested_v), sane_non_negative(ctx->negotiated_ev_max_v)));
         const float present_v_fb = fb_ok ? sane_non_negative(fb.present_voltage_v) : sane_non_negative(g_last_measured_v);
         const float present_i_fb = fb_ok ? sane_non_negative(fb.present_current_a) : 0.0f;
         const bool delivery_active = allow_energy && ctx->power_delivery_enabled && g_relay1_closed;
@@ -9946,7 +9957,8 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     const float req_power_kw = (requested_v * requested_i) / 1000.0f;
     const float avail_i = sane_non_negative(st.available_current_a);
     const float avail_p = sane_non_negative(st.available_power_kw);
-    const RuntimeEvseLimits limits = snapshot_runtime_evse_limits();
+    const RuntimeEvseLimits limits =
+        snapshot_runtime_evse_limits(std::max(sane_non_negative(requested_v), sane_non_negative(ctx->negotiated_ev_max_v)));
     const float configured_current_headroom_a =
         delivery_active ? std::max(0.0f, g_runtime_cfg.module_current_headroom_a) : 0.0f;
     const float requested_power_headroom_kw = (requested_v * configured_current_headroom_a) / 1000.0f;
@@ -11171,7 +11183,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
     const bool session_active_for_fault_hold =
         g_session_started || g_hlc_active || g_hlc_ready || g_relay1_closed || g_module_output_enabled;
     const bool active_session_fault_hold =
-        was_connected_state && session_active_for_fault_hold && raw_cp_state != 'A' && !cp_connected(raw_cp_state);
+        was_connected_state && session_active_for_fault_hold && !cp_connected(raw_cp_state);
     if (was_connected_state && !cp_connected(raw_cp_state) && g_cp_last_seen_connected_ms != 0) {
         const uint32_t hold_anchor_ms =
             session_active_for_fault_hold
