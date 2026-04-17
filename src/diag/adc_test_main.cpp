@@ -51,7 +51,7 @@ constexpr int kPlcSamplesPerPoll = 4;
 constexpr int kPlcSampleDelayUs = 6;
 constexpr uint16_t kPlcPhaseStepUs = 197;
 constexpr int kPlcTopK = 12;
-constexpr int kPlcSampleHistorySize = 24;
+constexpr int kPlcDecayMvPerScan = 25;
 constexpr uint32_t kPlcAdcMaxWaitSpins = 2000;
 constexpr uint32_t kPlcStateDebounceMs = 80;
 
@@ -88,11 +88,11 @@ struct HlwReading {
 
 struct PlcReading {
     int robust_mv{0};
+    int plateau_mv{0};
     int peak_mv{0};
     int last_valid_mv{0};
     int last_raw_count{0};
     int valid_samples{0};
-    int history_count{0};
     char raw_state{'A'};
     char stable_state{'A'};
     char candidate_state{'A'};
@@ -107,11 +107,11 @@ portMUX_TYPE g_cp_adc_mux = portMUX_INITIALIZER_UNLOCKED;
 uint32_t g_next_print_ms = 0;
 String g_serial_line;
 
-std::array<int, kPlcSampleHistorySize> g_plc_history{};
-uint8_t g_plc_history_count = 0;
-uint8_t g_plc_history_head = 0;
 uint16_t g_plc_sample_phase_us = 0;
 int g_plc_last_valid_mv = 0;
+int g_plc_last_peak_mv = 0;
+int g_plc_last_plateau_mv = 0;
+int g_plc_robust_mv = 0;
 char g_plc_state = 'A';
 char g_plc_candidate_state = 'A';
 uint32_t g_plc_candidate_since_ms = 0;
@@ -346,11 +346,7 @@ PlcReading capture_plc_current() {
         if (mv > peak) {
             peak = mv;
         }
-        g_plc_history[g_plc_history_head] = mv;
-        g_plc_history_head = static_cast<uint8_t>((g_plc_history_head + 1u) % kPlcSampleHistorySize);
-        if (g_plc_history_count < kPlcSampleHistorySize) {
-            ++g_plc_history_count;
-        }
+        insert_topk(mv);
         if ((i & 1) == 1) {
             taskYIELD();
         }
@@ -358,16 +354,14 @@ PlcReading capture_plc_current() {
 
     g_plc_sample_phase_us = static_cast<uint16_t>((g_plc_sample_phase_us + kPlcPhaseStepUs) % 1000u);
 
+    int plateau_mv = 0;
     int robust_mv = 0;
     if (valid_samples <= 0) {
-        robust_mv = (last_valid_mv > 0) ? last_valid_mv : 0;
+        robust_mv = (g_plc_robust_mv > 0) ? g_plc_robust_mv : ((last_valid_mv > 0) ? last_valid_mv : 0);
     } else {
         g_plc_last_valid_mv = last_valid_mv;
-        for (int i = 0; i < g_plc_history_count; ++i) {
-            insert_topk(g_plc_history[i]);
-        }
         if (tk <= 0) {
-            robust_mv = peak;
+            plateau_mv = peak;
         } else {
             int start = tk - ((tk / 6 > 3) ? (tk / 6) : 3);
             int end = tk - (tk >= 6 ? 1 : 0);
@@ -382,12 +376,20 @@ PlcReading capture_plc_current() {
                 sum += topk[i];
                 ++n;
             }
-            robust_mv = (n > 0) ? static_cast<int>(sum / n) : topk[tk - 1];
+            plateau_mv = (n > 0) ? static_cast<int>(sum / n) : topk[tk - 1];
         }
+        g_plc_last_peak_mv = peak;
+        g_plc_last_plateau_mv = plateau_mv;
+        if (g_plc_robust_mv <= 0) {
+            g_plc_robust_mv = plateau_mv;
+        } else {
+            g_plc_robust_mv = std::max(plateau_mv, g_plc_robust_mv - kPlcDecayMvPerScan);
+        }
+        robust_mv = g_plc_robust_mv;
     }
 
     const uint32_t now_ms = millis();
-    const char raw_state = cp_state_from_mv(robust_mv);
+    const char raw_state = classify_with_hys_hlw(robust_mv, g_plc_state);
     if (raw_state != g_plc_candidate_state) {
         g_plc_candidate_state = raw_state;
         g_plc_candidate_since_ms = now_ms;
@@ -398,11 +400,11 @@ PlcReading capture_plc_current() {
     }
 
     reading.robust_mv = robust_mv;
-    reading.peak_mv = peak;
+    reading.plateau_mv = (plateau_mv > 0) ? plateau_mv : g_plc_last_plateau_mv;
+    reading.peak_mv = (peak > 0) ? peak : g_plc_last_peak_mv;
     reading.last_valid_mv = last_valid_mv;
     reading.last_raw_count = last_raw_count;
     reading.valid_samples = valid_samples;
-    reading.history_count = g_plc_history_count;
     reading.raw_state = raw_state;
     reading.stable_state = g_plc_state;
     reading.candidate_state = g_plc_candidate_state;
@@ -462,14 +464,14 @@ void print_status() {
         static_cast<unsigned long>(hlw.phase_us));
 
     Serial.printf(
-        "[ADC-TEST][PLC] robust=%d peak=%d last_valid=%d last_raw=%d valid=%d hist=%d raw_state=%c candidate=%c "
+        "[ADC-TEST][PLC] robust=%d plateau=%d peak=%d last_valid=%d last_raw=%d valid=%d raw_state=%c candidate=%c "
         "stable=%c candidate_age_ms=%lu phase_us=%lu\n",
         plc.robust_mv,
+        plc.plateau_mv,
         plc.peak_mv,
         plc.last_valid_mv,
         plc.last_raw_count,
         plc.valid_samples,
-        plc.history_count,
         plc.raw_state,
         plc.candidate_state,
         plc.stable_state,

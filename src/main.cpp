@@ -167,14 +167,23 @@ constexpr int CP_T3_MV = 1450;
 constexpr int CP_T0_MV = 1250;
 constexpr int CP_NEG_THRESHOLD_MV = 500;
 constexpr int CP_HYSTERESIS_MV = 100;
+constexpr int CP_ENTER_BAND_MV = 20;
 constexpr int CP_SAMPLES_PER_POLL = 4;
-constexpr int CP_SAMPLE_HISTORY_SIZE = 24;
 constexpr int CP_SAMPLE_DELAY_US = 6;
 constexpr uint16_t CP_SAMPLE_PHASE_STEP_US = 197;
 constexpr int CP_TOPK = 12;
+constexpr int CP_ROBUST_DECAY_MV = 25;
+constexpr int CP_VERIFY_SAMPLE_COUNT = 96;
+constexpr int CP_VERIFY_TOPK = 24;
+constexpr uint16_t CP_VERIFY_PHASE_STEP_US = 53;
+constexpr uint32_t CP_VERIFY_INTERVAL_MS = 250;
+constexpr uint8_t CP_VERIFY_OVERRIDE_LIMIT = 2;
+constexpr uint8_t CP_VERIFY_REINIT_LIMIT = 4;
+constexpr uint8_t CP_ADC_TIMEOUT_REINIT_LIMIT = 3;
 constexpr uint32_t CP_SAMPLE_SETTLE_AFTER_QCA_MS = 1500;
 constexpr uint32_t CP_ADC_MAX_WAIT_SPINS = 2000;
 constexpr uint32_t CP_ADC_FAULT_LOG_MS = 2000;
+constexpr uint32_t CP_ADC_REINIT_COOLDOWN_MS = 2000;
 
 constexpr uint32_t CP_STABLE_MS = 300;
 constexpr uint32_t CP_STATE_DEBOUNCE_MS = 80;
@@ -193,6 +202,17 @@ constexpr uint8_t SLAC_SOFT_RETRY_LIMIT = 2;
 constexpr uint32_t CP_EF_PULSE_MS = 180;
 constexpr uint8_t EF_PULSE_AFTER_FAILURES = 3;
 constexpr uint32_t STARTUP_LOG_DELAY_MS = 10000;
+
+constexpr int CP_T12_ENTER_MV = CP_T12_MV + CP_ENTER_BAND_MV;
+constexpr int CP_T12_EXIT_MV = CP_T12_MV - CP_ENTER_BAND_MV;
+constexpr int CP_T9_ENTER_MV = CP_T9_MV + CP_ENTER_BAND_MV;
+constexpr int CP_T9_EXIT_MV = CP_T9_MV - CP_ENTER_BAND_MV;
+constexpr int CP_T6_ENTER_MV = CP_T6_MV + CP_ENTER_BAND_MV;
+constexpr int CP_T6_EXIT_MV = CP_T6_MV - CP_ENTER_BAND_MV;
+constexpr int CP_T3_ENTER_MV = CP_T3_MV + CP_ENTER_BAND_MV;
+constexpr int CP_T3_EXIT_MV = CP_T3_MV - CP_ENTER_BAND_MV;
+constexpr int CP_T0_ENTER_MV = CP_T0_MV + CP_ENTER_BAND_MV;
+constexpr int CP_T0_EXIT_MV = CP_T0_MV - CP_ENTER_BAND_MV;
 constexpr uint32_t QCA_INIT_RETRY_MS = 1000;
 constexpr int HLC_FIRST_PACKET_TIMEOUT_MS = 20000;
 constexpr int HLC_IDLE_TIMEOUT_MS = 60000;
@@ -2079,6 +2099,30 @@ bool cp_connected(char s) {
     return s == 'B' || s == 'C' || s == 'D';
 }
 
+char classify_cp_with_hysteresis(int mv, char prev) {
+    switch (prev) {
+        case 'A':
+            return (mv <= CP_T12_EXIT_MV) ? 'B' : 'A';
+        case 'B':
+            if (mv >= CP_T12_ENTER_MV) return 'A';
+            return (mv <= CP_T9_EXIT_MV) ? 'C' : 'B';
+        case 'C':
+            if (mv >= CP_T9_ENTER_MV) return 'B';
+            return (mv <= CP_T6_EXIT_MV) ? 'D' : 'C';
+        case 'D':
+            if (mv >= CP_T6_ENTER_MV) return 'C';
+            return (mv <= CP_T3_EXIT_MV) ? 'E' : 'D';
+        case 'E':
+            if (mv >= CP_T3_ENTER_MV) return 'D';
+            return (mv <= CP_T0_EXIT_MV) ? 'F' : 'E';
+        default:
+            return (mv >= CP_T0_ENTER_MV) ? 'E' : 'F';
+    }
+}
+
+void init_cp_adc_input();
+void reinit_cp_adc_input(uint32_t now_ms, const char* reason);
+
 uint32_t cp_pct_to_duty(uint16_t pct) {
     if (pct == 0) return 0;
     if (pct >= 100) return CP_1_MAX_DUTY_CYCLE;
@@ -2169,15 +2213,67 @@ const char* evse_state_name(slac::evse::State s) {
 }
 
 static uint16_t g_cp_sample_phase_us = 0;
-static std::array<int, CP_SAMPLE_HISTORY_SIZE> g_cp_sample_history{};
-static uint8_t g_cp_sample_history_count = 0;
-static uint8_t g_cp_sample_history_head = 0;
+static uint16_t g_cp_verify_phase_us = 0;
 static portMUX_TYPE g_cp_adc_mux = portMUX_INITIALIZER_UNLOCKED;
 static esp_adc_cal_characteristics_t g_cp_adc_chars{};
 static bool g_cp_adc_chars_ready = false;
 static uint32_t g_cp_next_fault_log_ms = 0;
+static uint32_t g_cp_next_verify_log_ms = 0;
 static uint32_t g_cp_adc_timeout_count = 0;
+static uint32_t g_cp_adc_reinit_count = 0;
+static uint32_t g_cp_last_adc_reinit_ms = 0;
+static uint32_t g_cp_next_verify_ms = 0;
 static int g_cp_last_valid_mv = 0;
+static int g_cp_last_plateau_mv = 0;
+static int g_cp_last_peak_mv = 0;
+static int g_cp_last_robust_mv = 0;
+static int g_cp_last_verify_mv = 0;
+static int g_cp_last_verify_peak_mv = 0;
+static char g_cp_last_verify_state = 'A';
+static uint8_t g_cp_verify_connected_override_run = 0;
+static uint8_t g_cp_verify_any_disagree_run = 0;
+
+enum class CpSampleSource : uint8_t {
+    Rtc = 0,
+    Verify = 1,
+};
+
+static CpSampleSource g_cp_last_sample_source = CpSampleSource::Rtc;
+
+const char* cp_sample_source_name(CpSampleSource source) {
+    switch (source) {
+        case CpSampleSource::Verify:
+            return "verify";
+        case CpSampleSource::Rtc:
+        default:
+            return "rtc";
+    }
+}
+
+void init_cp_adc_input() {
+    analogReadResolution(12);
+    pinMode(CP_1_READ_PIN, INPUT);
+    adcAttachPin(CP_1_READ_PIN);
+    analogSetPinAttenuation(CP_1_READ_PIN, ADC_11db);
+    adc_power_acquire();
+    (void)adc1_config_channel_atten(CP_1_ADC_CHANNEL, ADC_ATTEN_DB_12);
+    (void)esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, 1100, &g_cp_adc_chars);
+    g_cp_adc_chars_ready = true;
+}
+
+void reinit_cp_adc_input(uint32_t now_ms, const char* reason) {
+    if (g_cp_last_adc_reinit_ms != 0u &&
+        static_cast<int32_t>(now_ms - g_cp_last_adc_reinit_ms) < static_cast<int32_t>(CP_ADC_REINIT_COOLDOWN_MS)) {
+        return;
+    }
+    init_cp_adc_input();
+    g_cp_last_adc_reinit_ms = now_ms;
+    g_cp_adc_timeout_count = 0;
+    ++g_cp_adc_reinit_count;
+    Serial.printf("[CP] adc reinit reason=%s count=%lu\n",
+                  reason ? reason : "-",
+                  static_cast<unsigned long>(g_cp_adc_reinit_count));
+}
 
 bool read_cp_mv_once(int* out_mv) {
     if (!out_mv) {
@@ -2218,6 +2314,7 @@ bool read_cp_mv_once(int* out_mv) {
         return false;
     }
 
+    g_cp_adc_timeout_count = 0;
     *out_mv = g_cp_adc_chars_ready ? static_cast<int>(esp_adc_cal_raw_to_voltage(static_cast<uint32_t>(raw), &g_cp_adc_chars))
                                    : raw;
     return true;
@@ -2269,12 +2366,7 @@ int read_cp_mv_robust() {
         if (v > peak) {
             peak = v;
         }
-        g_cp_sample_history[g_cp_sample_history_head] = v;
-        g_cp_sample_history_head =
-            static_cast<uint8_t>((g_cp_sample_history_head + 1u) % CP_SAMPLE_HISTORY_SIZE);
-        if (g_cp_sample_history_count < CP_SAMPLE_HISTORY_SIZE) {
-            ++g_cp_sample_history_count;
-        }
+        insert_topk(v);
         if ((i & 1) == 1) {
             taskYIELD();
         }
@@ -2282,13 +2374,18 @@ int read_cp_mv_robust() {
 
     g_cp_sample_phase_us = static_cast<uint16_t>((g_cp_sample_phase_us + CP_SAMPLE_PHASE_STEP_US) % 1000U);
     if (valid_samples <= 0) {
+        if (g_cp_last_robust_mv > 0) {
+            return g_cp_last_robust_mv;
+        }
         return (last_valid_mv > 0) ? last_valid_mv : 0;
     }
     g_cp_last_valid_mv = last_valid_mv;
-    for (int i = 0; i < g_cp_sample_history_count; ++i) {
-        insert_topk(g_cp_sample_history[i]);
+    if (tk <= 0) {
+        g_cp_last_peak_mv = peak;
+        g_cp_last_plateau_mv = peak;
+        g_cp_last_robust_mv = peak;
+        return peak;
     }
-    if (tk <= 0) return peak;
 
     int start = tk - ((tk / 6 > 3) ? (tk / 6) : 3);
     int end = tk - (tk >= 6 ? 1 : 0);
@@ -2304,8 +2401,82 @@ int read_cp_mv_robust() {
         sum += topk[i];
         ++n;
     }
-    if (n > 0) return static_cast<int>(sum / n);
-    return topk[tk - 1];
+    const int plateau_mv = (n > 0) ? static_cast<int>(sum / n) : topk[tk - 1];
+    g_cp_last_peak_mv = peak;
+    g_cp_last_plateau_mv = plateau_mv;
+    if (g_cp_last_robust_mv <= 0) {
+        g_cp_last_robust_mv = plateau_mv;
+    } else {
+        g_cp_last_robust_mv = std::max(plateau_mv, g_cp_last_robust_mv - CP_ROBUST_DECAY_MV);
+    }
+    return g_cp_last_robust_mv;
+}
+
+int read_cp_mv_verify_burst(int* out_peak_mv) {
+    int topk[CP_VERIFY_TOPK];
+    int tk = 0;
+    int peak = 0;
+
+    auto insert_topk = [&](int v) {
+        if (tk < CP_VERIFY_TOPK) {
+            int i = tk++;
+            while (i > 0 && topk[i - 1] > v) {
+                topk[i] = topk[i - 1];
+                --i;
+            }
+            topk[i] = v;
+            return;
+        }
+        if (v <= topk[0]) {
+            return;
+        }
+        topk[0] = v;
+        int i = 0;
+        while ((i + 1) < tk && topk[i] > topk[i + 1]) {
+            const int t = topk[i];
+            topk[i] = topk[i + 1];
+            topk[i + 1] = t;
+            ++i;
+        }
+    };
+
+    if (g_cp_verify_phase_us) {
+        delayMicroseconds(g_cp_verify_phase_us);
+    }
+    (void)analogRead(CP_1_READ_PIN);
+    for (int i = 0; i < CP_VERIFY_SAMPLE_COUNT; ++i) {
+        delayMicroseconds(CP_SAMPLE_DELAY_US);
+        const int v = analogReadMilliVolts(CP_1_READ_PIN);
+        if (v > peak) {
+            peak = v;
+        }
+        insert_topk(v);
+        if ((i & 0x7) == 0x7) {
+            taskYIELD();
+        }
+    }
+    g_cp_verify_phase_us = static_cast<uint16_t>((g_cp_verify_phase_us + CP_VERIFY_PHASE_STEP_US) % 1000U);
+    if (out_peak_mv) {
+        *out_peak_mv = peak;
+    }
+    if (tk <= 0) {
+        return peak;
+    }
+    int start = tk - ((tk / 6 > 3) ? (tk / 6) : 3);
+    int end = tk - (tk >= 6 ? 1 : 0);
+    if (start < 0) start = 0;
+    if (end <= start) {
+        start = (tk > 3) ? (tk - 3) : 0;
+        end = tk;
+    }
+
+    int64_t sum = 0;
+    int n = 0;
+    for (int i = start; i < end; ++i) {
+        sum += topk[i];
+        ++n;
+    }
+    return (n > 0) ? static_cast<int>(sum / n) : topk[tk - 1];
 }
 
 std::shared_ptr<Qca7000Transport> g_transport;
@@ -8710,7 +8881,7 @@ void serial_ctrl_handle_line(String line) {
         return;
     }
     if (op == "STATUS") {
-        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s cp_mv=%d duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d emergency=%d led=%s led_count=%u\n",
+        Serial.printf("[SERCTRL] STATUS mode=%u(%s) plc_id=%u connector_id=%u controller_id=%u module_addr=0x%02X local_group=%u module_id=%s can_stack=%d module_mgr=%d cp=%s cp_mv=%d duty=%u hb=%d auth=%u allow_slac=%d allow_energy=%d armed=%d start=%d relay1=%d relay2=%d relay3=%d alloc_sz=%u ctrl_fb=%d stop_active=%d stop_hard=%d stop_done=%d emergency=%d led=%s led_count=%u cp_src=%s cp_rtc_mv=%d cp_verify_mv=%d cp_verify_state=%c cp_plateau_mv=%d cp_peak_mv=%d cp_adc_reinit=%lu cp_adc_timeouts=%lu\n",
                       static_cast<unsigned>(g_runtime_cfg.mode),
                       runtime_mode_name(),
                       static_cast<unsigned>(g_runtime_cfg.plc_id),
@@ -8740,7 +8911,15 @@ void serial_ctrl_handle_line(String line) {
                       controller_stop_is_complete() ? 1 : 0,
                       g_emergency_stop_active ? 1 : 0,
                       led_preset_name(effective_led_preset()),
-                      static_cast<unsigned>(active_led_count()));
+                      static_cast<unsigned>(active_led_count()),
+                      cp_sample_source_name(g_cp_last_sample_source),
+                      g_cp_last_robust_mv,
+                      g_cp_last_verify_mv,
+                      g_cp_last_verify_state,
+                      g_cp_last_plateau_mv,
+                      g_cp_last_peak_mv,
+                      static_cast<unsigned long>(g_cp_adc_reinit_count),
+                      static_cast<unsigned long>(g_cp_adc_timeout_count));
         return;
     }
 
@@ -11169,10 +11348,66 @@ void process_cp_and_fsm(uint32_t now_ms) {
     }
     g_cp_poll_enable_at_ms = 0u;
     note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0001u);
-    const int cp_mv = read_cp_mv_robust();
+    int cp_mv = read_cp_mv_robust();
     note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0002u);
+    if (g_cp_adc_timeout_count >= CP_ADC_TIMEOUT_REINIT_LIMIT) {
+        reinit_cp_adc_input(now_ms, "timeout");
+    }
+    CpSampleSource cp_sample_source = CpSampleSource::Rtc;
+    const int cp_rtc_mv = cp_mv;
+    char raw_cp_state = classify_cp_with_hysteresis(cp_mv, g_cp_state);
+    const bool should_verify_sampler =
+        (!g_session_started && !g_hlc_active && !g_fsm_priming && (raw_cp_state == 'A' || g_cp_state == 'A')) ||
+        g_cp_verify_any_disagree_run != 0u || g_cp_adc_timeout_count != 0u;
+    if (should_verify_sampler &&
+        (g_cp_next_verify_ms == 0u || static_cast<int32_t>(now_ms - g_cp_next_verify_ms) >= 0)) {
+        int verify_peak_mv = 0;
+        const int verify_mv = read_cp_mv_verify_burst(&verify_peak_mv);
+        g_cp_last_verify_mv = verify_mv;
+        g_cp_last_verify_peak_mv = verify_peak_mv;
+        g_cp_last_verify_state = classify_cp_with_hysteresis(verify_mv, g_cp_last_verify_state);
+        g_cp_next_verify_ms = now_ms + CP_VERIFY_INTERVAL_MS;
+        const bool rtc_connected = cp_connected(raw_cp_state);
+        const bool verify_connected = cp_connected(g_cp_last_verify_state);
+        if (rtc_connected != verify_connected) {
+            if (g_cp_verify_any_disagree_run < 0xFFu) {
+                ++g_cp_verify_any_disagree_run;
+            }
+            if (verify_connected && !rtc_connected && g_cp_verify_connected_override_run < 0xFFu) {
+                ++g_cp_verify_connected_override_run;
+            } else {
+                g_cp_verify_connected_override_run = 0u;
+            }
+            if (g_cp_next_verify_log_ms == 0u ||
+                static_cast<int32_t>(now_ms - g_cp_next_verify_log_ms) >= 0) {
+                Serial.printf("[CP] sampler mismatch rtc=%c/%d verify=%c/%d peak=%d override_run=%u disagree_run=%u\n",
+                              raw_cp_state,
+                              cp_rtc_mv,
+                              g_cp_last_verify_state,
+                              g_cp_last_verify_mv,
+                              g_cp_last_verify_peak_mv,
+                              static_cast<unsigned>(g_cp_verify_connected_override_run),
+                              static_cast<unsigned>(g_cp_verify_any_disagree_run));
+                g_cp_next_verify_log_ms = now_ms + 2000u;
+            }
+        } else {
+            g_cp_verify_any_disagree_run = 0u;
+            g_cp_verify_connected_override_run = 0u;
+        }
+        if (verify_connected && !rtc_connected &&
+            g_cp_verify_connected_override_run >= CP_VERIFY_OVERRIDE_LIMIT) {
+            cp_mv = verify_mv;
+            raw_cp_state = g_cp_last_verify_state;
+            cp_sample_source = CpSampleSource::Verify;
+        }
+        if (g_cp_verify_any_disagree_run >= CP_VERIFY_REINIT_LIMIT) {
+            reinit_cp_adc_input(now_ms, "verify_mismatch");
+            g_cp_verify_any_disagree_run = 0u;
+            g_cp_verify_connected_override_run = 0u;
+        }
+    }
     g_last_cp_mv = cp_mv;
-    const char raw_cp_state = cp_state_from_mv(cp_mv);
+    g_cp_last_sample_source = cp_sample_source;
     if (cp_connected(raw_cp_state)) {
         g_cp_last_seen_connected_ms = now_ms;
     }
