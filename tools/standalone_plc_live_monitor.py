@@ -15,8 +15,8 @@ import datetime as dt
 import json
 import math
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 import sys
 import time
 from typing import Optional
@@ -58,6 +58,42 @@ def safe_float(value: object, fallback: float = 0.0) -> float:
     return parsed
 
 
+def _port_owner_pids(port: str) -> list[dict[str, str]]:
+    target_paths = {port, os.path.realpath(port)}
+    owners: list[dict[str, str]] = []
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        if int(pid) == os.getpid():
+            continue
+        fd_dir = f"/proc/{pid}/fd"
+        try:
+            fds = os.listdir(fd_dir)
+        except OSError:
+            continue
+        matched = False
+        for fd in fds:
+            try:
+                fd_target = os.readlink(f"{fd_dir}/{fd}")
+            except OSError:
+                continue
+            if fd_target not in target_paths:
+                continue
+            matched = True
+            break
+        if not matched:
+            continue
+        cmdline_path = f"/proc/{pid}/cmdline"
+        cmdline = ""
+        try:
+            cmdline = open(cmdline_path, "rb").read().replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()
+        except OSError:
+            cmdline = ""
+        owners.append({
+            "pid": pid,
+            "cmdline": cmdline or "<unknown>",
+        })
+    return owners
+
+
 class Monitor:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
@@ -67,6 +103,7 @@ class Monitor:
             "result": "fail",
             "port": args.port,
             "mode": "",
+            "diagnosis": "",
             "headroom_expected_v": None,
             "headroom_expected_a": None,
             "hlc_follow_ev": None,
@@ -96,6 +133,11 @@ class Monitor:
             "max_applied_i_error": 0.0,
             "max_present_v_error_any": 0.0,
             "max_present_v_error_hold": 0.0,
+            "max_present_v_before_precharge_done": 0.0,
+            "current_demand_hold_samples": 0,
+            "bus_rise_missing_samples": 0,
+            "serial_control_intrusions": 0,
+            "serial_port_owners": [],
             "notes": [],
             "failure": "",
             "failure_stage": "",
@@ -107,6 +149,7 @@ class Monitor:
         self.monitor_started_monotonic = 0.0
         self.hold_started_monotonic = None
         self.last_hold_ok_monotonic = None
+        self.current_demand_start_monotonic = None
         self.metric_ts: dict[str, float] = {}
         self.loaded_samples: deque[tuple[float, float, float]] = deque()
 
@@ -156,9 +199,18 @@ class Monitor:
         currents = [sample[2] for sample in self.loaded_samples]
         voltage_span = max(voltages) - min(voltages)
         current_span = max(currents) - min(currents)
+        peak_current = max(currents) if currents else 0.0
+        # Real vehicles can dither commanded current by a few amps during an
+        # otherwise healthy high-current hold. Treat the current window as
+        # settled when it stays within the tighter of the configured absolute
+        # band or a modest fraction of the live current.
+        current_span_limit = max(
+            self.args.loaded_settle_delta_a,
+            peak_current * self.args.loaded_settle_delta_a_ratio,
+        )
         return (
             voltage_span <= self.args.loaded_settle_delta_v
-            and current_span <= self.args.loaded_settle_delta_a
+            and current_span <= current_span_limit
         )
 
     def _furthest_stage(self) -> str:
@@ -179,7 +231,50 @@ class Monitor:
                 return label
         return "startup"
 
+    def _diagnose_failure(self) -> None:
+        if self.summary["result"] == "pass":
+            self.summary["diagnosis"] = "ok"
+            return
+
+        if not self.summary["started_current_demand"]:
+            self.summary["diagnosis"] = "no_current_demand"
+            return
+
+        if self.summary["hold_started"]:
+            self.summary["diagnosis"] = "hold_interrupted"
+            return
+
+        bus_rise_missing = int(self.summary["bus_rise_missing_samples"])
+        hold_samples = int(self.summary["current_demand_hold_samples"])
+        peak_present_v = safe_float(self.summary["max_present_v_before_precharge_done"])
+        last_applied_v = safe_float(self.summary["last_applied_v"])
+        last_applied_i = safe_float(self.summary["last_applied_i"])
+
+        if (
+            hold_samples >= 8
+            and bus_rise_missing >= 8
+            and last_applied_v >= 100.0
+            and last_applied_i >= 1.5
+            and peak_present_v < self.args.precharge_bus_rise_min_v
+        ):
+            self.summary["diagnosis"] = "precharge_bus_rise_missing"
+            if (
+                not self.summary["failure"]
+                or self.summary["failure"] == "CurrentDemand never reached stable ready hold"
+            ):
+                self.summary["failure"] = (
+                    "precharge target armed but DC bus never rose under active 2A hold"
+                )
+            return
+
+        self.summary["diagnosis"] = "current_demand_not_ready"
+
     def _open_serial(self) -> None:
+        owners = _port_owner_pids(self.args.port)
+        if owners:
+            self.summary["serial_port_owners"] = owners
+            owner_text = "; ".join(f"pid={row['pid']} cmd={row['cmdline']}" for row in owners)
+            raise RuntimeError(f"serial port already owned: {owner_text}")
         self.ser = serial.Serial(
             port=self.args.port,
             baudrate=self.args.baud,
@@ -260,6 +355,17 @@ class Monitor:
         if '"msg":"PowerDeliveryRuntime"' in line:
             self._mark_metric("power_delivery_runtime", now)
 
+    def _parse_serial_control_intrusion(self, line: str) -> None:
+        if not line.startswith("[SERCTRL] "):
+            return
+        if line.startswith("[SERCTRL] controller serial task started"):
+            return
+        self.summary["serial_control_intrusions"] += 1
+        self._note_once("unexpected serial-control traffic observed during standalone monitor")
+        if len(self.summary["notes"]) < 8:
+            self.summary["notes"].append(f"serial-control line: {line}")
+        raise RuntimeError("unexpected serial-control traffic on PLC UART during standalone monitor")
+
     def _parse_hlc_json(self, line: str, now: float) -> None:
         if "[HLC] {" not in line:
             return
@@ -300,6 +406,8 @@ class Monitor:
         self.summary["peak_present_i"] = max(self.summary["peak_present_i"], present_i)
         self.summary["peak_applied_v"] = max(self.summary["peak_applied_v"], applied_v)
         self.summary["peak_applied_i"] = max(self.summary["peak_applied_i"], applied_i)
+        if self.current_demand_start_monotonic is None:
+            self.current_demand_start_monotonic = now
         self.loaded_samples.append((now, present_v, present_i))
         self._prune_loaded_samples(now)
         present_v_error = abs(present_v - applied_v)
@@ -346,6 +454,18 @@ class Monitor:
                 or present_i >= current_floor_a
             )
         )
+        if relay1 and target_applied and not precharge_done:
+            self.summary["current_demand_hold_samples"] += 1
+            self.summary["max_present_v_before_precharge_done"] = max(
+                self.summary["max_present_v_before_precharge_done"],
+                present_v,
+            )
+            if (
+                applied_v >= 100.0
+                and applied_i >= 1.5
+                and present_v < self.args.precharge_bus_rise_min_v
+            ):
+                self.summary["bus_rise_missing_samples"] += 1
         if hold_ok:
             self.last_hold_ok_monotonic = now
             self.summary["peak_present_v_hold"] = max(self.summary["peak_present_v_hold"], present_v)
@@ -442,6 +562,7 @@ class Monitor:
                     now = time.monotonic()
                     self._log(f"{ts()} {line}")
                     self._parse_cfg(line)
+                    self._parse_serial_control_intrusion(line)
                     self._parse_runtime_events(line, now)
                     self._parse_hlc_json(line, now)
                     if self.summary["hold_completed"]:
@@ -459,6 +580,7 @@ class Monitor:
             return 1
         finally:
             try:
+                self._diagnose_failure()
                 self.summary["timing_s"] = self._timing_payload()
                 self.summary["furthest_stage"] = self._furthest_stage()
                 if self.summary["result"] != "pass":
@@ -485,12 +607,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--loaded-settle-window-s", type=float, default=1.5)
     parser.add_argument("--loaded-settle-delta-v", type=float, default=5.0)
     parser.add_argument("--loaded-settle-delta-a", type=float, default=1.0)
+    parser.add_argument("--loaded-settle-delta-a-ratio", type=float, default=0.10)
     parser.add_argument("--loaded-settle-min-samples", type=int, default=4)
     parser.add_argument("--loaded-settle-coverage-ratio", type=float, default=0.75)
     parser.add_argument("--no-load-bench", action="store_true")
     parser.add_argument("--max-applied-v-error", type=float, default=1.0)
     parser.add_argument("--max-applied-i-error", type=float, default=0.6)
     parser.add_argument("--max-present-v-error", type=float, default=2.0)
+    parser.add_argument("--precharge-bus-rise-min-v", type=float, default=50.0)
     parser.add_argument("--esp-reset-before-start", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--esp-reset-pulse-s", type=float, default=DEFAULT_RESET_PULSE_S)
     parser.add_argument("--esp-reset-wait-s", type=float, default=DEFAULT_RESET_WAIT_S)

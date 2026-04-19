@@ -186,6 +186,9 @@ constexpr uint32_t CP_ADC_FAULT_LOG_MS = 2000;
 constexpr uint32_t CP_ADC_REINIT_COOLDOWN_MS = 2000;
 
 constexpr uint32_t CP_STABLE_MS = 300;
+constexpr uint32_t CONTROLLER_SLAC_START_STABLE_MS = 200;
+constexpr uint32_t STANDALONE_SLAC_START_STABLE_MS = CP_STABLE_MS;
+constexpr uint32_t STANDALONE_SLAC_RETRY_EXTRA_STABLE_MS = 0;
 constexpr uint32_t CP_STATE_DEBOUNCE_MS = 80;
 constexpr uint32_t CP_DISCONNECT_DEBOUNCE_MS = 1200;
 constexpr uint32_t CP_CONNECTED_HOLD_MS = 1500;
@@ -570,6 +573,7 @@ constexpr float PRECHARGE_START_ACCEPT_MIN_CURRENT_A = 0.50f;
 constexpr float CURRENT_DEMAND_ZERO_REQUEST_READY_DECAY_MAX_A = 4.0f;
 constexpr float CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_MAX_A = 4.0f;
 constexpr float CURRENT_DEMAND_LOW_REQUEST_READY_OVERSHOOT_MAX_A = 4.0f;
+constexpr float CURRENT_DEMAND_PRECHARGE_HOLD_EXIT_MIN_A = PRECHARGE_CURRENT_LIMIT_A + 0.50f;
 constexpr float CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_TRIGGER_DELTA_A = 5.0f;
 constexpr uint32_t CURRENT_DEMAND_LOW_REQUEST_RUNDOWN_GRACE_MS = 1800u;
 constexpr uint32_t PRECHARGE_RELAX_MIN_COUNT = 2u;
@@ -610,6 +614,9 @@ constexpr uint32_t STANDALONE_OUTPUT_LIMIT_GRACE_MS = 900u;
 constexpr float STANDALONE_OUTPUT_LIMIT_CURRENT_MIN_A = 1.0f;
 constexpr float STANDALONE_OUTPUT_LIMIT_POWER_MARGIN_KW = 1.5f;
 constexpr float STANDALONE_OUTPUT_LIMIT_VOLTAGE_MARGIN_V = 12.0f;
+constexpr float STANDALONE_OUTPUT_LIMIT_DELIVERY_VOLTAGE_MARGIN_V = 25.0f;
+constexpr float STANDALONE_OUTPUT_LIMIT_DELIVERY_VOLTAGE_RATIO = 0.12f;
+constexpr float STANDALONE_OUTPUT_LIMIT_DELIVERY_CURRENT_RATIO = 0.75f;
 constexpr uint8_t MAXWELL_FUNC_SET = 0x03u;
 constexpr uint8_t MAXWELL_CONTROLLER_ADDR = 0xF0u;
 constexpr uint16_t MAXWELL_REG_ALTITUDE = 0x0017u;
@@ -637,6 +644,7 @@ constexpr uint32_t MODULE_RUNTIME_LOG_INTERVAL_MS = 1000;
 constexpr uint32_t MODULE_SERVICE_INTERVAL_MS = 10;
 constexpr uint32_t MODULE_SERVICE_SLAC_CRITICAL_MS = 50;
 constexpr uint32_t MODULE_ASSIGNMENT_REPAIR_INTERVAL_MS = 500;
+constexpr uint32_t MODULE_OFF_RETRY_INTERVAL_MS = 250;
 constexpr uint32_t MODULE_MANAGER_RECOVERY_RETRY_MS = 2000;
 
 constexpr int RELAY_I2C_SDA = 12;
@@ -2099,6 +2107,28 @@ bool cp_connected(char s) {
     return s == 'B' || s == 'C' || s == 'D';
 }
 
+int cp_state_rank(char s) {
+    switch (s) {
+        // For active-session arbitration, prefer the most charge-ready
+        // connected state. In practice that means holding C over B so a
+        // transient verifier plateau near 9 V cannot drag an in-flight 5%
+        // session back out of matching/current-demand.
+        case 'C': return 3;
+        case 'B': return 2;
+        case 'D': return 1;
+        case 'A': return 0;
+        case 'E': return -1;
+        case 'F': return -2;
+        default: return -1;
+    }
+}
+
+char cp_preferred_connected_state(char lhs, char rhs) {
+    if (!cp_connected(lhs)) return rhs;
+    if (!cp_connected(rhs)) return lhs;
+    return (cp_state_rank(lhs) >= cp_state_rank(rhs)) ? lhs : rhs;
+}
+
 char classify_cp_with_hysteresis(int mv, char prev) {
     switch (prev) {
         case 'A':
@@ -2122,6 +2152,7 @@ char classify_cp_with_hysteresis(int mv, char prev) {
 
 void init_cp_adc_input();
 void reinit_cp_adc_input(uint32_t now_ms, const char* reason);
+extern uint16_t g_last_cp_duty_pct;
 
 uint32_t cp_pct_to_duty(uint16_t pct) {
     if (pct == 0) return 0;
@@ -2182,6 +2213,8 @@ void write_ledc_duty(uint32_t duty) {
     }
 }
 
+uint32_t slac_start_stable_ms();
+
 const char* evse_state_name(slac::evse::State s) {
     switch (s) {
     case slac::evse::State::Reset:
@@ -2231,6 +2264,7 @@ static int g_cp_last_verify_mv = 0;
 static int g_cp_last_verify_peak_mv = 0;
 static char g_cp_last_verify_state = 'A';
 static uint8_t g_cp_verify_connected_override_run = 0;
+static uint8_t g_cp_verify_connected_level_override_run = 0;
 static uint8_t g_cp_verify_any_disagree_run = 0;
 
 enum class CpSampleSource : uint8_t {
@@ -2461,6 +2495,25 @@ int read_cp_mv_verify_burst(int* out_peak_mv) {
     }
     if (tk <= 0) {
         return peak;
+    }
+    const bool low_duty_connected_window = g_last_cp_duty_pct <= 5u;
+    if (low_duty_connected_window && peak > 0) {
+        // Under 5% PWM only a small fraction of the burst lands on the CP high
+        // plateau. Averaging too much of the upper tail can drag the verifier
+        // down into D/E even when the true peak cluster is cleanly in B/C.
+        const int peak_cluster_floor_mv = std::max(0, peak - 250);
+        int64_t peak_cluster_sum = 0;
+        int peak_cluster_n = 0;
+        for (int i = tk - 1; i >= 0; --i) {
+            if (topk[i] < peak_cluster_floor_mv) {
+                break;
+            }
+            peak_cluster_sum += topk[i];
+            ++peak_cluster_n;
+        }
+        if (peak_cluster_n >= 2) {
+            return static_cast<int>(peak_cluster_sum / peak_cluster_n);
+        }
     }
     int start = tk - ((tk / 6 > 3) ? (tk / 6) : 3);
     int end = tk - (tk >= 6 ? 1 : 0);
@@ -2746,6 +2799,8 @@ uint32_t g_cp_last_digital_activity_ms = 0;
 uint32_t g_cp_pwm_ready_since_ms = 0;
 uint32_t g_cp_next_spike_log_ms = 0;
 uint32_t g_hlc_disconnect_hold_until_ms = 0;
+char g_cp_verify_hold_state = 'A';
+uint32_t g_cp_verify_hold_until_ms = 0u;
 
 uint16_t g_last_cp_duty_pct = 100;
 bool g_ef_pulse_active = false;
@@ -3059,6 +3114,7 @@ bool g_module_output_enabled = false;
 std::vector<std::string> g_module_allowlist{};
 std::map<std::string, float> g_active_module_power_limits_kw{};
 uint32_t g_module_recovery_retry_at_ms = 0u;
+uint32_t g_local_module_off_retry_at_ms = 0u;
 double g_meter_wh_real = 0.0;
 uint32_t g_meter_last_sample_ms = 0;
 float g_last_measured_v = 0.0f;
@@ -3331,6 +3387,17 @@ bool mode_is_local_autonomous() {
 
 bool mode_requires_controller_contract() {
     return runtime_mode() == OperatingMode::ExternalController;
+}
+
+uint32_t slac_start_stable_ms() {
+    if (mode_requires_controller_contract()) {
+        return CONTROLLER_SLAC_START_STABLE_MS;
+    }
+    uint32_t required_ms = STANDALONE_SLAC_START_STABLE_MS;
+    if (g_slac_failures_this_cp != 0u) {
+        required_ms += STANDALONE_SLAC_RETRY_EXTRA_STABLE_MS;
+    }
+    return required_ms;
 }
 
 bool standalone_welding_fake_zero_enabled() {
@@ -4052,6 +4119,13 @@ bool current_demand_voltage_ready_safe(float requested_v, float applied_v, float
     return measured_v <= (target_v + overshoot_tolerance_v);
 }
 
+bool current_demand_still_in_precharge_hold(float requested_i, float present_i) {
+    const float target_i = std::isfinite(requested_i) ? std::max(0.0f, requested_i) : 0.0f;
+    const float measured_i = std::isfinite(present_i) ? std::max(0.0f, present_i) : 0.0f;
+    return target_i > (PRECHARGE_CURRENT_LIMIT_A + 0.05f) &&
+           measured_i <= CURRENT_DEMAND_PRECHARGE_HOLD_EXIT_MIN_A;
+}
+
 enum class EvseIsolationAssessment : uint8_t {
     Unavailable = 0,
     Invalid,
@@ -4163,12 +4237,27 @@ bool standalone_sustained_output_shortfall(HlcAppContext* ctx,
     const float current_shortfall_a = target_i - measured_i;
     const float current_shortfall_margin_a = std::max(1.0f, target_i * 0.15f);
     const bool voltage_is_up = measured_v >= std::max(50.0f, target_v - STANDALONE_OUTPUT_LIMIT_VOLTAGE_MARGIN_V);
+    float compliance_target_v =
+        std::isfinite(g_last_module_target_v) ? std::max(0.0f, g_last_module_target_v) : 0.0f;
+    if (compliance_target_v <= 50.0f) {
+        compliance_target_v = target_v;
+    }
+    const float voltage_delivery_margin_v =
+        std::max(STANDALONE_OUTPUT_LIMIT_DELIVERY_VOLTAGE_MARGIN_V,
+                 compliance_target_v * STANDALONE_OUTPUT_LIMIT_DELIVERY_VOLTAGE_RATIO);
+    const bool current_is_meaningful =
+        measured_i >= std::max(PRECHARGE_START_ACCEPT_MIN_CURRENT_A,
+                               target_i * STANDALONE_OUTPUT_LIMIT_DELIVERY_CURRENT_RATIO);
+    const bool voltage_delivery_mismatch =
+        current_is_meaningful &&
+        measured_v < std::max(0.0f, compliance_target_v - voltage_delivery_margin_v);
     const float requested_power_kw = (target_v * target_i) / 1000.0f;
     const float present_power_kw = (measured_v * measured_i) / 1000.0f;
     const bool power_shortfall =
         requested_power_kw > (present_power_kw + STANDALONE_OUTPUT_LIMIT_POWER_MARGIN_KW);
     const bool active_shortfall =
-        current_shortfall_a > current_shortfall_margin_a && (voltage_is_up || power_shortfall);
+        (current_shortfall_a > current_shortfall_margin_a && (voltage_is_up || power_shortfall)) ||
+        voltage_delivery_mismatch;
 
     if (!active_shortfall) {
         standalone_clear_output_limit_shortfall(ctx);
@@ -5200,6 +5289,44 @@ bool module_telemetry_fresh(const cbmodules::ModuleStateView& s, uint32_t now_ms
         return false;
     }
     return (now_ms - s.telemetry.last_update_ms) <= MODULE_TELEMETRY_FRESH_MS;
+}
+
+bool maybe_wake_local_module_off_locked(uint32_t now_ms,
+                                        float target_v,
+                                        float target_i,
+                                        const char* reason) {
+    if (!mode_is_local_autonomous() || !g_module_ready || target_i <= 0.05f) {
+        return false;
+    }
+    if (g_local_module_off_retry_at_ms != 0u &&
+        static_cast<int32_t>(now_ms - g_local_module_off_retry_at_ms) < 0) {
+        return false;
+    }
+
+    const auto states = g_module_mgr.module_states();
+    for (const auto& s : states) {
+        if (s.id != runtime_local_module_id()) {
+            continue;
+        }
+        if (!s.telemetry.online || s.telemetry.faulted || s.isolation_latched ||
+            !module_telemetry_fresh(s, now_ms) || !s.telemetry.module_off) {
+            return false;
+        }
+        g_local_module_off_retry_at_ms = now_ms + MODULE_OFF_RETRY_INTERVAL_MS;
+        Serial.printf("[MOD] wake local OFF module (%s) V=%.1f I=%.2f lc=%s alarm=0x%08lX\n",
+                      reason ? reason : "WakeOff",
+                      static_cast<double>(target_v),
+                      static_cast<double>(target_i),
+                      module_lifecycle_name(s.lifecycle),
+                      static_cast<unsigned long>(s.telemetry.alarms));
+        return send_maxwell_set_u32_retry(
+            g_runtime_cfg.local_module_address,
+            build_module_spec_for_addr(g_runtime_cfg.local_module_address).group,
+            MAXWELL_REG_ONOFF,
+            0x00000000u,
+            reason ? reason : "WakeOff");
+    }
+    return false;
 }
 
 bool local_module_isolation_clearable(const cbmodules::ModuleStateView& s, uint32_t now_ms) {
@@ -7122,6 +7249,17 @@ bool modules_apply_target(bool enable,
     apply_fresh_measurements_from_states(&live_st, pre_tick_ms);
 
     const ModuleCommandTarget cmd = build_module_command_target(enable, target_v, target_i, headroom_policy);
+    if (enable && cmd.applied_current_a > 0.05f) {
+        const bool woke_off = maybe_wake_local_module_off_locked(
+            pre_tick_ms, cmd.applied_voltage_v, cmd.applied_current_a, reason ? reason : "ApplyTarget");
+        if (woke_off) {
+            delay(10);
+            g_module_mgr.poll_rx(12);
+            g_module_mgr.tick(millis());
+        }
+    } else {
+        g_local_module_off_retry_at_ms = 0u;
+    }
     cbmodules::GroupTarget tgt{};
     tgt.enable = enable;
     tgt.voltage_v = enable ? cmd.applied_voltage_v : 0.0f;
@@ -10093,6 +10231,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     const bool meter_recent = meter_sample_recent(response_sample_ms, CURRENT_DEMAND_RESPONSE_TELEMETRY_MAX_AGE_MS);
     const bool current_converged = current_demand_current_converged(requested_i, present_i);
     const bool current_ready_safe = current_demand_current_ready_safe(requested_i, present_i);
+    const bool precharge_current_hold = current_demand_still_in_precharge_hold(requested_i, present_i);
     current_demand_update_low_request_rundown(ctx, requested_i, now_ms);
     const bool current_rundown_active =
         current_demand_low_request_rundown_active(ctx, requested_i, present_i, now_ms);
@@ -10109,30 +10248,6 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
     // or while the bus voltage is still materially above the requested/applied
     // level after the PreCharge -> CurrentDemand handoff.
     const bool response_sample_ready = telemetry_recent && (telemetry_valid || meter_recent);
-    const bool response_ready =
-        delivery_active && target_applied && g_relay1_closed && response_sample_ready &&
-        response_current_ready && voltage_ready_safe;
-    const bool stop_charging = !mode_requires_controller_contract() && g_ctrl.stop_active;
-    const bool sustained_output_shortfall =
-        standalone_sustained_output_shortfall(ctx,
-                                              delivery_active,
-                                              response_sample_ready,
-                                              requested_v,
-                                              requested_i,
-                                              present_v,
-                                              present_i,
-                                              now_ms);
-    const float response_i =
-        (req->protocol == JPV2G_PROTOCOL_DIN70121)
-            ? din_present_current_response_a(present_i,
-                                             effective_req_i,
-                                             requested_i,
-                                             present_v,
-                                             requested_v,
-                                             response_ready)
-            : present_i;
-    update_last_bms_request(requested_v, requested_i, 2u, response_ready, true);
-
     const float req_power_kw = (requested_v * requested_i) / 1000.0f;
     const float avail_i = sane_non_negative(st.available_current_a);
     const float avail_p = sane_non_negative(st.available_power_kw);
@@ -10153,14 +10268,44 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
         (req_power_kw > (effective_req_power_kw + requested_power_headroom_kw + 0.1f)) ||
         (avail_p > 0.0f && req_power_kw > (avail_p + 0.1f));
     const bool voltage_limited = requested_v > (MODULE_MAX_VOLTAGE_V + 0.5f);
+    if (precharge_current_hold) {
+        current_limited = true;
+        if (req_power_kw > 0.1f) {
+            power_limited = true;
+        }
+    }
+    const bool sustained_output_shortfall =
+        standalone_sustained_output_shortfall(ctx,
+                                              delivery_active,
+                                              response_sample_ready,
+                                              requested_v,
+                                              requested_i,
+                                              present_v,
+                                              present_i,
+                                              now_ms);
     if (sustained_output_shortfall) {
         current_limited = true;
         if (req_power_kw > 0.1f) {
             power_limited = true;
         }
     }
+    const bool response_ready =
+        delivery_active && target_applied && g_relay1_closed && response_sample_ready &&
+        !precharge_current_hold && response_current_ready && voltage_ready_safe &&
+        !current_limited && !power_limited;
+    const bool stop_charging = !mode_requires_controller_contract() && g_ctrl.stop_active;
+    const float response_i =
+        (req->protocol == JPV2G_PROTOCOL_DIN70121)
+            ? din_present_current_response_a(present_i,
+                                             effective_req_i,
+                                             requested_i,
+                                             present_v,
+                                             requested_v,
+                                             response_ready)
+            : present_i;
+    update_last_bms_request(requested_v, requested_i, 2u, response_ready, true);
     Serial.printf("[HLC] {\"msg\":\"CurrentDemandRuntime\",\"reqV\":%.1f,\"reqI\":%.1f,\"appliedV\":%.1f,"
-                  "\"appliedI\":%.2f,\"allow\":%d,\"delivery\":%d,\"targetApplied\":%d,\"ready\":%d,\"hold\":%d,\"stopCharging\":%d,"
+                  "\"appliedI\":%.2f,\"allow\":%d,\"delivery\":%d,\"targetApplied\":%d,\"ready\":%d,\"hold\":%d,\"prechargeHold\":%d,\"stopCharging\":%d,"
                   "\"presentV\":%.1f,\"presentI\":%.2f,\"relay1\":%d,\"prechargeDone\":%d,\"telemetryValid\":%d,"
                   "\"sampleFresh\":%d,\"telemetryRecent\":%d,\"meterRecent\":%d,\"currSafe\":%d,\"currConv\":%d,\"rundown\":%d,\"voltSafe\":%d,\"shortfall\":%d,\"saturated\":%d,\"currLim\":%d,\"voltLim\":%d,\"pwrLim\":%d,"
                   "\"availI\":%.1f,\"availP\":%.1f}\n",
@@ -10173,6 +10318,7 @@ int hlc_handle_current_demand(HlcAppContext* ctx,
                   target_applied ? 1 : 0,
                   response_ready ? 1 : 0,
                   current_requested ? 0 : 1,
+                  precharge_current_hold ? 1 : 0,
                   stop_charging ? 1 : 0,
                   present_v,
                   present_i,
@@ -11008,7 +11154,10 @@ void apply_cp_output(char state, uint32_t now_ms) {
     const bool connected_hold =
         (!connected && g_cp_last_seen_connected_ms != 0 &&
          static_cast<int32_t>(now_ms - g_cp_last_seen_connected_ms) <= static_cast<int32_t>(CP_CONNECTED_HOLD_MS));
-    const bool pwm_connected = connected || connected_hold;
+    const bool active_session_pwm_hold =
+        g_session_started || g_session_matched || g_hlc_active || g_hlc_ready || g_relay1_closed ||
+        g_module_output_enabled;
+    const bool pwm_connected = connected || (connected_hold && active_session_pwm_hold);
     if (g_ef_pulse_active && static_cast<int32_t>(now_ms - g_ef_pulse_until_ms) >= 0) {
         g_ef_pulse_active = false;
     }
@@ -11016,7 +11165,7 @@ void apply_cp_output(char state, uint32_t now_ms) {
     const bool hold_active = static_cast<int32_t>(now_ms - g_slac_hold_until_ms) < 0;
     const bool controller_permits_pwm =
         mode_requires_controller_contract()
-            ? (g_session_started || g_hlc_active)
+            ? (controller_allows_slac_start(now_ms) || g_session_started || g_hlc_active)
             : (mode_is_local_autonomous() || g_session_started || g_hlc_active);
     const bool pwm_enable_delay_elapsed =
         (g_slac_pwm_enable_at_ms == 0u) || static_cast<int32_t>(now_ms - g_slac_pwm_enable_at_ms) >= 0;
@@ -11061,12 +11210,20 @@ void start_session(uint32_t now_ms) {
     g_last_seen_ev_mac_valid = false;
     g_fsm->start(now_ms);
     g_fsm_priming = false;
-    g_slac_pwm_enable_at_ms = mode_requires_controller_contract() ? (now_ms + CP_STABLE_MS) : 0u;
+    // In controller mode we already wait for a stable pre-session 5% PWM
+    // window before starting SLAC. Re-applying a second post-start 300 ms PWM
+    // blackout kicks some BMS benches back out of matching.
+    g_slac_pwm_enable_at_ms = 0u;
     g_session_started = true;
     g_session_started_ms = now_ms;
     g_session_rx_queue_drop_baseline = g_transport ? g_transport->rx_queue_drops() : 0u;
     g_bcd_entered = false;
     g_session_matched = false;
+    if (g_fsm->get_state() == slac::evse::State::Idle) {
+        g_fsm->enter_bcd(now_ms);
+        g_bcd_entered = true;
+        Serial.println("[FSM] EnterBCD");
+    }
     g_last_fsm_state = g_fsm->get_state();
     Serial.println("[SLAC] session start");
 }
@@ -11356,9 +11513,38 @@ void process_cp_and_fsm(uint32_t now_ms) {
     CpSampleSource cp_sample_source = CpSampleSource::Rtc;
     const int cp_rtc_mv = cp_mv;
     char raw_cp_state = classify_cp_with_hysteresis(cp_mv, g_cp_state);
+    const char rtc_cp_state = raw_cp_state;
+    const bool active_pwm_connected_session =
+        g_last_cp_duty_pct <= 5u &&
+        (g_session_started || g_hlc_active || g_hlc_ready || g_relay1_closed || g_module_output_enabled);
+    const bool matched_or_delivery_live =
+        g_session_matched || g_hlc_active || g_hlc_ready || g_relay1_closed || g_module_output_enabled;
+    const bool suspicious_pwm_low_state =
+        active_pwm_connected_session && (raw_cp_state == 'D' || raw_cp_state == 'E' || raw_cp_state == 'F');
+    const bool slac_matching_window =
+        g_session_started &&
+        !g_session_matched &&
+        !g_hlc_active &&
+        !g_hlc_ready &&
+        !g_relay1_closed &&
+        !g_module_output_enabled &&
+        g_last_cp_duty_pct <= 5u;
+    const bool pre_session_controller_pwm_low_state =
+        mode_requires_controller_contract() &&
+        !g_session_started &&
+        !g_hlc_active &&
+        !g_fsm_priming &&
+        g_last_cp_duty_pct <= 5u &&
+        controller_allows_slac_start(now_ms) &&
+        (raw_cp_state == 'D' || g_cp_state == 'D');
     const bool should_verify_sampler =
         (!g_session_started && !g_hlc_active && !g_fsm_priming && (raw_cp_state == 'A' || g_cp_state == 'A')) ||
-        g_cp_verify_any_disagree_run != 0u || g_cp_adc_timeout_count != 0u;
+        suspicious_pwm_low_state ||
+        pre_session_controller_pwm_low_state ||
+        g_cp_verify_any_disagree_run != 0u ||
+        g_cp_verify_connected_override_run != 0u ||
+        g_cp_verify_connected_level_override_run != 0u ||
+        g_cp_adc_timeout_count != 0u;
     if (should_verify_sampler &&
         (g_cp_next_verify_ms == 0u || static_cast<int32_t>(now_ms - g_cp_next_verify_ms) >= 0)) {
         int verify_peak_mv = 0;
@@ -11369,7 +11555,115 @@ void process_cp_and_fsm(uint32_t now_ms) {
         g_cp_next_verify_ms = now_ms + CP_VERIFY_INTERVAL_MS;
         const bool rtc_connected = cp_connected(raw_cp_state);
         const bool verify_connected = cp_connected(g_cp_last_verify_state);
-        if (rtc_connected != verify_connected) {
+        const bool verify_improves_connected_state =
+            active_pwm_connected_session && rtc_connected && verify_connected &&
+            cp_state_rank(g_cp_last_verify_state) > cp_state_rank(raw_cp_state);
+    const bool active_session_verify_authority =
+        active_pwm_connected_session &&
+        verify_connected &&
+        matched_or_delivery_live;
+    const bool slac_matching_verify_authority =
+        slac_matching_window &&
+        verify_connected;
+        const bool pre_session_pwm_verify_authority =
+            pre_session_controller_pwm_low_state &&
+            verify_connected &&
+            g_cp_last_verify_state == 'B' &&
+            raw_cp_state != 'B';
+        if (active_session_verify_authority) {
+            cp_sample_source = CpSampleSource::Verify;
+            cp_mv = verify_mv;
+            raw_cp_state = g_cp_last_verify_state;
+            if (cp_connected(g_cp_state)) {
+                const char held_connected_state = cp_preferred_connected_state(g_cp_state, raw_cp_state);
+                if (held_connected_state != raw_cp_state) {
+                    raw_cp_state = held_connected_state;
+                    cp_mv = std::max(cp_mv, std::max(g_last_cp_mv, g_cp_last_plateau_mv));
+                }
+            }
+            if (cp_connected(raw_cp_state)) {
+                if (g_cp_verify_hold_until_ms != 0u &&
+                    static_cast<int32_t>(now_ms - g_cp_verify_hold_until_ms) < 0 &&
+                    cp_connected(g_cp_verify_hold_state)) {
+                    g_cp_verify_hold_state = cp_preferred_connected_state(g_cp_verify_hold_state, raw_cp_state);
+                } else {
+                    g_cp_verify_hold_state = raw_cp_state;
+                }
+                g_cp_verify_hold_until_ms = now_ms + CP_VERIFY_INTERVAL_MS + CP_STATE_DEBOUNCE_MS;
+            }
+            g_cp_verify_any_disagree_run = 0u;
+            g_cp_verify_connected_override_run = 0u;
+            g_cp_verify_connected_level_override_run = 0u;
+            if ((rtc_cp_state != g_cp_last_verify_state || rtc_cp_state != raw_cp_state) &&
+                (g_cp_next_verify_log_ms == 0u ||
+                 static_cast<int32_t>(now_ms - g_cp_next_verify_log_ms) >= 0)) {
+                Serial.printf("[CP] active-session verify authority rtc=%c/%d verify=%c/%d chosen=%c/%d peak=%d duty=%u\n",
+                              rtc_cp_state,
+                              cp_rtc_mv,
+                              g_cp_last_verify_state,
+                              g_cp_last_verify_mv,
+                              raw_cp_state,
+                              cp_mv,
+                              g_cp_last_verify_peak_mv,
+                              static_cast<unsigned>(g_last_cp_duty_pct));
+                g_cp_next_verify_log_ms = now_ms + 2000u;
+            }
+        } else if (slac_matching_verify_authority) {
+            // During the SLAC matching window, trust the burst verifier's
+            // connected-state reading directly. Carrying forward a higher
+            // previously latched state (for example stale C from a raw PWM
+            // valley sample) can confuse benches that expect a stable B2
+            // pilot through CM_START_ATTEN_CHAR / sounding.
+            cp_sample_source = CpSampleSource::Verify;
+            cp_mv = verify_mv;
+            raw_cp_state = g_cp_last_verify_state;
+            if (cp_connected(raw_cp_state)) {
+                g_cp_verify_hold_state = raw_cp_state;
+                g_cp_verify_hold_until_ms = now_ms + CP_VERIFY_INTERVAL_MS + CP_STATE_DEBOUNCE_MS;
+            }
+            g_cp_verify_any_disagree_run = 0u;
+            g_cp_verify_connected_override_run = 0u;
+            g_cp_verify_connected_level_override_run = 0u;
+            if ((rtc_cp_state != g_cp_last_verify_state || rtc_cp_state != raw_cp_state) &&
+                (g_cp_next_verify_log_ms == 0u ||
+                 static_cast<int32_t>(now_ms - g_cp_next_verify_log_ms) >= 0)) {
+                Serial.printf("[CP] matching verify authority rtc=%c/%d verify=%c/%d chosen=%c/%d peak=%d duty=%u\n",
+                              rtc_cp_state,
+                              cp_rtc_mv,
+                              g_cp_last_verify_state,
+                              g_cp_last_verify_mv,
+                              raw_cp_state,
+                              cp_mv,
+                              g_cp_last_verify_peak_mv,
+                              static_cast<unsigned>(g_last_cp_duty_pct));
+                g_cp_next_verify_log_ms = now_ms + 2000u;
+            }
+        } else if (pre_session_pwm_verify_authority) {
+            cp_sample_source = CpSampleSource::Verify;
+            cp_mv = verify_mv;
+            raw_cp_state = g_cp_last_verify_state;
+            if (cp_connected(raw_cp_state)) {
+                g_cp_verify_hold_state = raw_cp_state;
+                g_cp_verify_hold_until_ms = now_ms + CP_VERIFY_INTERVAL_MS + CP_STATE_DEBOUNCE_MS;
+            }
+            g_cp_verify_any_disagree_run = 0u;
+            g_cp_verify_connected_override_run = 0u;
+            g_cp_verify_connected_level_override_run = 0u;
+            if ((rtc_cp_state != g_cp_last_verify_state || rtc_cp_state != raw_cp_state) &&
+                (g_cp_next_verify_log_ms == 0u ||
+                 static_cast<int32_t>(now_ms - g_cp_next_verify_log_ms) >= 0)) {
+                Serial.printf("[CP] pre-session verify authority rtc=%c/%d verify=%c/%d chosen=%c/%d peak=%d duty=%u\n",
+                              rtc_cp_state,
+                              cp_rtc_mv,
+                              g_cp_last_verify_state,
+                              g_cp_last_verify_mv,
+                              raw_cp_state,
+                              cp_mv,
+                              g_cp_last_verify_peak_mv,
+                              static_cast<unsigned>(g_last_cp_duty_pct));
+                g_cp_next_verify_log_ms = now_ms + 2000u;
+            }
+        } else if (rtc_connected != verify_connected) {
             if (g_cp_verify_any_disagree_run < 0xFFu) {
                 ++g_cp_verify_any_disagree_run;
             }
@@ -11378,6 +11672,7 @@ void process_cp_and_fsm(uint32_t now_ms) {
             } else {
                 g_cp_verify_connected_override_run = 0u;
             }
+            g_cp_verify_connected_level_override_run = 0u;
             if (g_cp_next_verify_log_ms == 0u ||
                 static_cast<int32_t>(now_ms - g_cp_next_verify_log_ms) >= 0) {
                 Serial.printf("[CP] sampler mismatch rtc=%c/%d verify=%c/%d peak=%d override_run=%u disagree_run=%u\n",
@@ -11390,20 +11685,46 @@ void process_cp_and_fsm(uint32_t now_ms) {
                               static_cast<unsigned>(g_cp_verify_any_disagree_run));
                 g_cp_next_verify_log_ms = now_ms + 2000u;
             }
+        } else if (verify_improves_connected_state) {
+            if (g_cp_verify_connected_level_override_run < 0xFFu) {
+                ++g_cp_verify_connected_level_override_run;
+            }
+            if (g_cp_next_verify_log_ms == 0u ||
+                static_cast<int32_t>(now_ms - g_cp_next_verify_log_ms) >= 0) {
+                Serial.printf("[CP] sampler connected-state drift rtc=%c/%d verify=%c/%d peak=%d level_override_run=%u duty=%u\n",
+                              raw_cp_state,
+                              cp_rtc_mv,
+                              g_cp_last_verify_state,
+                              g_cp_last_verify_mv,
+                              g_cp_last_verify_peak_mv,
+                              static_cast<unsigned>(g_cp_verify_connected_level_override_run),
+                              static_cast<unsigned>(g_last_cp_duty_pct));
+                g_cp_next_verify_log_ms = now_ms + 2000u;
+            }
         } else {
             g_cp_verify_any_disagree_run = 0u;
             g_cp_verify_connected_override_run = 0u;
+            g_cp_verify_connected_level_override_run = 0u;
         }
-        if (verify_connected && !rtc_connected &&
+        if (!active_session_verify_authority &&
+            verify_connected && !rtc_connected &&
             g_cp_verify_connected_override_run >= CP_VERIFY_OVERRIDE_LIMIT) {
             cp_mv = verify_mv;
             raw_cp_state = g_cp_last_verify_state;
             cp_sample_source = CpSampleSource::Verify;
+        } else if (!active_session_verify_authority &&
+                   verify_improves_connected_state &&
+                   g_cp_verify_connected_level_override_run >= CP_VERIFY_OVERRIDE_LIMIT) {
+            cp_mv = verify_mv;
+            raw_cp_state = g_cp_last_verify_state;
+            cp_sample_source = CpSampleSource::Verify;
         }
-        if (g_cp_verify_any_disagree_run >= CP_VERIFY_REINIT_LIMIT) {
+        if (!active_session_verify_authority &&
+            g_cp_verify_any_disagree_run >= CP_VERIFY_REINIT_LIMIT) {
             reinit_cp_adc_input(now_ms, "verify_mismatch");
             g_cp_verify_any_disagree_run = 0u;
             g_cp_verify_connected_override_run = 0u;
+            g_cp_verify_connected_level_override_run = 0u;
         }
     }
     g_last_cp_mv = cp_mv;
@@ -11450,6 +11771,34 @@ void process_cp_and_fsm(uint32_t now_ms) {
                 g_cp_next_spike_log_ms = now_ms + 10000;
             }
         }
+    }
+    const bool verify_connected_hold_active =
+        (active_pwm_connected_session || pre_session_controller_pwm_low_state) &&
+        cp_connected(g_cp_verify_hold_state) &&
+        g_cp_verify_hold_until_ms != 0u &&
+        static_cast<int32_t>(now_ms - g_cp_verify_hold_until_ms) < 0;
+    const bool controller_slac_b_hold_active =
+        g_cp_verify_hold_state == 'B' &&
+        pre_session_controller_pwm_low_state;
+    const bool matching_slac_b_hold_active =
+        g_cp_verify_hold_state == 'B' &&
+        slac_matching_window &&
+        g_cp_verify_hold_until_ms != 0u &&
+        static_cast<int32_t>(now_ms - g_cp_verify_hold_until_ms) < 0;
+    if ((controller_slac_b_hold_active || matching_slac_b_hold_active) && filtered_cp_state != 'B') {
+        filtered_cp_state = 'B';
+        cp_mv = std::max(cp_mv, std::max(g_cp_last_verify_mv, g_cp_last_verify_peak_mv));
+    } else if (verify_connected_hold_active &&
+               cp_state_rank(g_cp_verify_hold_state) > cp_state_rank(filtered_cp_state)) {
+        filtered_cp_state = g_cp_verify_hold_state;
+        cp_mv = std::max(cp_mv, std::max(g_cp_last_verify_mv, g_cp_last_verify_peak_mv));
+    } else if (!session_active_for_fault_hold || !cp_connected(filtered_cp_state)) {
+        g_cp_verify_hold_state = 'A';
+        g_cp_verify_hold_until_ms = 0u;
+    }
+    if (slac_matching_window && filtered_cp_state == 'C') {
+        filtered_cp_state = 'B';
+        cp_mv = std::max(cp_mv, std::max(g_cp_last_verify_mv, g_cp_last_verify_peak_mv));
     }
     if (filtered_cp_state != g_cp_state_candidate) {
         g_cp_state_candidate = filtered_cp_state;
@@ -11531,9 +11880,44 @@ void process_cp_and_fsm(uint32_t now_ms) {
     note_crash_breadcrumb(CrashBreadcrumbStage::FsmPollActive, 0x0003u);
 
     const bool slac_start_ok = controller_allows_slac_start(now_ms);
-    const bool pwm_ready = g_cp_pwm_ready_since_ms != 0u &&
-                           static_cast<int32_t>(now_ms - g_cp_pwm_ready_since_ms) >=
-                               static_cast<int32_t>(CP_STABLE_MS);
+    const uint32_t stable_required_ms = slac_start_stable_ms();
+    const bool pwm_ready =
+        g_cp_pwm_ready_since_ms != 0u &&
+        static_cast<int32_t>(now_ms - g_cp_pwm_ready_since_ms) >=
+            static_cast<int32_t>(stable_required_ms);
+    bool prestart_param_latched = false;
+    slac::messages::HomeplugMessage prestart_param_msg;
+
+    // In controller mode the EV can start broadcasting CM_SLAC_PARAM.REQ as
+    // soon as the pre-session 5% PWM window opens. If the FSM is still in
+    // Idle, those frames get logged by the transport but dropped before the
+    // session officially starts. Latch the first request and replay it into
+    // the FSM immediately after start_session() so we do not miss the EV's
+    // initial SLAC burst on benches that only offer a narrow window.
+    if (mode_requires_controller_contract() && !g_session_started && !g_fsm_priming &&
+        g_fsm && g_cp_connected_since_ms != 0u && slac_start_ok) {
+        for (int i = 0; i < SLAC_ACTIVE_MAX_FRAMES_PER_LOOP; ++i) {
+            const int timeout_ms = (i == 0) ? 2 : 0;
+            if (!g_channel.read(prestart_param_msg, timeout_ms)) {
+                if (!g_channel.got_timeout()) {
+                    Serial.printf("[SLAC] prestart read failed: %s\n", g_channel.get_error().c_str());
+                }
+                break;
+            }
+            if (prestart_param_msg.get_mmtype() ==
+                (slac::defs::MMTYPE_CM_SLAC_PARAM | slac::defs::MMTYPE_MODE_REQ)) {
+                prestart_param_latched = true;
+                const auto& req = prestart_param_msg.get_payload<slac::messages::cm_slac_parm_req>();
+                const uint8_t* src = prestart_param_msg.get_src_mac();
+                Serial.printf("[SLAC] prestart latch param.req src=%02X:%02X:%02X:%02X:%02X:%02X run_id=%02X %02X %02X %02X %02X %02X %02X %02X\n",
+                              src ? src[0] : 0, src ? src[1] : 0, src ? src[2] : 0,
+                              src ? src[3] : 0, src ? src[4] : 0, src ? src[5] : 0,
+                              req.run_id[0], req.run_id[1], req.run_id[2], req.run_id[3],
+                              req.run_id[4], req.run_id[5], req.run_id[6], req.run_id[7]);
+                break;
+            }
+        }
+    }
 
     if (!connected) {
         clear_post_session_restart_wait();
@@ -11541,12 +11925,25 @@ void process_cp_and_fsm(uint32_t now_ms) {
     }
 
     service_post_session_restart_wait(now_ms);
+    const bool session_start_ready =
+        mode_requires_controller_contract() ? (prestart_param_latched || pwm_ready) : pwm_ready;
+
     if (!g_session_started && !g_fsm_priming && g_cp_connected_since_ms != 0 &&
         !g_post_session_restart_wait_active &&
         static_cast<int32_t>(now_ms - g_slac_hold_until_ms) >= 0 &&
         slac_start_ok &&
-        (mode_requires_controller_contract() || pwm_ready)) {
+        session_start_ready) {
         start_session(now_ms);
+        if (prestart_param_latched && g_fsm) {
+            g_fsm->on_slac_message(prestart_param_msg, now_ms);
+            const slac::evse::State replay_state = g_fsm->get_state();
+            if (replay_state != g_last_fsm_state) {
+                Serial.printf("[FSM] %s -> %s\n",
+                              evse_state_name(g_last_fsm_state),
+                              evse_state_name(replay_state));
+                g_last_fsm_state = replay_state;
+            }
+        }
     } else if (mode_requires_controller_contract() && !g_session_started &&
                g_cp_connected_since_ms != 0 && !slac_start_ok) {
         static uint32_t next_wait_log_ms = 0;
